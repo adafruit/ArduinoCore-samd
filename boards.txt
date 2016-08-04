@@ -95,3 +95,31 @@ adafruit_feather_m0.bootloader.file=feather/samd21_sam_ba.bin
 #adafruit_metro_m0.build.pid=0x8013
 #adafruit_metro_m0.bootloader.tool=openocd
 #adafruit_metro_m0.bootloader.file=metro/samd21_sam_ba.bin
+
+# Atmel Xplained SAMR21G18A  (Progamming Port)
+# ---------------------------------------
+xplained_samr21g18a_edbg.name=Atmel Xplained SAMR21G18A (Programming Port)
+xplained_samr21g18a_edbg.vid.0=0x03eb
+xplained_samr21g18a_edbg.pid.0=0x2157
+
+xplained_samr21g18a_edbg.upload.tool=openocd
+xplained_samr21g18a_edbg.upload.protocol=sam-ba
+xplained_samr21g18a_edbg.upload.maximum_size=262144
+xplained_samr21g18a_edbg.upload.use_1200bps_touch=false
+xplained_samr21g18a_edbg.upload.wait_for_upload_port=false
+xplained_samr21g18a_edbg.upload.native_usb=false
+xplained_samr21g18a_edbg.build.mcu=cortex-m0plus
+xplained_samr21g18a_edbg.build.f_cpu=48000000L
+xplained_samr21g18a_edbg.build.usb_product="Test"
+xplained_samr21g18a_edbg.build.usb_manufacturer="Test LLC"
+xplained_samr21g18a_edbg.build.board=SAMD_ZERO
+xplained_samr21g18a_edbg.build.core=arduino
+xplained_samr21g18a_edbg.build.extra_flags=-D__SAMD21G18A__ {build.usb_flags}
+xplained_samr21g18a_edbg.build.ldscript=linker_scripts/gcc/flash_with_bootloader.ld
+xplained_samr21g18a_edbg.build.openocdscript=openocd_scripts/arduino_zero.cfg
+xplained_samr21g18a_edbg.build.variant=xplained_samr21g18a
+xplained_samr21g18a_edbg.build.variant_system_lib=
+xplained_samr21g18a_edbg.build.vid=0x2341
+xplained_samr21g18a_edbg.build.pid=0x804d
+xplained_samr21g18a_edbg.bootloader.tool=openocd
+xplained_samr21g18a_edbg.bootloader.file=zero/samd21_sam_ba.bin

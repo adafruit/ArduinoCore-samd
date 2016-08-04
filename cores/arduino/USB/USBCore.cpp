@@ -264,7 +264,7 @@ void USBDeviceClass::handleEndpoint(uint8_t ep)
 	{
 		// Handle received bytes
 		if (available(CDC_ENDPOINT_OUT))
-			Serial.accept();
+			SerialUSB.accept();
 	}
 	if (ep == CDC_ENDPOINT_IN)
 	{

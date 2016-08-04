@@ -351,6 +351,6 @@ bool Serial_::rts() {
 	return _usbLineInfo.lineState & 0x2;
 }
 
-Serial_ Serial(USBDevice);
+Serial_ SerialUSB(USBDevice);
 
 #endif
