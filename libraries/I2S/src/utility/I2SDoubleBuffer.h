@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2015 Arduino LLC.  All right reserved.
+  Copyright (c) 2016 Arduino LLC.  All right reserved.
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -16,41 +16,35 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#define ARDUINO_MAIN
-#include "Arduino.h"
+#ifndef _I2S_DOUBLE_BUFFER_H_INCLUDED
+#define _I2S_DOUBLE_BUFFER_H_INCLUDED
 
-// Weak empty variant initialization function.
-// May be redefined by variant files.
-void initVariant() __attribute__((weak));
-void initVariant() { }
+#include <stddef.h>
+#include <stdint.h>
 
-// Initialize C library
-extern "C" void __libc_init_array(void);
+#define I2S_BUFFER_SIZE 512
 
-/*
- * \brief Main entry point of Arduino application
- */
-int main( void )
+class I2SDoubleBuffer
 {
-  init();
+public:
+  I2SDoubleBuffer();
+  virtual ~I2SDoubleBuffer();
 
-  __libc_init_array();
+  void reset();
 
-  initVariant();
+  size_t availableForWrite();
+  size_t write(const void *buffer, size_t size);
+  size_t read(void *buffer, size_t size);
+  size_t peek(void *buffer, size_t size);
+  void* data();
+  size_t available();
+  void swap(int length = 0);
 
-  delay(1);
-#if defined(USBCON)
-  USBDevice.init();
-  USBDevice.attach();
+private:
+  uint8_t _buffer[2][I2S_BUFFER_SIZE];
+  volatile int _length[2];
+  volatile int _readOffset[2];
+  volatile int _index; 
+};
+
 #endif
-
-  setup();
-
-  for (;;)
-  {
-    loop();
-    if (serialEventRun) serialEventRun();
-  }
-
-  return 0;
-}
