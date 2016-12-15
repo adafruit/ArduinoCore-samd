@@ -1,6 +1,6 @@
 # Arduino Core for SAMD21 CPU
 
-This repository containts the source code and configuration files of the Arduino Core
+This repository contains the source code and configuration files of the Arduino Core
 for Atmel's SAMD21 processor (used on the Arduino Zero board).
 
 In particular, this adds support for the Adafruit SAMD Boards such as the Feather M0
