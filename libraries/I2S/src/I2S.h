@@ -52,7 +52,8 @@ public:
   virtual size_t write(const uint8_t *buffer, size_t size);
 
   virtual int availableForWrite();
-
+  
+  //void read(int32_t *left, int32_t *right);
   int read(void* buffer, size_t size);
 
   size_t write(int);
