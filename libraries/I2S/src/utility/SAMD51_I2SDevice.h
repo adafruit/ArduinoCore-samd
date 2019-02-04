@@ -20,8 +20,6 @@
 
 #include <Arduino.h>
 
-//void printRegisters ();
-
 class I2SDevice_SAMD51 {
 public:
 
@@ -50,7 +48,7 @@ public:
   inline int glckId(int index) {
     return (index == 0) ? I2S_GCLK_ID_0 : I2S_GCLK_ID_1;
   }
-// New for SAMD51, taken from Adafrui Zero I2S Library ----
+// --- New for SAMD51, taken from Adafrui Zero I2S Library ----
   inline void setMasterClockOutputDivisionFactor(int index, uint8_t mckoutdiv) {
   // printRegisters();
   //  Serial.println ("index: " + String(index));
@@ -75,29 +73,30 @@ public:
     i2s.CLKCTRL[index].reg |= I2S_CLKCTRL_FSWIDTH(fswidth); 
   }
   
-  inline void setTxMode(int index, int bitsPersample) {
-  //while(i2s.SYNCBUSY.reg);  // wait for sync
-    
+  // added bitsPerSample parameter
+  inline void setTxMode(int index, int bitsPerSample) {
+
+    // Previously used here:  
     //i2s.RXCTRL.bit.SERMODE = 0x01;
-    //i2s.TXCTRL.reg &= ~(0x03); //TODO: why is this not in CMSIS...
+    //i2s.TXCTRL.reg &= ~(0x03); //TODO: why is this not in CMSIS... <- I think Atmel's datasheet has an errata, it has no sense to set this serializer as RX
     //i2s.TXCTRL.reg |= 0x01;
     
     uint8_t wordSize = 0;
-  switch (bitsPersample)
-  {
-    case 8:
-      wordSize = I2S_TXCTRL_DATASIZE_8_Val;
-      break;
-    case 16:
-      wordSize = I2S_TXCTRL_DATASIZE_16_Val;
-      break;
-    case 24:
-      wordSize = I2S_TXCTRL_DATASIZE_24_Val;
-      break;
-    case 32:
-      wordSize = I2S_TXCTRL_DATASIZE_32_Val;
-      break;
-  }
+    switch (bitsPerSample)
+    {
+      case 8:
+        wordSize = I2S_TXCTRL_DATASIZE_8_Val;
+        break;
+      case 16:
+        wordSize = I2S_TXCTRL_DATASIZE_16_Val;
+        break;
+      case 24:
+        wordSize = I2S_TXCTRL_DATASIZE_24_Val;
+        break;
+      case 32:
+        wordSize = I2S_TXCTRL_DATASIZE_32_Val;
+        break;
+    }
 
     i2s.TXCTRL.reg &= I2S_TXCTRL_RESETVALUE;
     i2s.TXCTRL.reg = I2S_TXCTRL_DMA_SINGLE |
@@ -112,15 +111,16 @@ public:
    // printRegisters();
    // while(true);
  }
+
+  // added bitsPerSample parameter
+  inline void setRxMode(int index, int bitsPerSample) {
   
-  inline void setRxMode(int index, int bitsPersample) {
-  
-  //i2s.RXCTRL.bit.SERMODE = 0x00;
-  //i2s.TXCTRL.reg &= ~(0x03); //TODO: why is this not in CMSIS...
-  //i2s.TXCTRL.reg |= 0x00;
-  
+    //i2s.RXCTRL.bit.SERMODE = 0x00;
+    //i2s.TXCTRL.reg &= ~(0x03); //TODO: why is this not in CMSIS...
+    //i2s.TXCTRL.reg |= 0x00;
+    
     uint8_t wordSize = 0;
-    switch (bitsPersample)
+    switch (bitsPerSample)
     {
       case 8:
         wordSize = I2S_RXCTRL_DATASIZE_8_Val;
@@ -136,20 +136,23 @@ public:
         break;
     }
 
+    //while(i2s.SYNCBUSY.reg);  // wait for sync
     i2s.RXCTRL.reg &= I2S_RXCTRL_RESETVALUE;
-    i2s.RXCTRL.reg = I2S_RXCTRL_DMA_SINGLE | //I2S_RXCTRL_DMA_MULTIPLE |   <- CASCA 
+    i2s.RXCTRL.reg = I2S_RXCTRL_DMA_SINGLE | //I2S_RXCTRL_DMA_MULTIPLE |   <- IT HANGS 
         I2S_RXCTRL_MONO_STEREO |
         I2S_RXCTRL_BITREV_MSBIT |
-        I2S_RXCTRL_EXTEND_ZERO |
+        I2S_RXCTRL_EXTEND_ZERO |  // ZERO fills with ONEs and ONE fills with ZEROs, CMSIS errata?
         I2S_RXCTRL_WORDADJ_RIGHT | 
         I2S_RXCTRL_DATASIZE(wordSize) |
         I2S_RXCTRL_SLOTADJ_RIGHT | 
         I2S_RXCTRL_CLKSEL_CLK0 |
         I2S_RXCTRL_SERMODE_RX;
+    
+    // printRegisters();
+    // while(true);
 }
+// end new-----
 
-
-// -----
   inline void setSerialClockSelectMasterClockDiv(int index) {
     i2s.CLKCTRL[index].bit.SCKSEL = I2S_CLKCTRL_SCKSEL_MCKDIV_Val;
   }
@@ -268,16 +271,19 @@ public:
     }
   }
 
+  // this should be explitted or filtered with "bool txrx"
   inline void enableSerializer(int index) {
     i2s.CTRLA.bit.RXEN = 1;
     i2s.CTRLA.bit.TXEN = 1;
   }
 
+  // this should be explitted or filtered with "bool txrx"
   inline void disableSerializer(int index) {
     i2s.CTRLA.bit.RXEN = 0;
-    i2s.CTRLA.bit.TXEN = 0;
+    i2s.CTRLA.bit.TXEN = 0; 
   }
 
+  // this is also new, dmaTriggerSource also depends on serializer furthermore clock source index
   // rx = 0, tx = 1
   inline int dmaTriggerSource(int index, bool txrx = 0) {
     if (txrx) {
@@ -317,7 +323,7 @@ public:
   inline int rxReady(int index) {
     return (index == 0) ? i2s.INTFLAG.bit.RXRDY0 :i2s.INTFLAG.bit.RXRDY1;
   }
-// ---
+// for blocking read ---
   inline void read(int32_t *left, int32_t *right) {
    // printRegisters ();
     while( (!i2s.INTFLAG.bit.RXRDY0) || i2s.SYNCBUSY.bit.RXDATA );
@@ -355,8 +361,10 @@ public:
     return (void*)&i2s.RXDATA.reg;
   }
 
+
+  // BOOOM, This is my arduino's embeded debugger xD
   inline void printRegisters()
-{
+  {
     // MCLK_APBAMASK
     Serial.println ("SAMD51_MCLK Main Clock (APBA Mask)");
     Serial.println ("(32-bit) MCLK->APBAMASK: 0x"   + String(MCLK->APBAMASK.reg,                HEX) + "\t, 0b" + String(MCLK->APBAMASK.reg,                BIN));

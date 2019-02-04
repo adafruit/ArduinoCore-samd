@@ -170,6 +170,7 @@ int I2SClass::begin(int mode, long sampleRate, int bitsPerSample, bool driveCloc
   pinPeripheral(_sdPin, PIO_COM);
 #endif
 /*
+// Test what pins are being used
   Serial.println("_sdPin:  " + String(_sdPin));
   Serial.println("_sckPin: " + String(_sckPin));
   Serial.println("_fsPin:  " + String(_fsPin));
@@ -339,7 +340,7 @@ int I2SClass::availableForWrite()
 
   return space;
 }
-/*/ ---
+// New, just for testing, blocking read
 void I2SClass::read(int32_t *left, int32_t *right)
 {
   if (_state != I2S_STATE_RECEIVER)
@@ -347,13 +348,14 @@ void I2SClass::read(int32_t *left, int32_t *right)
 
   i2sd.read(left, right);
 }
-// ---*/
+// 
 int I2SClass::read(void* buffer, size_t size)
 {
   if (_state != I2S_STATE_RECEIVER) {
     enableReceiver();
   }
 
+// Testing registers if they match AdafruitZeroI2S configuration
 //  i2sd.printRegisters();
 //  while(true);
   
@@ -445,12 +447,12 @@ void I2SClass::onReceive(void(*function)(void))
   _onReceive = function;
 }
 
-void I2SClass::enableClock(int divider)
+void I2SClass::enableClock(int divider/*, int mck_mult*/)
 {
 #if defined(__SAMD51__)
 
   // divider = sampleRate * numChannels * _bitsPerSample  (44100 * 2 * 32)
-  uint32_t mckFreq  = (divider / 2 / _bitsPerSample) * 256; // (fs_freq * mck_mult)
+  uint32_t mckFreq  = (divider / 2 / _bitsPerSample) * 256; // (fs_freq * mck_mult), assumes 2 channels and mck_mult = 256
   uint32_t sckFreq  = divider; // (fs_freq * I2S_NUM_SLOTS * bitsPerSample)
 
   uint32_t gclkval  = GCLK_PCHCTRL_GEN_GCLK1_Val;
@@ -465,11 +467,13 @@ void I2SClass::enableClock(int divider)
     gclkFreq = 12000000; // 120Mhz
   }
 /*
-Serial.println ("divider: " + String(divider));
+  Serial.println ("divider: " + String(divider));
   Serial.println ("mckoutdiv: " + String(mckoutdiv));
-   Serial.println ("mckdiv: " + String(mckdiv));
+  Serial.println ("mckdiv: " + String(mckdiv));
   */
   //while (GCLK->SYNCBUSY.reg); 
+
+  // if this is not configured I2S won't work at all.
   GCLK->PCHCTRL[I2S_GCLK_ID_0].reg = gclkval | GCLK_PCHCTRL_CHEN; 
   GCLK->PCHCTRL[I2S_GCLK_ID_1].reg = gclkval | GCLK_PCHCTRL_CHEN;
 
@@ -480,54 +484,55 @@ Serial.println ("divider: " + String(divider));
 
 #else // SAMD21
   int div = SystemCoreClock / divider;
-  int src = GCLK_GENCTRL_SRC_DFLL48M_Val;                 // <--- ERROR SAMD51
+  int src = GCLK_GENCTRL_SRC_DFLL48M_Val;                
 
   if (div > 255) {
     // divider is too big, use 8 MHz oscillator instead
     div = 8000000 / divider;
-    src = GCLK_GENCTRL_SRC_OSC8M_Val;                     // <--- ERROR SAMD51
+    src = GCLK_GENCTRL_SRC_OSC8M_Val;                     
   }
 
   // configure the clock divider
-  while (GCLK->STATUS.bit.SYNCBUSY);                      // <--- ERROR SAMD51
-  GCLK->GENDIV.bit.ID = _clockGenerator;                  // <--- ERROR SAMD51
-  GCLK->GENDIV.bit.DIV = div;                             // <--- ERROR SAMD51
+  while (GCLK->STATUS.bit.SYNCBUSY);                   
+  GCLK->GENDIV.bit.ID = _clockGenerator;                 
+  GCLK->GENDIV.bit.DIV = div;                         
 
   // use the DFLL as the source
-  while (GCLK->STATUS.bit.SYNCBUSY);                      // <--- ERROR SAMD51
-  GCLK->GENCTRL.bit.ID = _clockGenerator;                 // <--- ERROR SAMD51   
-  GCLK->GENCTRL.bit.SRC = src;                            // <--- ERROR SAMD51
-  GCLK->GENCTRL.bit.IDC = 1;                              // <--- ERROR SAMD51
-  GCLK->GENCTRL.bit.GENEN = 1;                            // <--- ERROR SAMD51
+  while (GCLK->STATUS.bit.SYNCBUSY);                     
+  GCLK->GENCTRL.bit.ID = _clockGenerator;              
+  GCLK->GENCTRL.bit.SRC = src;                           
+  GCLK->GENCTRL.bit.IDC = 1;                            
+  GCLK->GENCTRL.bit.GENEN = 1;                          
 
   // enable
-  while (GCLK->STATUS.bit.SYNCBUSY);                      // <--- ERROR SAMD51
-  GCLK->CLKCTRL.bit.ID = i2sd.glckId(_deviceIndex);       // <--- ERROR SAMD51
-  GCLK->CLKCTRL.bit.GEN = _clockGenerator;                // <--- ERROR SAMD51
-  GCLK->CLKCTRL.bit.CLKEN = 1;                            // <--- ERROR SAMD51
+  while (GCLK->STATUS.bit.SYNCBUSY);                     
+  GCLK->CLKCTRL.bit.ID = i2sd.glckId(_deviceIndex);      
+  GCLK->CLKCTRL.bit.GEN = _clockGenerator;             
+  GCLK->CLKCTRL.bit.CLKEN = 1;                      
 
-  while (GCLK->STATUS.bit.SYNCBUSY);                      // <--- ERROR SAMD51
+  while (GCLK->STATUS.bit.SYNCBUSY);                    
 #endif
 }
 
 void I2SClass::disableClock()
 {
 #if defined(__SAMD51__)
+  // Need to be tested if works
   //GCLK->PCHCTRL[I2S_GCLK_ID_0].reg = GCLK_PCHCTRL_RESETVALUE;
   //GCLK->PCHCTRL[I2S_GCLK_ID_1].reg = GCLK_PCHCTRL_RESETVALUE;
 #else // SAMD21
-  while (GCLK->STATUS.bit.SYNCBUSY);                      // <--- ERROR SAMD51
-  GCLK->GENCTRL.bit.ID = _clockGenerator;                 // <--- ERROR SAMD51
-  GCLK->GENCTRL.bit.SRC = GCLK_GENCTRL_SRC_DFLL48M_Val;   // <--- ERROR SAMD51
-  GCLK->GENCTRL.bit.IDC = 1;                              // <--- ERROR SAMD51
-  GCLK->GENCTRL.bit.GENEN = 0;                            // <--- ERROR SAMD51
+  while (GCLK->STATUS.bit.SYNCBUSY);                     
+  GCLK->GENCTRL.bit.ID = _clockGenerator;                
+  GCLK->GENCTRL.bit.SRC = GCLK_GENCTRL_SRC_DFLL48M_Val;   
+  GCLK->GENCTRL.bit.IDC = 1;                             
+  GCLK->GENCTRL.bit.GENEN = 0;                          
 
-  while (GCLK->STATUS.bit.SYNCBUSY);                      // <--- ERROR SAMD51
-  GCLK->CLKCTRL.bit.ID = i2sd.glckId(_deviceIndex);       // <--- ERROR SAMD51
-  GCLK->CLKCTRL.bit.GEN = _clockGenerator;                // <--- ERROR SAMD51
-  GCLK->CLKCTRL.bit.CLKEN = 0;                            // <--- ERROR SAMD51
+  while (GCLK->STATUS.bit.SYNCBUSY);                      
+  GCLK->CLKCTRL.bit.ID = i2sd.glckId(_deviceIndex);      
+  GCLK->CLKCTRL.bit.GEN = _clockGenerator;              
+  GCLK->CLKCTRL.bit.CLKEN = 0;                          
 
-  while (GCLK->STATUS.bit.SYNCBUSY);                      // <--- ERROR SAMD51
+  while (GCLK->STATUS.bit.SYNCBUSY);                  
 #endif
 }
 
@@ -628,7 +633,8 @@ void I2SClass::onDmaTransferComplete(int channel)
 
 
 #if defined(__SAMD51__)
-
+  // If you want to use this class as output on SAMD51, you can redefine this on arduino's setup function as:
+  //  I2S = I2SClass(I2S_DEVICE, I2S_CLOCK_GENERATOR, PIN_I2S_SDO, PIN_I2S_SCK, PIN_I2S_FS);
   #if I2S_INTERFACES_COUNT > 0
   I2SClass I2S(I2S_DEVICE, I2S_CLOCK_GENERATOR, PIN_I2S_SDI, PIN_I2S_SCK, PIN_I2S_FS);
   #endif

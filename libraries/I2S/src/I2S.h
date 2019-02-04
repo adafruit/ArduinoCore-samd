@@ -53,7 +53,7 @@ public:
 
   virtual int availableForWrite();
   
-  //void read(int32_t *left, int32_t *right);
+  void read(int32_t *left, int32_t *right); // this function is NOT available on Standard Arduino's I2S API, just for testing
   int read(void* buffer, size_t size);
 
   size_t write(int);
