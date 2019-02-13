@@ -97,7 +97,7 @@ void SystemInit( void )
   }
   
   /* ----------------------------------------------------------------------------------------------
-   * 3) Put Generic Clock Generator 3 as source for Generic Clock Gen 0 (DFLL48M reference)
+   * 3) Put OSCULP32K as source for Generic Clock Generator 0
    */
   GCLK->GENCTRL[0].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_OSCULP32K) | GCLK_GENCTRL_GENEN;
   
