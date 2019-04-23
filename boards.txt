@@ -525,6 +525,7 @@ adafruit_feather_m4.menu.maxqspi.50.build.flags.maxqspi=-DVARIANT_QSPI_BAUD_DEFA
 adafruit_feather_m4.menu.maxqspi.fcpu=CPU Speed / 2
 adafruit_feather_m4.menu.maxqspi.fcpu.build.flags.maxqspi=-DVARIANT_QSPI_BAUD_DEFAULT=({build.f_cpu})
 
+
 # Adafruit HalloWing M0 (SAMD21)
 # ------------------------------
 adafruit_hallowing.name=Adafruit Hallowing M0
