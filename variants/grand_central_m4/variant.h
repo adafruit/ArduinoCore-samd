@@ -144,33 +144,35 @@ static const uint8_t ATN = PIN_ATN;
 /*
  * Serial interfaces
  */
+#define UART_INTERFACES_COUNT 4
 
 // Serial1
-#define PIN_SERIAL1_RX       (0ul)
-#define PIN_SERIAL1_TX       (1ul)
-#define PAD_SERIAL1_TX       (UART_TX_PAD_0)
-#define PAD_SERIAL1_RX       (SERCOM_RX_PAD_1)
+#define PIN_SERIAL1_RX      (0ul)
+#define PIN_SERIAL1_TX      (1ul)
+#define PAD_SERIAL1_TX      (UART_TX_PAD_0)
+#define PAD_SERIAL1_RX      (SERCOM_RX_PAD_1)
+#define SERCOM_SERIAL1      sercom0
 
 // Serial2
-#define PIN_SERIAL2_RX       (19ul)
-#define PIN_SERIAL2_TX       (18ul)
-#define PAD_SERIAL2_TX       (UART_TX_PAD_0)
-#define PAD_SERIAL2_RX       (SERCOM_RX_PAD_1)
-#define SERCOM_SERIAL2		 sercom4
+#define PIN_SERIAL2_RX      (19ul)
+#define PIN_SERIAL2_TX      (18ul)
+#define PAD_SERIAL2_TX      (UART_TX_PAD_0)
+#define PAD_SERIAL2_RX      (SERCOM_RX_PAD_1)
+#define SERCOM_SERIAL2		  sercom4
 
 // Serial3
-#define PIN_SERIAL3_RX       (17ul)
-#define PIN_SERIAL3_TX       (16ul)
-#define PAD_SERIAL3_TX       (UART_TX_PAD_0)
-#define PAD_SERIAL3_RX       (SERCOM_RX_PAD_1)
-#define SERCOM_SERIAL3		 sercom1
+#define PIN_SERIAL3_RX      (17ul)
+#define PIN_SERIAL3_TX      (16ul)
+#define PAD_SERIAL3_TX      (UART_TX_PAD_0)
+#define PAD_SERIAL3_RX      (SERCOM_RX_PAD_1)
+#define SERCOM_SERIAL3		  sercom1
 
 // Serial4
-#define PIN_SERIAL4_RX       (15ul)
-#define PIN_SERIAL4_TX       (14ul)
-#define PAD_SERIAL4_TX       (UART_TX_PAD_0)
-#define PAD_SERIAL4_RX       (SERCOM_RX_PAD_1)
-#define SERCOM_SERIAL4		 sercom5
+#define PIN_SERIAL4_RX      (15ul)
+#define PIN_SERIAL4_TX      (14ul)
+#define PAD_SERIAL4_TX      (UART_TX_PAD_0)
+#define PAD_SERIAL4_RX      (SERCOM_RX_PAD_1)
+#define SERCOM_SERIAL4		  sercom5
 /*
  * SPI Interfaces
  */
