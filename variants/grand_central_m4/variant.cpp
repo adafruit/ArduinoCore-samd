@@ -183,35 +183,92 @@ const PinDescription g_APinDescription[]=
   { PORTB, 31, PIO_DIGITAL, PIN_ATTR_DIGITAL, No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_15 },
 } ;
 
-const void* g_apTCInstances[TCC_INST_NUM+TC_INST_NUM]={ TCC0, TCC1, TCC2, TCC3, TCC4, TC0, TC1, TC2, TC3, TC4, TC5, TC6, TC7 } ;
-const uint32_t GCLK_CLKCTRL_IDs[TCC_INST_NUM+TC_INST_NUM] = { TCC0_GCLK_ID, TCC1_GCLK_ID, TCC2_GCLK_ID, TCC3_GCLK_ID, TCC4_GCLK_ID, TC0_GCLK_ID, TC1_GCLK_ID, TC2_GCLK_ID, TC3_GCLK_ID, TC4_GCLK_ID, TC5_GCLK_ID, TC6_GCLK_ID, TC7_GCLK_ID } ;
+const void* g_apTCInstances[TCC_INST_NUM+TC_INST_NUM]={ TCC0, TCC1, TCC2, TCC3, TCC4, TC0, TC1, TC2, TC3, TC4, TC5, TC6, TC7 };
+const uint32_t GCLK_CLKCTRL_IDs[TCC_INST_NUM+TC_INST_NUM] = { TCC0_GCLK_ID, TCC1_GCLK_ID, TCC2_GCLK_ID, TCC3_GCLK_ID, TCC4_GCLK_ID, TC0_GCLK_ID, TC1_GCLK_ID, TC2_GCLK_ID, TC3_GCLK_ID, TC4_GCLK_ID, TC5_GCLK_ID, TC6_GCLK_ID, TC7_GCLK_ID };
 
 
 // Multi-serial objects instantiation
-SERCOM sercom0( SERCOM0 ) ;
-SERCOM sercom1( SERCOM1 ) ;
-SERCOM sercom2( SERCOM2 ) ;
-SERCOM sercom3( SERCOM3 ) ;
-SERCOM sercom4( SERCOM4 ) ;
-SERCOM sercom5( SERCOM5 ) ;
-SERCOM sercom6( SERCOM6 ) ;
-SERCOM sercom7( SERCOM7 ) ;
+SERCOM sercom0( SERCOM0 );
+SERCOM sercom1( SERCOM1 );
+SERCOM sercom2( SERCOM2 );
+SERCOM sercom3( SERCOM3 );
+SERCOM sercom4( SERCOM4 );
+SERCOM sercom5( SERCOM5 );
+SERCOM sercom6( SERCOM6 );
+SERCOM sercom7( SERCOM7 );
 
-Uart Serial1( &sercom0, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
+Uart Serial1( &SERCOM_SERIAL1, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX );
 
-void SERCOM0_0_Handler()
+void SERIAL1_HANDLER(0)()
 {
   Serial1.IrqHandler();
 }
-void SERCOM0_1_Handler()
+void SERIAL1_HANDLER(1)()
 {
   Serial1.IrqHandler();
 }
-void SERCOM0_2_Handler()
+void SERIAL1_HANDLER(2)()
 {
   Serial1.IrqHandler();
 }
-void SERCOM0_3_Handler()
+void SERIAL1_HANDLER(3)()
 {
   Serial1.IrqHandler();
+}
+
+Uart Serial2(&SERCOM_SERIAL2, PIN_SERIAL2_RX, PIN_SERIAL2_TX, PAD_SERIAL2_RX, PAD_SERIAL2_TX);
+
+void SERIAL2_HANDLER(0)()
+{
+  Serial2.IrqHandler();
+}
+void SERIAL2_HANDLER(1)()
+{
+  Serial2.IrqHandler();
+}
+void SERIAL2_HANDLER(2)()
+{
+  Serial2.IrqHandler();
+}
+void SERIAL2_HANDLER(3)()
+{
+  Serial2.IrqHandler();
+}
+
+Uart Serial3(&SERCOM_SERIAL3, PIN_SERIAL3_RX, PIN_SERIAL3_TX, PAD_SERIAL3_RX, PAD_SERIAL3_TX);
+
+void SERIAL3_HANDLER(0)()
+{
+  Serial3.IrqHandler();
+}
+void SERIAL3_HANDLER(1)()
+{
+  Serial3.IrqHandler();
+}
+void SERIAL3_HANDLER(2)()
+{
+  Serial3.IrqHandler();
+}
+void SERIAL3_HANDLER(3)()
+{
+  Serial3.IrqHandler();
+}
+
+Uart Serial4(&SERCOM_SERIAL4, PIN_SERIAL4_RX, PIN_SERIAL4_TX, PAD_SERIAL4_RX, PAD_SERIAL4_TX);
+
+void SERIAL4_HANDLER(0)()
+{
+  Serial4.IrqHandler();
+}
+void SERIAL4_HANDLER(1)()
+{
+  Serial4.IrqHandler();
+}
+void SERIAL4_HANDLER(2)()
+{
+  Serial4.IrqHandler();
+}
+void SERIAL4_HANDLER(3)()
+{
+  Serial4.IrqHandler();
 }
