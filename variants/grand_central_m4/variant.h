@@ -63,13 +63,13 @@ extern "C"
 #define NUM_ANALOG_OUTPUTS   (2)
 #define analogInputToDigitalPin(p) ((p < 8) ? 67 + (p) : (p < 16) ? 54 + (p) - 8 : (p < 18) ? 12 + (p) - 16 : (p == 18) ? 9 : -1)
 
-#define digitalPinToPort(P)        ( &(PORT->Group[g_APinDescription[P].ulPort]) )
-#define digitalPinToBitMask(P)     ( 1 << g_APinDescription[P].ulPin )
-//#define analogInPinToBit(P)        ( )
-#define portOutputRegister(port)   ( &(port->OUT.reg) )
-#define portInputRegister(port)    ( &(port->IN.reg) )
-#define portModeRegister(port)     ( &(port->DIR.reg) )
-#define digitalPinHasPWM(P)        ( g_APinDescription[P].ulPWMChannel != NOT_ON_PWM || g_APinDescription[P].ulTCChannel != NOT_ON_TIMER )
+#define digitalPinToPort(P)        (&(PORT->Group[g_APinDescription[P].ulPort]))
+#define digitalPinToBitMask(P)     (1 << g_APinDescription[P].ulPin)
+//#define analogInPinToBit(P)        ()
+#define portOutputRegister(port)   ((uint8_t *)&(port->OUT.reg))
+#define portInputRegister(port)    ((uint8_t *)&(port->IN.reg))
+#define portModeRegister(port)     ((uint8_t *)&(port->DIR.reg))
+#define digitalPinHasPWM(P)        (g_APinDescription[P].ulPWMChannel != NOT_ON_PWM || g_APinDescription[P].ulTCChannel != NOT_ON_TIMER)
 
 /*
  * digitalPinToTimer(..) is AVR-specific and is not defined for SAMD
