@@ -14,47 +14,94 @@
 # License along with this library; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-menu.cache=Cache
-menu.speed=CPU Speed
-menu.opt=Optimize
-menu.maxqspi=Max QSPI
-menu.usbstack=USB Stack
-menu.debug=Debug
 
-# Seeed Femto M0 (SAMD21)
-# ------------------------------
-Seeed_femto_m0.name=Seeed Femto M0
-Seeed_femto_m0.vid.0=0x2886
-Seeed_femto_m0.pid.0=0x802C
-Seeed_femto_m0.vid.1=0x2886
-Seeed_femto_m0.pid.1=0x002C
-Seeed_femto_m0.upload.tool=bossac
-Seeed_femto_m0.upload.protocol=sam-ba
-Seeed_femto_m0.upload.maximum_size=262144
-Seeed_femto_m0.upload.offset=0x2000
-Seeed_femto_m0.upload.use_1200bps_touch=true
-Seeed_femto_m0.upload.wait_for_upload_port=true
-Seeed_femto_m0.upload.native_usb=true
-Seeed_femto_m0.build.mcu=cortex-m0plus
-Seeed_femto_m0.build.f_cpu=48000000L
-Seeed_femto_m0.build.usb_product="Seeed femto M0"
-Seeed_femto_m0.build.usb_manufacturer="Seeed"
-Seeed_femto_m0.build.board=SAMD_FEMTO_M0
-Seeed_femto_m0.build.core=arduino
-Seeed_femto_m0.build.extra_flags=-DCRYSTALLESS -DARDUINO_SAMD_ZERO -D__SAMD21G18A__ -DARM_MATH_CM0PLUS -DSEEED_FEMTO_M0 {build.usb_flags}
-Seeed_femto_m0.build.ldscript=linker_scripts/gcc/flash_with_bootloader.ld
-Seeed_femto_m0.build.openocdscript=openocd_scripts/femto_m0.cfg
-Seeed_femto_m0.build.variant=femto_m0
-Seeed_femto_m0.build.variant_system_lib=
-Seeed_femto_m0.build.vid=0x2886
-Seeed_femto_m0.build.pid=0x802C
-Seeed_femto_m0.bootloader.tool=openocd
-Seeed_femto_m0.bootloader.file=circuitplayM0/bootloader-femto_m0-v3.7.0-31-seeeduino.bin
-Seeed_femto_m0.menu.usbstack.arduino=Arduino
-Seeed_femto_m0.menu.usbstack.tinyusb=TinyUSB
-Seeed_femto_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
-Seeed_femto_m0.menu.debug.off=Off
-Seeed_femto_m0.menu.debug.on=On
-Seeed_femto_m0.menu.debug.on.build.flags.debug=-g
+# Seeeduino Zero
+# ---------------------------------------
+zero.name=Seeeduino Zero
+zero.vid.0=0x2886
+zero.pid.0=0x800B
+zero.vid.1=0x2886
+zero.pid.1=0x000B
 
+zero.upload.tool=bossac
+zero.upload.protocol=sam-ba
+zero.upload.maximum_size=262144
+zero.upload.use_1200bps_touch=true
+zero.upload.wait_for_upload_port=true
+zero.upload.native_usb=true
+zero.build.mcu=cortex-m0plus
+zero.build.f_cpu=48000000L
+zero.build.usb_product="Seeeduino Zero"
+zero.build.usb_manufacturer="Seeed Studio"
+zero.build.board=SAMD_ZERO
+zero.build.core=arduino
+zero.build.extra_flags=-D__SAMD21G18A__ {build.usb_flags}
+zero.build.ldscript=linker_scripts/gcc/flash_with_bootloader.ld
+zero.build.openocdscript=openocd_scripts/arduino_zero.cfg
+zero.build.variant=arduino_zero
+zero.build.variant_system_lib=
+zero.build.vid=0x2886
+zero.build.pid=0x800B
+zero.bootloader.tool=openocd
+zero.bootloader.file=seeed_zero/samd21_sam_ba.bin
+
+# Seeeduino LoRaWAN
+# ---------------------------------------
+rolawan.name=Seeeduino LoRaWAN
+rolawan.vid.0=0x2886
+rolawan.pid.0=0x800C
+rolawan.vid.1=0x2886
+rolawan.pid.1=0x000C
+
+rolawan.upload.tool=bossac
+rolawan.upload.protocol=sam-ba
+rolawan.upload.maximum_size=262144
+rolawan.upload.use_1200bps_touch=true
+rolawan.upload.wait_for_upload_port=true
+rolawan.upload.native_usb=true
+rolawan.build.mcu=cortex-m0plus
+rolawan.build.f_cpu=48000000L
+rolawan.build.usb_product="Seeeduino LoRaWAN"
+rolawan.build.usb_manufacturer="Seeed Studio"
+rolawan.build.board=SAMD_ZERO
+rolawan.build.core=arduino
+rolawan.build.extra_flags=-D__SAMD21G18A__ {build.usb_flags}
+rolawan.build.ldscript=linker_scripts/gcc/flash_with_bootloader.ld
+rolawan.build.openocdscript=openocd_scripts/arduino_zero.cfg
+rolawan.build.variant=arduino_zero
+rolawan.build.variant_system_lib=
+rolawan.build.vid=0x2886
+rolawan.build.pid=0x800C
+rolawan.bootloader.tool=openocd
+rolawan.bootloader.file=lorawan/samd21_sam_ba.bin
+
+# Wio GPS Board
+# ---------------------------------------
+WioGPS.name=Wio GPS Board
+WioGPS.vid.0=0x2886
+WioGPS.pid.0=0x800E
+WioGPS.vid.1=0x2886
+WioGPS.pid.1=0x000E
+
+WioGPS.upload.tool=bossac
+WioGPS.upload.protocol=sam-ba
+WioGPS.upload.maximum_size=262144
+WioGPS.upload.use_1200bps_touch=true
+WioGPS.upload.wait_for_upload_port=true
+WioGPS.upload.native_usb=true
+WioGPS.build.mcu=cortex-m0plus
+WioGPS.build.f_cpu=48000000L
+WioGPS.build.usb_product="Wio GPS Board"
+WioGPS.build.usb_manufacturer="Seeed Studio"
+WioGPS.build.board=SAMD_ZERO
+WioGPS.build.core=arduino
+WioGPS.build.extra_flags=-D__SAMD21G18A__ {build.usb_flags} -DWIO_GPS_BOARD
+WioGPS.build.ldscript=linker_scripts/gcc/flash_with_bootloader.ld
+WioGPS.build.openocdscript=openocd_scripts/arduino_zero.cfg
+WioGPS.build.variant=arduino_zero
+WioGPS.build.variant_system_lib=
+WioGPS.build.vid=0x2886
+WioGPS.build.pid=0x800E
+WioGPS.bootloader.tool=openocd
+WioGPS.bootloader.file=wioGPS/samd21_sam_ba.bin
 
