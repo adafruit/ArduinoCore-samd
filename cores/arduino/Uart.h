@@ -44,6 +44,9 @@ class Uart : public HardwareSerial
 
     operator bool() { return true; }
 
+  protected:
+    virtual void rxDataPreview(const uint8_t data);
+
   private:
     SERCOM *sercom;
     RingBuffer rxBuffer;

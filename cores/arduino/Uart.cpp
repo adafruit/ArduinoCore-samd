@@ -50,7 +50,7 @@ void Uart::begin(unsigned long baudrate, uint16_t config)
   pinPeripheral(uc_pinRX, g_APinDescription[uc_pinRX].ulPinType);
   pinPeripheral(uc_pinTX, g_APinDescription[uc_pinTX].ulPinType);
 
-  if (uc_padTX == UART_TX_RTS_CTS_PAD_0_2_3) { 
+  if (uc_padTX == UART_TX_RTS_CTS_PAD_0_2_3) {
     if (uc_pinCTS != NO_CTS_PIN) {
       pinPeripheral(uc_pinCTS, g_APinDescription[uc_pinCTS].ulPinType);
     }
@@ -88,6 +88,8 @@ void Uart::flush()
   sercom->flushUART();
 }
 
+void Uart::rxDataPreview(const uint8_t data) {}
+
 void Uart::IrqHandler()
 {
   if (sercom->isFrameErrorUART()) {
@@ -98,7 +100,9 @@ void Uart::IrqHandler()
   }
 
   if (sercom->availableDataUART()) {
-    rxBuffer.store_char(sercom->readDataUART());
+    const uint8_t data = sercom->readDataUART();
+    rxDataPreview(data);
+    rxBuffer.store_char(data);
 
     if (uc_pinRTS != NO_RTS_PIN) {
       // RX buffer space is below the threshold, de-assert RTS
