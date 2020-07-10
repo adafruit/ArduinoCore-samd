@@ -117,9 +117,8 @@ class SPIClass {
   byte transfer(uint8_t data);
   uint16_t transfer16(uint16_t data);
   void transfer(void *buf, size_t count);
-  void transfer(const void* txbuf, void* rxbuf, size_t count,
-         bool block = true);
-  void waitForTransfer(void);
+  void transfer(void* txbuf, void* rxbuf, size_t count); //non dma
+  void transfer(void* txbuf, void* rxbuf, size_t count, void (*functionToCallWhenComplete)(void) ); //dma
 
   // Transaction Functions
   void usingInterrupt(int interruptNumber);
@@ -169,13 +168,16 @@ class SPIClass {
   char interruptSave;
   uint32_t interruptMask;
 
-  // transfer(txbuf, rxbuf, count, block) uses DMA if possible
-  Adafruit_ZeroDMA readChannel,
-                   writeChannel;
-  DmacDescriptor  *readDescriptor  = NULL,
-                  *writeDescriptor = NULL;
-  volatile bool    dma_busy = false;
-  static void      dmaCallback(Adafruit_ZeroDMA *dma);
+  // objects and functions used for dma transfer
+  Adafruit_ZeroDMA readChannel;
+  Adafruit_ZeroDMA writeChannel;
+  DmacDescriptor  *readDescriptor  = NULL;
+  DmacDescriptor  *writeDescriptor = NULL;
+  volatile bool    dma_write_done 	 = false;
+  volatile bool    dma_read_done  	 = false;
+  static void      dmaCallback_read(Adafruit_ZeroDMA *dma);
+  static void      dmaCallback_write(Adafruit_ZeroDMA *dma);
+  void (*userDmaCallback)(void) = NULL; //function pointer to users dma callback function						 
 };
 
 #if SPI_INTERFACES_COUNT > 0

@@ -235,155 +235,146 @@ void SPIClass::transfer(void *buf, size_t count)
   }
 }
 
+// Non-DMA transfer function.
+// this was removed from the dma function and made its own
+void SPIClass::transfer(void* txbuf, void* rxbuf, size_t count)
+{
+    uint8_t *txbuf8 = (uint8_t *)txbuf,
+            *rxbuf8 = (uint8_t *)rxbuf;
+    if(rxbuf8) {
+        if(txbuf8) {
+            // Writing and reading simultaneously
+            while(count--) {
+                *rxbuf8++ = _p_sercom->transferDataSPI(*txbuf8++);
+            }
+        } else {
+            // Reading only
+            while(count--) {
+                *rxbuf8++ = _p_sercom->transferDataSPI(0xFF);
+            }
+        }
+    } else if(txbuf) {
+        // Writing only
+        while(count--) {
+            (void)_p_sercom->transferDataSPI(*txbuf8++);
+        }
+    }
+}
+
+
 // Pointer to SPIClass object, one per DMA channel.
 static SPIClass *spiPtr[DMAC_CH_NUM] = { 0 }; // Legit inits list to NULL
 
-void SPIClass::dmaCallback(Adafruit_ZeroDMA *dma) {
-  // dmaCallback() receives an Adafruit_ZeroDMA object. From this we can get
-  // a channel number (0 to DMAC_CH_NUM-1, always unique per ZeroDMA object),
-  // then locate the originating SPIClass object using array lookup, setting
-  // the dma_busy element 'false' to indicate end of transfer.
-  spiPtr[dma->getChannel()]->dma_busy = false;
+// dma callback when the read part is completed
+void SPIClass::dmaCallback_read(Adafruit_ZeroDMA *dma)
+{
+	// dmaCallback() receives an Adafruit_ZeroDMA object. From this we can get
+	// a channel number (0 to DMAC_CH_NUM-1, always unique per ZeroDMA object),
+	// then locate the originating SPIClass object using array lookup, setting
+	uint8_t channel = dma->getChannel();
+
+	// flag this part of the dma done
+	spiPtr[channel]->dma_read_done = true;
+
+	// read and write dmas are both done
+	if(spiPtr[channel]->dma_read_done && spiPtr[channel]->dma_write_done)
+	{
+		// call the callback function the user specified
+		spiPtr[channel]->userDmaCallback();
+	}
 }
 
-void SPIClass::transfer(const void* txbuf, void* rxbuf, size_t count,
-  bool block) {
+// dma callback when the write part is completed
+void SPIClass::dmaCallback_write(Adafruit_ZeroDMA *dma)
+{
+	// dmaCallback() receives an Adafruit_ZeroDMA object. From this we can get
+	// a channel number (0 to DMAC_CH_NUM-1, always unique per ZeroDMA object),
+	// then locate the originating SPIClass object using array lookup, setting
+	uint8_t channel = dma->getChannel();
 
-    // If receiving data and the RX DMA channel is not yet allocated...
-    if(rxbuf && (readChannel.getChannel() >= DMAC_CH_NUM)) {
-        if(readChannel.allocate() == DMA_STATUS_OK) {
-            readDescriptor =
-              readChannel.addDescriptor(
+	// flag this part of the dma done
+	spiPtr[channel]->dma_write_done = true;
+
+	// read and write dmas are both done
+	if(spiPtr[channel]->dma_read_done && spiPtr[channel]->dma_write_done)
+	{
+		// call the callback function the user specified
+		spiPtr[channel]->userDmaCallback();
+	}
+}
+
+// dma transfer function for spi
+// this function does not block, and dma will transfer in the background
+// the callback parameter should be passed in by the user, it is called when the dma is done
+void SPIClass::transfer(void* txbuf, void* rxbuf, size_t count, void (*functionToCallWhenComplete)(void) )
+{
+	// save this function to call when the dma is done
+	userDmaCallback = functionToCallWhenComplete;
+
+	//******************************
+    // If the RX DMA channel is not yet allocated...
+    if(readChannel.getChannel() >= DMAC_CH_NUM)
+    {
+        if(readChannel.allocate() == DMA_STATUS_OK)
+        {
+            readDescriptor = readChannel.addDescriptor(
                 (void *)getDataRegister(), // Source address (SPI data reg)
-                NULL,                      // Dest address (set later)
-                0,                         // Count (set later)
+				rxbuf,                     // Dest address
+				count,                     // Count
                 DMA_BEAT_SIZE_BYTE,        // Bytes/hwords/words
                 false,                     // Don't increment source address
                 true);                     // Increment dest address
             readChannel.setTrigger(getDMAC_ID_RX());
             readChannel.setAction(DMA_TRIGGER_ACTON_BEAT);
+            readChannel.setCallback(dmaCallback_read, DMA_CALLBACK_TRANSFER_DONE);
             spiPtr[readChannel.getChannel()] = this;
-            // Since all RX transfers involve a TX, a
-            // separate callback here is not necessary.
         }
     }
+    else
+    {
+    	// update to use the currently passed buffers
+    	readChannel.changeDescriptor(
+    			readDescriptor,
+				(void *)getDataRegister(),	// Source address (SPI data reg)
+				rxbuf, 						// Dest address
+				count);						// Count
+    }
 
-    // Unlike the rxbuf check above, where a RX DMA channel is allocated
-    // only if receiving data (and channel not previously alloc'd), the
-    // TX DMA channel is always needed, because even RX-only SPI requires
-    // writing dummy bytes to the peripheral.
-    if(writeChannel.getChannel() >= DMAC_CH_NUM) {
-        if(writeChannel.allocate() == DMA_STATUS_OK) {
-            writeDescriptor =
-              writeChannel.addDescriptor(
-                NULL,                      // Source address (set later)
+    // If the TX DMA channel is not yet allocated...
+    if(writeChannel.getChannel() >= DMAC_CH_NUM)
+    {
+        if(writeChannel.allocate() == DMA_STATUS_OK)
+        {
+            writeDescriptor = writeChannel.addDescriptor(
+                txbuf,                     // Source address
                 (void *)getDataRegister(), // Dest (SPI data register)
-                0,                         // Count (set later)
+				count,                     // Count
                 DMA_BEAT_SIZE_BYTE,        // Bytes/hwords/words
                 true,                      // Increment source address
                 false);                    // Don't increment dest address
             writeChannel.setTrigger(getDMAC_ID_TX());
             writeChannel.setAction(DMA_TRIGGER_ACTON_BEAT);
-            writeChannel.setCallback(dmaCallback);
+            writeChannel.setCallback(dmaCallback_write, DMA_CALLBACK_TRANSFER_DONE);
             spiPtr[writeChannel.getChannel()] = this;
         }
     }
-
-    if(writeDescriptor && (readDescriptor || !rxbuf)) {
-        static const uint8_t dum = 0xFF; // Dummy byte for read-only xfers
-
-        // Initialize read descriptor dest address to rxbuf
-        if(rxbuf) readDescriptor->DSTADDR.reg = (uint32_t)rxbuf;
-
-        // If reading only, set up writeDescriptor to issue dummy bytes
-        // (set SRCADDR to &dum and SRCINC to 0). Otherwise, set SRCADDR
-        // to txbuf and SRCINC to 1. Only needed once at start.
-        if(rxbuf && !txbuf) {
-            writeDescriptor->SRCADDR.reg       = (uint32_t)&dum;
-            writeDescriptor->BTCTRL.bit.SRCINC = 0;
-        } else {
-            writeDescriptor->SRCADDR.reg       = (uint32_t)txbuf;
-            writeDescriptor->BTCTRL.bit.SRCINC = 1;
-        }
-
-        while(count > 0) {
-            // Maximum bytes per DMA descriptor is 65,535 (NOT 65,536).
-            // We could set up a descriptor chain, but that gets more
-            // complex. For now, instead, break up long transfers into
-            // chunks of 65,535 bytes max...these transfers are all
-            // blocking, regardless of the "block" argument, except
-            // for the last one which will observe the background request.
-            // The fractional part is done first, so for any "partially
-            // blocking" transfers like these at least it's the largest
-            // single-descriptor transfer possible that occurs in the
-            // background, rather than the tail end.
-            int  bytesThisPass;
-            bool blockThisPass;
-            if(count > 65535) { // Too big for 1 descriptor
-                blockThisPass = true;
-                bytesThisPass = count % 65535; // Fractional part
-                if(!bytesThisPass) bytesThisPass = 65535;
-            } else {
-                blockThisPass = block;
-                bytesThisPass = count;
-            }
-
-            // Issue 'bytesThisPass' bytes...
-            if(rxbuf) {
-                // Reading, or reading + writing.
-                // Set up read descriptor.
-                // Src address doesn't change, only dest & count.
-                // DMA needs address set to END of buffer, so
-                // increment the address now, before the transfer.
-                readDescriptor->DSTADDR.reg += bytesThisPass;
-                readDescriptor->BTCNT.reg    = bytesThisPass;
-                // Start the RX job BEFORE the TX job!
-                // That's the whole secret sauce to the two-channel transfer.
-                // Nothing will actually happen until the write channel job
-                // is also started.
-                readChannel.startJob();
-            }
-            if(txbuf) {
-                // DMA needs address set to END of buffer, so
-                // increment the address now, before the transfer.
-                writeDescriptor->SRCADDR.reg += bytesThisPass;
-            }
-            writeDescriptor->BTCNT.reg = bytesThisPass;
-            dma_busy = true;
-            writeChannel.startJob();
-            count   -= bytesThisPass;
-            if(blockThisPass) {
-                while(dma_busy);
-            }
-        }
-    } else {
-        // Non-DMA fallback.
-        uint8_t *txbuf8 = (uint8_t *)txbuf,
-                *rxbuf8 = (uint8_t *)rxbuf;
-        if(rxbuf8) {
-            if(txbuf8) {
-                // Writing and reading simultaneously
-                while(count--) {
-                    *rxbuf8++ = _p_sercom->transferDataSPI(*txbuf8++);
-                }
-            } else {
-                // Reading only
-                while(count--) {
-                    *rxbuf8++ = _p_sercom->transferDataSPI(0xFF);
-                }
-            }
-        } else if(txbuf) {
-            // Writing only
-            while(count--) {
-                (void)_p_sercom->transferDataSPI(*txbuf8++);
-            }
-        }
+    else
+    {
+    	// update to use the currently passed buffers
+    	writeChannel.changeDescriptor(
+    			writeDescriptor,
+				txbuf,						// Source address
+				(void *)getDataRegister(),	// Dest (SPI data register)
+				count);						// Count
     }
-}
 
-// Waits for a prior in-background DMA transfer to complete.
-void SPIClass::waitForTransfer(void) {
-    while(dma_busy);
+    //******************************
+    // clear the flags
+    // fire the dma transactions
+	dma_read_done  = false;
+	dma_write_done = false;
+	readChannel.startJob();
+	writeChannel.startJob();
 }
 
 void SPIClass::attachInterrupt() {
