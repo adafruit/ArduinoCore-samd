@@ -261,7 +261,6 @@ void SPIClass::transfer(void* txbuf, void* rxbuf, size_t count)
     }
 }
 
-
 // Pointer to SPIClass object, one per DMA channel.
 static SPIClass *spiPtr[DMAC_CH_NUM] = { 0 }; // Legit inits list to NULL
 
@@ -279,8 +278,12 @@ void SPIClass::dmaCallback_read(Adafruit_ZeroDMA *dma)
 	// read and write dmas are both done
 	if(spiPtr[channel]->dma_read_done && spiPtr[channel]->dma_write_done)
 	{
-		// call the callback function the user specified
-		spiPtr[channel]->userDmaCallback();
+		// is a user specified callback to call on completion
+		if(spiPtr[channel]->userDmaCallback != NULL)
+		{
+			// call the callback function the user specified
+			spiPtr[channel]->userDmaCallback();
+		}
 	}
 }
 
@@ -298,15 +301,41 @@ void SPIClass::dmaCallback_write(Adafruit_ZeroDMA *dma)
 	// read and write dmas are both done
 	if(spiPtr[channel]->dma_read_done && spiPtr[channel]->dma_write_done)
 	{
-		// call the callback function the user specified
-		spiPtr[channel]->userDmaCallback();
+		// is a user specified callback to call on completion
+		if(spiPtr[channel]->userDmaCallback != NULL)
+		{
+			// call the callback function the user specified
+			spiPtr[channel]->userDmaCallback();
+		}
 	}
+}
+
+// dma transfer function for spi with pole for completion
+void SPIClass::transfer(const void* txbuf, void* rxbuf, uint32_t count, bool block)
+{
+	// start the dma transfer, but do not specify a user callback function, will pole for completion instead
+	transfer(txbuf, rxbuf, count, NULL);
+
+	// if this function should automatically wait for completion, otherwise user must do manually
+	if(block)
+	{
+		waitForTransfer();
+	}
+}
+
+// Waits for a prior in-background DMA transfer to complete.
+void SPIClass::waitForTransfer(void)
+{
+    while( !dma_read_done || !dma_write_done )
+    {
+    	// do nothing, wait for transfer completion
+    }
 }
 
 // dma transfer function for spi
 // this function does not block, and dma will transfer in the background
 // the callback parameter should be passed in by the user, it is called when the dma is done
-void SPIClass::transfer(void* txbuf, void* rxbuf, size_t count, void (*functionToCallWhenComplete)(void) )
+void SPIClass::transfer(void* txbuf, void* rxbuf, uint32_t count, void (*functionToCallWhenComplete)(void) )
 {
 	// save this function to call when the dma is done
 	userDmaCallback = functionToCallWhenComplete;

@@ -104,8 +104,9 @@ void loop()
 	// send the command byte
 	//SPI.transfer(255);
 
-	#if(1)
-		// dma transfer
+	#define DMA_TEST 3 //select the type of dma to test
+	#if(DMA_TEST == 1)
+		// asyncronous dma transfer
 		// reset the transaction flag
 		dmaDone = false;
 
@@ -120,9 +121,25 @@ void loop()
 		// wait here until transfer is completed
 		while(!dmaDone); // this is updated by our callback function
 
-	#else
+	#elif(DMA_TEST == 2)
+		// dma transfer pole for completion
+		// calls the dma transfer, this call will block
+		SPI.transfer(send_memory, receive_memory, DATA_LENGTH, true); //dma
+
+	#elif(DMA_TEST == 3)
+		// dma transfer pole for completion
+		// calls the dma transfer, this call will not block
+		SPI.transfer(send_memory, receive_memory, DATA_LENGTH, false); //dma
+
+		// can do other things here...
+
+		// wait here until transfer is completed
+		SPI.waitForTransfer();
+
+	#elif(DMA_TEST == 4)
 		//non dma transfer
 		SPI.transfer(send_memory, receive_memory, DATA_LENGTH);
+
 	#endif
 
 	// disable Slave Select

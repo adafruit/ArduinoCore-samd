@@ -118,7 +118,9 @@ class SPIClass {
   uint16_t transfer16(uint16_t data);
   void transfer(void *buf, size_t count);
   void transfer(void* txbuf, void* rxbuf, size_t count); //non dma
-  void transfer(void* txbuf, void* rxbuf, size_t count, void (*functionToCallWhenComplete)(void) ); //dma
+  void transfer(const void* txbuf, void* rxbuf, uint32_t count, bool block = true); //dma pole for completion
+  void waitForTransfer(void); //dma pole for completion
+  void transfer(void* txbuf, void* rxbuf, uint32_t count, void (*functionToCallWhenComplete)(void) ); //dma asynchronous
 
   // Transaction Functions
   void usingInterrupt(int interruptNumber);
@@ -175,9 +177,11 @@ class SPIClass {
   DmacDescriptor  *writeDescriptor = NULL;
   volatile bool    dma_write_done 	 = false;
   volatile bool    dma_read_done  	 = false;
+  size_t 		   dma_bytes_remaining;
   static void      dmaCallback_read(Adafruit_ZeroDMA *dma);
   static void      dmaCallback_write(Adafruit_ZeroDMA *dma);
-  void (*userDmaCallback)(void) = NULL; //function pointer to users dma callback function						 
+  void (*userDmaCallback)(void) = NULL; //function pointer to users dma callback function
+
 };
 
 #if SPI_INTERFACES_COUNT > 0
