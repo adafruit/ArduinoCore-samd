@@ -118,8 +118,8 @@ class SPIClass {
   uint16_t transfer16(uint16_t data);
   void transfer(void *buf, size_t count);
   void transfer(void* txbuf, void* rxbuf, size_t count); //non dma
-  void transfer(const void* txbuf, void* rxbuf, uint32_t count, bool block = true); //dma pole for completion
-  void waitForTransfer(void); //dma pole for completion
+  void transfer(const void* txbuf, void* rxbuf, uint32_t count, bool block = true); //dma poll for completion
+  void waitForTransfer(void); //dma poll for completion
   void transfer(void* txbuf, void* rxbuf, uint32_t count, void (*functionToCallWhenComplete)(void) ); //dma asynchronous
 
   // Transaction Functions

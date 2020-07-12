@@ -330,10 +330,10 @@ void SPIClass::checkDmaComplete(uint8_t channel)
 	}
 }
 
-// dma transfer function for spi with pole for completion
+// dma transfer function for spi with poll for completion
 void SPIClass::transfer(const void* txbuf, void* rxbuf, uint32_t count, bool block)
 {
-	// start the dma transfer, but do not specify a user callback function, will pole for completion instead
+	// start the dma transfer, but do not specify a user callback function, will poll for completion instead
 	transfer(txbuf, rxbuf, count, NULL);
 
 	// if this function should automatically wait for completion, otherwise user must do manually
