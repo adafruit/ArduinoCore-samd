@@ -275,16 +275,8 @@ void SPIClass::dmaCallback_read(Adafruit_ZeroDMA *dma)
 	// flag this part of the dma done
 	spiPtr[channel]->dma_read_done = true;
 
-	// read and write dmas are both done
-	if(spiPtr[channel]->dma_read_done && spiPtr[channel]->dma_write_done)
-	{
-		// is a user specified callback to call on completion
-		if(spiPtr[channel]->userDmaCallback != NULL)
-		{
-			// call the callback function the user specified
-			spiPtr[channel]->userDmaCallback();
-		}
-	}
+	// see if the entire transaction is completed
+	checkDmaComplete(channel);
 }
 
 // dma callback when the write part is completed
@@ -298,15 +290,43 @@ void SPIClass::dmaCallback_write(Adafruit_ZeroDMA *dma)
 	// flag this part of the dma done
 	spiPtr[channel]->dma_write_done = true;
 
+	// see if the entire transaction is completed
+	checkDmaComplete(channel);
+
+}
+
+// see if the entire dma transaction is completed
+// will automatically initiate another dma if we have bytes remaining to transfer
+void SPIClass::checkDmaComplete(uint8_t channel)
+{
 	// read and write dmas are both done
 	if(spiPtr[channel]->dma_read_done && spiPtr[channel]->dma_write_done)
 	{
-		// is a user specified callback to call on completion
-		if(spiPtr[channel]->userDmaCallback != NULL)
+		// are more bytes that need to be transfered
+		// fire another dma transaction
+		if( (spiPtr[channel]->dma_bytes_remaining) > 0)
 		{
-			// call the callback function the user specified
-			spiPtr[channel]->userDmaCallback();
+			// initiate another transfer for the next section of bytes
+			// update buffer pointers offsets
+			// use the same user callback as last time if any
+			void* txbuf = spiPtr[channel]->txbuf_last + DMA_MAX_TRANSFER_SIZE;
+			void* rxbuf = spiPtr[channel]->rxbuf_last + DMA_MAX_TRANSFER_SIZE;
+			spiPtr[channel]->transfer(txbuf, rxbuf, spiPtr[channel]->dma_bytes_remaining, spiPtr[channel]->userDmaCallback );
 		}
+		// the transfer is completed, no bytes remaining
+		else
+		{
+			// flag as completed for anything poling for completion
+			spiPtr[channel]->dma_complete = true;
+
+			// call the callback function the user specified if any
+			if(spiPtr[channel]->userDmaCallback != NULL)
+			{
+				spiPtr[channel]->userDmaCallback();
+			}
+
+		}
+
 	}
 }
 
@@ -326,7 +346,7 @@ void SPIClass::transfer(const void* txbuf, void* rxbuf, uint32_t count, bool blo
 // Waits for a prior in-background DMA transfer to complete.
 void SPIClass::waitForTransfer(void)
 {
-    while( !dma_read_done || !dma_write_done )
+    while( !dma_complete )
     {
     	// do nothing, wait for transfer completion
     }
@@ -337,8 +357,41 @@ void SPIClass::waitForTransfer(void)
 // the callback parameter should be passed in by the user, it is called when the dma is done
 void SPIClass::transfer(void* txbuf, void* rxbuf, uint32_t count, void (*functionToCallWhenComplete)(void) )
 {
-	// save this function to call when the dma is done
+	// remember these buffer pointers
+	// will reuse if we have to do multiple dma transactions and pointer math
+	txbuf_last = txbuf;
+	rxbuf_last = rxbuf;
+
+	// save this function to call when the entire dma is done
 	userDmaCallback = functionToCallWhenComplete;
+
+	// Maximum bytes per DMA descriptor is 65,535 (NOT 65,536).
+	// We could set up a descriptor chain, but that gets more
+	// complex. For now, instead, break up long transfers into
+	// chunks of 65,535 bytes max...these transfers are all
+	// blocking, regardless of the "block" argument, except
+	// for the last one which will observe the background request.
+	// The fractional part is done first, so for any "partially
+	// blocking" transfers like these at least it's the largest
+	// single-descriptor transfer possible that occurs in the
+	// background, rather than the tail end.
+	uint16_t  bytesThisPass;
+
+	if(count > DMA_MAX_TRANSFER_SIZE)
+	{
+		// Too big for 1 descriptor
+		// will need to do multiple dma transfers
+		bytesThisPass = DMA_MAX_TRANSFER_SIZE;
+
+		// remember bytes remaining for future transfers
+		dma_bytes_remaining = count - DMA_MAX_TRANSFER_SIZE;
+	}
+	else
+	{
+		// can do everything in one dma transfer
+		bytesThisPass 		= count;
+		dma_bytes_remaining = 0;
+	}
 
 	//******************************
     // If the RX DMA channel is not yet allocated...
@@ -349,7 +402,7 @@ void SPIClass::transfer(void* txbuf, void* rxbuf, uint32_t count, void (*functio
             readDescriptor = readChannel.addDescriptor(
                 (void *)getDataRegister(), // Source address (SPI data reg)
 				rxbuf,                     // Dest address
-				count,                     // Count
+				bytesThisPass,             // bytes to transfer
                 DMA_BEAT_SIZE_BYTE,        // Bytes/hwords/words
                 false,                     // Don't increment source address
                 true);                     // Increment dest address
@@ -366,7 +419,7 @@ void SPIClass::transfer(void* txbuf, void* rxbuf, uint32_t count, void (*functio
     			readDescriptor,
 				(void *)getDataRegister(),	// Source address (SPI data reg)
 				rxbuf, 						// Dest address
-				count);						// Count
+				bytesThisPass);				// bytes to transfer
     }
 
     // If the TX DMA channel is not yet allocated...
@@ -377,7 +430,7 @@ void SPIClass::transfer(void* txbuf, void* rxbuf, uint32_t count, void (*functio
             writeDescriptor = writeChannel.addDescriptor(
                 txbuf,                     // Source address
                 (void *)getDataRegister(), // Dest (SPI data register)
-				count,                     // Count
+				bytesThisPass,             // bytes to transfer
                 DMA_BEAT_SIZE_BYTE,        // Bytes/hwords/words
                 true,                      // Increment source address
                 false);                    // Don't increment dest address
@@ -394,14 +447,16 @@ void SPIClass::transfer(void* txbuf, void* rxbuf, uint32_t count, void (*functio
     			writeDescriptor,
 				txbuf,						// Source address
 				(void *)getDataRegister(),	// Dest (SPI data register)
-				count);						// Count
+				bytesThisPass);				// bytes to transfer
     }
 
     //******************************
     // clear the flags
-    // fire the dma transactions
 	dma_read_done  = false;
 	dma_write_done = false;
+	dma_complete   = false;
+
+    // fire the dma transactions
 	readChannel.startJob();
 	writeChannel.startJob();
 }

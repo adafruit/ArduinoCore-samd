@@ -449,7 +449,7 @@ bool Adafruit_ZeroDMA::isActive(void) const {
 DmacDescriptor *Adafruit_ZeroDMA::addDescriptor(
   void           *src,
   void           *dst,
-  uint32_t        count,
+  uint16_t        count,
   dma_beat_size   size,
   bool            srcInc,
   bool            dstInc,
@@ -537,7 +537,7 @@ DmacDescriptor *Adafruit_ZeroDMA::addDescriptor(
 // etc.) are unchanged.  Mostly for changing the data being pushed to a
 // peripheral (DAC, SPI, whatev.)
 void Adafruit_ZeroDMA::changeDescriptor(DmacDescriptor *desc,
-  void *src, void *dst, uint32_t count) {
+  void *src, void *dst, uint16_t count) {
 
     uint8_t bytesPerBeat; // Beat transfer size IN BYTES
     switch(desc->BTCTRL.bit.BEATSIZE) {

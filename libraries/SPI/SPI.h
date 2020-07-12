@@ -170,16 +170,26 @@ class SPIClass {
   char interruptSave;
   uint32_t interruptMask;
 
-  // objects and functions used for dma transfer
+  //***********************************************************
+  // constants, objects, and functions used for dma transfers
+
+  #define DMA_MAX_TRANSFER_SIZE		65535			// maximum bytes a dma can transfer per transaction
+
   Adafruit_ZeroDMA readChannel;
   Adafruit_ZeroDMA writeChannel;
   DmacDescriptor  *readDescriptor  = NULL;
   DmacDescriptor  *writeDescriptor = NULL;
-  volatile bool    dma_write_done 	 = false;
-  volatile bool    dma_read_done  	 = false;
-  size_t 		   dma_bytes_remaining;
+
+  volatile bool    dma_write_done 	 = false;		// true when read dma callback completes
+  volatile bool    dma_read_done  	 = false;		// true when write dma callback completes
+  uint32_t 		   dma_bytes_remaining;				// number of bytes remaining for future dma transactions
+  volatile bool    dma_complete  	 = false;		// all transactions completed and no bytes remaining
+  void* 		   txbuf_last;						// pointer to buffer last used
+  void* 		   rxbuf_last;						// pointer to buffer last used
+
   static void      dmaCallback_read(Adafruit_ZeroDMA *dma);
   static void      dmaCallback_write(Adafruit_ZeroDMA *dma);
+  static void      checkDmaComplete(uint8_t channel);
   void (*userDmaCallback)(void) = NULL; //function pointer to users dma callback function
 
 };
