@@ -122,12 +122,12 @@ void loop()
 		while(!dmaDone); // this is updated by our callback function
 
 	#elif(DMA_TEST == 2)
-		// dma transfer pole for completion
+		// dma transfer poll for completion
 		// calls the dma transfer, this call will block
 		SPI.transfer(send_memory, receive_memory, DATA_LENGTH, true); //dma
 
 	#elif(DMA_TEST == 3)
-		// dma transfer pole for completion
+		// dma transfer poll for completion
 		// calls the dma transfer, this call will not block
 		SPI.transfer(send_memory, receive_memory, DATA_LENGTH, false); //dma
 
