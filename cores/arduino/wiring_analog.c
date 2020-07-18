@@ -274,7 +274,7 @@ uint32_t analogRead(uint32_t pin)
   if (pin <= 5) {
     pin += A0;
   }
-#if NUM_ANALOG_PINS > 8
+#if NUM_ANALOG_INPUTS > 8
   else if (pin < 16) {     // Grand Central's extra 8 pins are discontinuous
     pin += PIN_A8 - 8;     //   and are on LOWER digital Pins than A0..A7
   }
