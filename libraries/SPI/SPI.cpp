@@ -235,6 +235,7 @@ void SPIClass::transfer(void *buf, size_t count)
   }
 }
 
+/*
 // Non-DMA transfer function.
 // this was removed from the dma function and made its own
 void SPIClass::transfer(void* txbuf, void* rxbuf, size_t count)
@@ -260,6 +261,7 @@ void SPIClass::transfer(void* txbuf, void* rxbuf, size_t count)
         }
     }
 }
+*/
 
 // Pointer to SPIClass object, one per DMA channel.
 static SPIClass *spiPtr[DMAC_CH_NUM] = { 0 }; // Legit inits list to NULL
@@ -309,8 +311,9 @@ void SPIClass::checkDmaComplete(uint8_t channel)
 			// initiate another transfer for the next section of bytes
 			// update buffer pointers offsets
 			// use the same user callback as last time if any
-			void* txbuf = spiPtr[channel]->txbuf_last + DMA_MAX_TRANSFER_SIZE;
-			void* rxbuf = spiPtr[channel]->rxbuf_last + DMA_MAX_TRANSFER_SIZE;
+			// (uint8_t*) typecast needed as c does not like pointer math of void*, but we know we are doing byte math
+			void* txbuf = (uint8_t*)spiPtr[channel]->txbuf_last + DMA_MAX_TRANSFER_SIZE;
+			void* rxbuf = (uint8_t*)spiPtr[channel]->rxbuf_last + DMA_MAX_TRANSFER_SIZE;
 			spiPtr[channel]->transfer(txbuf, rxbuf, spiPtr[channel]->dma_bytes_remaining, spiPtr[channel]->userDmaCallback );
 		}
 		// the transfer is completed, no bytes remaining
@@ -331,10 +334,10 @@ void SPIClass::checkDmaComplete(uint8_t channel)
 }
 
 // dma transfer function for spi with poll for completion
-void SPIClass::transfer(const void* txbuf, void* rxbuf, uint32_t count, bool block)
+void SPIClass::transfer(void* txbuf, void* rxbuf, uint32_t count, bool block)
 {
 	// start the dma transfer, but do not specify a user callback function, will poll for completion instead
-	transfer(txbuf, rxbuf, count, NULL);
+	transfer(txbuf, rxbuf, count, (void (*)(void))NULL );
 
 	// if this function should automatically wait for completion, otherwise user must do manually
 	if(block)

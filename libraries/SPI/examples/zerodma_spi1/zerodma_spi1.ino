@@ -104,14 +104,14 @@ void loop()
 	// send the command byte
 	//SPI.transfer(255);
 
-	#define DMA_TEST 3 //select the type of dma to test
+	#define DMA_TEST 1 //select the type of dma to test
 	#if(DMA_TEST == 1)
 		// asyncronous dma transfer
 		// reset the transaction flag
 		dmaDone = false;
 
 		// calls the dma transfer, this call does not block
-		// will call the callback frunction when the dma is completed
+		// will call the callback function when the dma is completed
 		SPI.transfer(send_memory, receive_memory, DATA_LENGTH, callback_dmaDone); //dma
 
 		// can do other things here...
