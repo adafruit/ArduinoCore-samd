@@ -3,7 +3,6 @@
 // Callback will be called when the dma is completed
 
 #include <SPI.h>
-#include <Math.h>
 //#define PRINT_MEMMORY_BUFFERS
 
 #define SS	2
@@ -136,10 +135,10 @@ void loop()
 		// wait here until transfer is completed
 		SPI.waitForTransfer();
 
-	#elif(DMA_TEST == 4)
-		//non dma transfer
-		SPI.transfer(send_memory, receive_memory, DATA_LENGTH);
-
+	//#elif(DMA_TEST == 4)
+	//	//non dma transfer
+	//	SPI.transfer(send_memory, receive_memory, DATA_LENGTH);
+	//
 	#endif
 
 	// disable Slave Select
