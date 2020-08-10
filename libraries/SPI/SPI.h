@@ -117,9 +117,10 @@ class SPIClass {
   byte transfer(uint8_t data);
   uint16_t transfer16(uint16_t data);
   void transfer(void *buf, size_t count);
-  void transfer(const void* txbuf, void* rxbuf, size_t count,
-         bool block = true);
-  void waitForTransfer(void);
+  //void transfer(void* txbuf, void* rxbuf, size_t count); //non dma
+  void transfer(void* txbuf, void* rxbuf, uint32_t count, bool block); //dma poll for completion
+  void waitForTransfer(void); //dma poll for completion
+  void transfer(void* txbuf, void* rxbuf, uint32_t count, void (*functionToCallWhenComplete)(void) ); //dma asynchronous
 
   // Transaction Functions
   void usingInterrupt(int interruptNumber);
@@ -169,13 +170,28 @@ class SPIClass {
   char interruptSave;
   uint32_t interruptMask;
 
-  // transfer(txbuf, rxbuf, count, block) uses DMA if possible
-  Adafruit_ZeroDMA readChannel,
-                   writeChannel;
-  DmacDescriptor  *readDescriptor  = NULL,
-                  *writeDescriptor = NULL;
-  volatile bool    dma_busy = false;
-  static void      dmaCallback(Adafruit_ZeroDMA *dma);
+  //***********************************************************
+  // constants, objects, and functions used for dma transfers
+
+  #define DMA_MAX_TRANSFER_SIZE		65535			// maximum bytes a dma can transfer per transaction
+
+  Adafruit_ZeroDMA readChannel;
+  Adafruit_ZeroDMA writeChannel;
+  DmacDescriptor  *readDescriptor  = NULL;
+  DmacDescriptor  *writeDescriptor = NULL;
+
+  volatile bool    dma_write_done 	 	= false;		// true when read dma callback completes
+  volatile bool    dma_read_done  	 	= false;		// true when write dma callback completes
+  uint32_t 		   dma_bytes_remaining 	= 0;			// number of bytes remaining for future dma transactions
+  volatile bool    dma_complete  	 	= false;		// all transactions completed and no bytes remaining
+  void* 		   txbuf_last			= NULL;			// pointer to buffer last used
+  void* 		   rxbuf_last			= NULL;			// pointer to buffer last used
+
+  static void      dmaCallback_read(Adafruit_ZeroDMA *dma);
+  static void      dmaCallback_write(Adafruit_ZeroDMA *dma);
+  static void      checkDmaComplete(uint8_t channel);
+  void (*userDmaCallback)(void) = NULL; //function pointer to users dma callback function
+
 };
 
 #if SPI_INTERFACES_COUNT > 0
