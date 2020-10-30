@@ -84,3 +84,4 @@ void initVariant(void) {
   pinMode(12, OUTPUT);
   digitalWrite(12, HIGH);
 }
+const int PINS_COUNT = sizeof(g_APinDescription)/sizeof(*g_APinDescription);

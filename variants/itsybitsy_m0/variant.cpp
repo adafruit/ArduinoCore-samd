@@ -124,3 +124,4 @@ void SERCOM0_Handler()
   Serial1.IrqHandler();
 }
 
+const int PINS_COUNT = sizeof(g_APinDescription)/sizeof(*g_APinDescription);

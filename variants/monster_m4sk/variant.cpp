@@ -105,3 +105,4 @@ SERCOM sercom2( SERCOM2 ) ;
 SERCOM sercom3( SERCOM3 ) ;
 SERCOM sercom4( SERCOM4 ) ;
 SERCOM sercom5( SERCOM5 ) ;
+const int PINS_COUNT = sizeof(g_APinDescription)/sizeof(*g_APinDescription);

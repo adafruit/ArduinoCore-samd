@@ -95,3 +95,4 @@ void SERCOM0_Handler()
   WIRE_IT_HANDLER();
 }
 
+const int PINS_COUNT = sizeof(g_APinDescription)/sizeof(*g_APinDescription);
