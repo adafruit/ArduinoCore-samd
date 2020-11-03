@@ -37,7 +37,7 @@
 // ----
 
 // Number of pins defined in PinDescription array
-#define PINS_COUNT           (39u)
+extern const int PINS_COUNT;
 #define NUM_DIGITAL_PINS     (39u)
 #define NUM_ANALOG_INPUTS    (11u)
 #define NUM_ANALOG_OUTPUTS   (1u)

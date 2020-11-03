@@ -53,7 +53,7 @@ extern "C"
  *----------------------------------------------------------------------------*/
 
 // Number of pins defined in PinDescription array
-#define PINS_COUNT           (16u)
+extern const int PINS_COUNT;
 #define NUM_DIGITAL_PINS     (16u)
 #define NUM_ANALOG_INPUTS    (3u)
 #define NUM_ANALOG_OUTPUTS   (1u)
