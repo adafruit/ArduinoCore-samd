@@ -85,6 +85,8 @@ extern "C"
 #define PIN_ENCODER_B        2
 #define PIN_ENCODER_SWITCH   3
 
+#define PIN_TOUCH            4
+
 /*
  * Analog pins
  */
