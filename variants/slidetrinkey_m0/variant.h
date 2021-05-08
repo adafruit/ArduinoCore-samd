@@ -54,8 +54,8 @@ extern "C"
 
 // Number of pins defined in PinDescription array
 #define PINS_COUNT           (6u)
-#define NUM_DIGITAL_PINS     (2u)
-#define NUM_ANALOG_INPUTS    (2u)
+#define NUM_DIGITAL_PINS     (3u)
+#define NUM_ANALOG_INPUTS    (3u)
 #define NUM_ANALOG_OUTPUTS   (1u)
 #define analogInputToDigitalPin(p)  (p)
 
@@ -81,17 +81,19 @@ extern "C"
 #define NUM_NEOPIXEL         (2u)
 
 // POT
-#define PIN_POTENTIOMETER    (1u)
+#define PIN_POTENTIOMETER    (0u)
 
 /*
  * Analog pins
  */
 #define PIN_A0               (0ul)
 #define PIN_A1               (1ul)
+#define PIN_A2               (2ul)
 #define PIN_DAC0             PIN_A0
 
 static const uint8_t A0  = PIN_A0;
 static const uint8_t A1  = PIN_A1;
+static const uint8_t A2  = PIN_A2;
 
 #define ADC_RESOLUTION		12
 
