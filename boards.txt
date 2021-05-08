@@ -476,7 +476,7 @@ adafruit_rotarytrinkey_m0.menu.debug.on.build.flags.debug=-g
 
 # Adafruit NeoKey Trinkey (SAMD21)
 # ------------------------------
-adafruit_neokeytrinkey_m0.name=Adafruit Rotary Trinkey (SAMD21)
+adafruit_neokeytrinkey_m0.name=Adafruit NeoKey Trinkey (SAMD21)
 adafruit_neokeytrinkey_m0.vid.0=0x239A
 adafruit_neokeytrinkey_m0.pid.0=0x80FF
 adafruit_neokeytrinkey_m0.vid.1=0x239A
@@ -542,7 +542,7 @@ adafruit_slidetrinkey_m0.upload.wait_for_upload_port=true
 adafruit_slidetrinkey_m0.upload.native_usb=true
 adafruit_slidetrinkey_m0.build.mcu=cortex-m0plus
 adafruit_slidetrinkey_m0.build.f_cpu=48000000L
-adafruit_slidetrinkey_m0.build.usb_product="Rotary Trinkey M0"
+adafruit_slidetrinkey_m0.build.usb_product="Slide Trinkey M0"
 adafruit_slidetrinkey_m0.build.usb_manufacturer="Adafruit"
 adafruit_slidetrinkey_m0.build.board=SLIDETRINKEY_M0
 adafruit_slidetrinkey_m0.build.core=arduino
