@@ -4,6 +4,10 @@
 #include "Arduino.h"
 #include "utility/dma.h"
 
+#ifndef DMAC_DESC_HEAP_SIZE
+#define DMAC_DESC_HEAP_SIZE 4
+#endif
+
 // Status codes returned by some DMA functions and/or held in
 // a channel's jobStatus variable.
 enum ZeroDMAstatus {
@@ -54,6 +58,8 @@ class Adafruit_ZeroDMA {
 
 
  protected:  
+  __attribute__((__aligned__(16))) uint8_t desc_heap[DMAC_DESC_HEAP_SIZE*16];
+  DmacDescriptor *            alloc_descriptor();
   uint8_t                     channel;
   volatile enum ZeroDMAstatus jobStatus;
   bool                        hasDescriptors;
@@ -61,6 +67,7 @@ class Adafruit_ZeroDMA {
   uint8_t                     peripheralTrigger;
   dma_transfer_trigger_action triggerAction;
   void                      (*callback[DMA_CALLBACK_N])(Adafruit_ZeroDMA *);
+  size_t                      allocated = 0;
 };
 
 #endif // _ADAFRUIT_ZERODMA_H_

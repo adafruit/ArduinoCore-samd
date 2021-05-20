@@ -1,5 +1,4 @@
 #include <Adafruit_ZeroDMA.h>
-#include <malloc.h> // memalign() function
 
 #include "utility/dma.h"
 static volatile uint32_t _channelMask = 0; // Bitmask of allocated channels
@@ -477,7 +476,7 @@ DmacDescriptor *Adafruit_ZeroDMA::addDescriptor(
         // (aligned_alloc() or posix_memalign()) are not currently
         // available in the version of ARM GCC in use, but this is,
         // so here we are.
-        if(!(desc = (DmacDescriptor *)memalign(16, sizeof(DmacDescriptor)))) {
+        if(!(desc = alloc_descriptor())) {
             return NULL;
         }
         DmacDescriptor *prev = &_descriptor[channel];
@@ -610,6 +609,16 @@ void Adafruit_ZeroDMA::loop(boolean flag) {
         }
         // Loop or unloop descriptor list as appropriate
         desc->DESCADDR.reg = loopFlag ?  (uint32_t)&_descriptor[channel] : 0;
+    }
+}
+
+//Alocates a descriptor from the local pool
+DmacDescriptor * Adafruit_ZeroDMA::alloc_descriptor(){
+    if(allocated * sizeof(DmacDescriptor) >= sizeof(desc_heap)){
+        return (DmacDescriptor *)(&desc_heap[0] + (allocated++) * sizeof(DmacDescriptor));
+    }else
+    {
+        return NULL;
     }
 }
 
