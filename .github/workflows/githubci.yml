@@ -32,14 +32,9 @@ jobs:
         
     - name: Checkout code
       uses: actions/checkout@v2
+      with:
+        submodules: 'true'
 
-    - name: Checkout submodules
-      shell: bash
-      run: |
-        auth_header="$(git config --local --get http.https://github.com/.extraheader)"
-        git submodule sync --recursive
-        git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive      
-        
     - name: Install Arduino CLI and Tools
       run: |
         # make all our directories we need for files and libraries
