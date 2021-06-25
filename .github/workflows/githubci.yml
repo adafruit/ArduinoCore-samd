@@ -19,8 +19,8 @@ jobs:
           - 'pyportal_m4'
           - 'pyportal_m4_titano'
           - 'feather_m4_can'
-          - 'metro_m0_tinyusb'
-          - 'metro_m4_tinyusb'
+          - 'metro_m0:usbstack=tinyusb'
+          - 'metro_m4:speed=120,usbstack=tinyusb'
 
     runs-on: ubuntu-latest
     
