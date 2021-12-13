@@ -150,7 +150,12 @@ void SERCOM5_3_Handler()
 void initVariant(void) {
   // special initialization code just for us
 
+#ifdef PIN_NEOPIXEL_POWER
   // turn on neopixel
-  pinMode(7, OUTPUT);
-  digitalWrite(7, HIGH);
+  pinMode(PIN_NEOPIXEL_POWER, OUTPUT);
+  digitalWrite(PIN_NEOPIXEL_POWER, HIGH);
+  PortGroup *port = digitalPinToPort(PIN_NEOPIXEL_POWER);
+  uint32_t bitnum = g_APinDescription[PIN_NEOPIXEL_POWER].ulPin;
+  port->PINCFG[bitnum].bit.DRVSTR = 1;  // turn up neopixel power
+#endif
 }

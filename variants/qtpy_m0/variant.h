@@ -81,6 +81,7 @@ extern "C"
 #define PIN_LED              PIN_LED_13
 #define LED_BUILTIN          PIN_LED_13
 #define PIN_NEOPIXEL         (11u)
+#define PIN_NEOPIXEL_POWER   (12u)
 
 /*
  * Analog pins
