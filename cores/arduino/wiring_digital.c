@@ -39,39 +39,39 @@ void pinMode( uint32_t ulPin, uint32_t ulMode )
   {
     case INPUT:
       // Set pin to input mode
-      PORT->Group[port].PINCFG[pin].reg=(uint8_t)(PORT_PINCFG_INEN) ;
-      PORT->Group[port].DIRCLR.reg = pinMask ;
-    break ;
+      PORT->Group[port].PINCFG[pin].reg = (uint8_t) (PORT_PINCFG_INEN);
+      PORT->Group[port].DIRCLR.reg = pinMask;
+    break;
 
     case INPUT_PULLUP:
       // Set pin to input mode with pull-up resistor enabled
-      PORT->Group[port].PINCFG[pin].reg=(uint8_t)(PORT_PINCFG_INEN|PORT_PINCFG_PULLEN) ;
-      PORT->Group[port].DIRCLR.reg = pinMask ;
+      PORT->Group[port].PINCFG[pin].reg = (uint8_t) (PORT_PINCFG_INEN | PORT_PINCFG_PULLEN);
+      PORT->Group[port].DIRCLR.reg = pinMask;
 
       // Enable pull level (cf '22.6.3.2 Input Configuration' and '22.8.7 Data Output Value Set')
-      PORT->Group[port].OUTSET.reg = pinMask ;
-    break ;
+      PORT->Group[port].OUTSET.reg = pinMask;
+    break;
 
     case INPUT_PULLDOWN:
       // Set pin to input mode with pull-down resistor enabled
-      PORT->Group[port].PINCFG[pin].reg=(uint8_t)(PORT_PINCFG_INEN|PORT_PINCFG_PULLEN) ;
-      PORT->Group[port].DIRCLR.reg = pinMask ;
+      PORT->Group[port].PINCFG[pin].reg = (uint8_t) (PORT_PINCFG_INEN | PORT_PINCFG_PULLEN);
+      PORT->Group[port].DIRCLR.reg = pinMask;
 
       // Enable pull level (cf '22.6.3.2 Input Configuration' and '22.8.6 Data Output Value Clear')
-      PORT->Group[port].OUTCLR.reg = pinMask ;
-    break ;
+      PORT->Group[port].OUTCLR.reg = pinMask;
+    break;
 
     case OUTPUT:
       // enable input, to support reading back values, with pullups disabled
-      PORT->Group[port].PINCFG[pin].reg=(uint8_t)(PORT_PINCFG_INEN) ;
+      PORT->Group[port].PINCFG[pin].reg = (uint8_t) (PORT_PINCFG_INEN | PORT_PINCFG_DRVSTR);
 
       // Set pin to output mode
-      PORT->Group[port].DIRSET.reg = pinMask ;
-    break ;
+      PORT->Group[port].DIRSET.reg = pinMask;
+    break;
 
     default:
       // do nothing
-    break ;
+    break;
   }
 }
 

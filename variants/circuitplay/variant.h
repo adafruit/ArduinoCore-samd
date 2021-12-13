@@ -72,6 +72,13 @@
 #define PIN_LED     PIN_LED_13
 #define LED_BUILTIN PIN_LED
 
+// Neopixel
+#define PIN_NEOPIXEL  8
+#define NEOPIXEL_NUM  10
+
+#define PIN_BUTTON1   4 // Left Button
+#define PIN_BUTTON2   5 // Right Button
+
 
 //#define PIN_LED_RXL          (25u)
 //#define PIN_LED_TXL          (26u)
