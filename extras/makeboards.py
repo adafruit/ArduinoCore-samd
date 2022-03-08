@@ -169,7 +169,7 @@ make_board("SAMD21", "adafruit_feather_m0", "feather_m0",
 
 make_board("SAMD21", "adafruit_feather_m0_express", "feather_m0_express", 
            "Adafruit", "Feather M0 Express", "0x239A", ["0x801B", "0x001B"],
-           "SAMD_FEATHER_M0_EXPRESS", "-D__SAMD21G18A__ -DARDUINO_SAMD_FEATHER_M0 -DARDUINO_SAMD_FEATHER_M0", "featherM0/bootloader-feather_m0-v2.0.0-adafruit.5.bin")
+           "SAMD_FEATHER_M0_EXPRESS", "-D__SAMD21G18A__ -DARDUINO_SAMD_FEATHER_M0 -DADAFRUIT_FEATHER_M0_EXPRESS", "featherM0/bootloader-feather_m0-v2.0.0-adafruit.5.bin")
 
 make_board("SAMD21", "adafruit_metro_m0", "metro_m0", 
            "Adafruit", "Metro M0 Express", "0x239A", ["0x8013", "0x0013"],
