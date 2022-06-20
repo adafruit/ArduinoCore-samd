@@ -20,6 +20,7 @@ menu.opt=Optimize
 menu.maxqspi=Max QSPI
 menu.usbstack=USB Stack
 menu.debug=Debug
+menu.airlift=AirLift
 
 # -----------------------------------
 # Adafruit Feather M0 (SAMD21)
@@ -77,6 +78,10 @@ adafruit_feather_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_feather_m0.menu.debug.off=Off
 adafruit_feather_m0.menu.debug.on=On
 adafruit_feather_m0.menu.debug.on.build.flags.debug=-g
+adafruit_feather_m0.menu.airlift.none=None
+adafruit_feather_m0.menu.airlift.none.build.flags.airlift=
+adafruit_feather_m0.menu.airlift.wing=AirLift FeatherWing
+adafruit_feather_m0.menu.airlift.wing.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -133,6 +138,10 @@ adafruit_feather_m0_express.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TIN
 adafruit_feather_m0_express.menu.debug.off=Off
 adafruit_feather_m0_express.menu.debug.on=On
 adafruit_feather_m0_express.menu.debug.on.build.flags.debug=-g
+adafruit_feather_m0_express.menu.airlift.none=None
+adafruit_feather_m0_express.menu.airlift.none.build.flags.airlift=
+adafruit_feather_m0_express.menu.airlift.wing=AirLift FeatherWing
+adafruit_feather_m0_express.menu.airlift.wing.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -189,6 +198,10 @@ adafruit_metro_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_metro_m0.menu.debug.off=Off
 adafruit_metro_m0.menu.debug.on=On
 adafruit_metro_m0.menu.debug.on.build.flags.debug=-g
+adafruit_metro_m0.menu.airlift.none=None
+adafruit_metro_m0.menu.airlift.none.build.flags.airlift=
+adafruit_metro_m0.menu.airlift.shield=AirLift Shield
+adafruit_metro_m0.menu.airlift.shield.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=6 -DESP32_RESETN=5 -DSPIWIFI_SS=10 -DSPIWIFI_ACK=7 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -245,6 +258,8 @@ adafruit_circuitplayground_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_T
 adafruit_circuitplayground_m0.menu.debug.off=Off
 adafruit_circuitplayground_m0.menu.debug.on=On
 adafruit_circuitplayground_m0.menu.debug.on.build.flags.debug=-g
+adafruit_circuitplayground_m0.menu.airlift.none=None
+adafruit_circuitplayground_m0.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -301,6 +316,8 @@ adafruit_gemma_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_gemma_m0.menu.debug.off=Off
 adafruit_gemma_m0.menu.debug.on=On
 adafruit_gemma_m0.menu.debug.on.build.flags.debug=-g
+adafruit_gemma_m0.menu.airlift.none=None
+adafruit_gemma_m0.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -357,6 +374,8 @@ adafruit_trinket_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_trinket_m0.menu.debug.off=Off
 adafruit_trinket_m0.menu.debug.on=On
 adafruit_trinket_m0.menu.debug.on.build.flags.debug=-g
+adafruit_trinket_m0.menu.airlift.none=None
+adafruit_trinket_m0.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -415,6 +434,8 @@ adafruit_qtpy_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_qtpy_m0.menu.debug.off=Off
 adafruit_qtpy_m0.menu.debug.on=On
 adafruit_qtpy_m0.menu.debug.on.build.flags.debug=-g
+adafruit_qtpy_m0.menu.airlift.none=None
+adafruit_qtpy_m0.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -473,6 +494,8 @@ adafruit_neotrinkey_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_neotrinkey_m0.menu.debug.off=Off
 adafruit_neotrinkey_m0.menu.debug.on=On
 adafruit_neotrinkey_m0.menu.debug.on.build.flags.debug=-g
+adafruit_neotrinkey_m0.menu.airlift.none=None
+adafruit_neotrinkey_m0.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -531,6 +554,8 @@ adafruit_rotarytrinkey_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYU
 adafruit_rotarytrinkey_m0.menu.debug.off=Off
 adafruit_rotarytrinkey_m0.menu.debug.on=On
 adafruit_rotarytrinkey_m0.menu.debug.on.build.flags.debug=-g
+adafruit_rotarytrinkey_m0.menu.airlift.none=None
+adafruit_rotarytrinkey_m0.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -589,6 +614,8 @@ adafruit_neokeytrinkey_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYU
 adafruit_neokeytrinkey_m0.menu.debug.off=Off
 adafruit_neokeytrinkey_m0.menu.debug.on=On
 adafruit_neokeytrinkey_m0.menu.debug.on.build.flags.debug=-g
+adafruit_neokeytrinkey_m0.menu.airlift.none=None
+adafruit_neokeytrinkey_m0.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -647,6 +674,8 @@ adafruit_slidetrinkey_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUS
 adafruit_slidetrinkey_m0.menu.debug.off=Off
 adafruit_slidetrinkey_m0.menu.debug.on=On
 adafruit_slidetrinkey_m0.menu.debug.on.build.flags.debug=-g
+adafruit_slidetrinkey_m0.menu.airlift.none=None
+adafruit_slidetrinkey_m0.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -705,6 +734,8 @@ adafruit_proxlighttrinkey_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TI
 adafruit_proxlighttrinkey_m0.menu.debug.off=Off
 adafruit_proxlighttrinkey_m0.menu.debug.on=On
 adafruit_proxlighttrinkey_m0.menu.debug.on.build.flags.debug=-g
+adafruit_proxlighttrinkey_m0.menu.airlift.none=None
+adafruit_proxlighttrinkey_m0.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -763,6 +794,10 @@ adafruit_itsybitsy_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_itsybitsy_m0.menu.debug.off=Off
 adafruit_itsybitsy_m0.menu.debug.on=On
 adafruit_itsybitsy_m0.menu.debug.on.build.flags.debug=-g
+adafruit_itsybitsy_m0.menu.airlift.none=None
+adafruit_itsybitsy_m0.menu.airlift.none.build.flags.airlift=
+adafruit_itsybitsy_m0.menu.airlift.bitsy=AirLift Bitsy
+adafruit_itsybitsy_m0.menu.airlift.bitsy.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -819,6 +854,8 @@ adafruit_pirkey.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_pirkey.menu.debug.off=Off
 adafruit_pirkey.menu.debug.on=On
 adafruit_pirkey.menu.debug.on.build.flags.debug=-g
+adafruit_pirkey.menu.airlift.none=None
+adafruit_pirkey.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -877,6 +914,10 @@ adafruit_hallowing.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_hallowing.menu.debug.off=Off
 adafruit_hallowing.menu.debug.on=On
 adafruit_hallowing.menu.debug.on.build.flags.debug=-g
+adafruit_hallowing.menu.airlift.none=None
+adafruit_hallowing.menu.airlift.none.build.flags.airlift=
+adafruit_hallowing.menu.airlift.wing=AirLift FeatherWing
+adafruit_hallowing.menu.airlift.wing.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -935,6 +976,8 @@ adafruit_crickit_m0.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_crickit_m0.menu.debug.off=Off
 adafruit_crickit_m0.menu.debug.on=On
 adafruit_crickit_m0.menu.debug.on.build.flags.debug=-g
+adafruit_crickit_m0.menu.airlift.none=None
+adafruit_crickit_m0.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -993,6 +1036,8 @@ adafruit_blm_badge.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_blm_badge.menu.debug.off=Off
 adafruit_blm_badge.menu.debug.on=On
 adafruit_blm_badge.menu.debug.on.build.flags.debug=-g
+adafruit_blm_badge.menu.airlift.none=None
+adafruit_blm_badge.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -1070,6 +1115,10 @@ adafruit_metro_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_metro_m4.menu.debug.off=Off
 adafruit_metro_m4.menu.debug.on=On
 adafruit_metro_m4.menu.debug.on.build.flags.debug=-g
+adafruit_metro_m4.menu.airlift.none=None
+adafruit_metro_m4.menu.airlift.none.build.flags.airlift=
+adafruit_metro_m4.menu.airlift.shield=AirLift Shield
+adafruit_metro_m4.menu.airlift.shield.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=6 -DESP32_RESETN=5 -DSPIWIFI_SS=10 -DSPIWIFI_ACK=7 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -1145,6 +1194,10 @@ adafruit_grandcentral_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUS
 adafruit_grandcentral_m4.menu.debug.off=Off
 adafruit_grandcentral_m4.menu.debug.on=On
 adafruit_grandcentral_m4.menu.debug.on.build.flags.debug=-g
+adafruit_grandcentral_m4.menu.airlift.none=None
+adafruit_grandcentral_m4.menu.airlift.none.build.flags.airlift=
+adafruit_grandcentral_m4.menu.airlift.shield=AirLift Shield
+adafruit_grandcentral_m4.menu.airlift.shield.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=6 -DESP32_RESETN=5 -DSPIWIFI_SS=10 -DSPIWIFI_ACK=7 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -1218,6 +1271,10 @@ adafruit_itsybitsy_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_itsybitsy_m4.menu.debug.off=Off
 adafruit_itsybitsy_m4.menu.debug.on=On
 adafruit_itsybitsy_m4.menu.debug.on.build.flags.debug=-g
+adafruit_itsybitsy_m4.menu.airlift.none=None
+adafruit_itsybitsy_m4.menu.airlift.none.build.flags.airlift=
+adafruit_itsybitsy_m4.menu.airlift.bitsy=AirLift Bitsy
+adafruit_itsybitsy_m4.menu.airlift.bitsy.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -1293,6 +1350,10 @@ adafruit_feather_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_feather_m4.menu.debug.off=Off
 adafruit_feather_m4.menu.debug.on=On
 adafruit_feather_m4.menu.debug.on.build.flags.debug=-g
+adafruit_feather_m4.menu.airlift.none=None
+adafruit_feather_m4.menu.airlift.none.build.flags.airlift=
+adafruit_feather_m4.menu.airlift.wing=AirLift FeatherWing
+adafruit_feather_m4.menu.airlift.wing.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -1366,6 +1427,10 @@ adafruit_feather_m4_can.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_feather_m4_can.menu.debug.off=Off
 adafruit_feather_m4_can.menu.debug.on=On
 adafruit_feather_m4_can.menu.debug.on.build.flags.debug=-g
+adafruit_feather_m4_can.menu.airlift.none=None
+adafruit_feather_m4_can.menu.airlift.none.build.flags.airlift=
+adafruit_feather_m4_can.menu.airlift.wing=AirLift FeatherWing
+adafruit_feather_m4_can.menu.airlift.wing.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -1441,6 +1506,8 @@ adafruit_trellis_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_trellis_m4.menu.debug.off=Off
 adafruit_trellis_m4.menu.debug.on=On
 adafruit_trellis_m4.menu.debug.on.build.flags.debug=-g
+adafruit_trellis_m4.menu.airlift.none=None
+adafruit_trellis_m4.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -1516,6 +1583,8 @@ adafruit_pyportal_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_pyportal_m4.menu.debug.off=Off
 adafruit_pyportal_m4.menu.debug.on=On
 adafruit_pyportal_m4.menu.debug.on.build.flags.debug=-g
+adafruit_pyportal_m4.menu.airlift.builtin=Built In
+adafruit_pyportal_m4.menu.airlift.builtin.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT
 
 
 # -----------------------------------
@@ -1589,6 +1658,8 @@ adafruit_pyportal_m4_titano.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TIN
 adafruit_pyportal_m4_titano.menu.debug.off=Off
 adafruit_pyportal_m4_titano.menu.debug.on=On
 adafruit_pyportal_m4_titano.menu.debug.on.build.flags.debug=-g
+adafruit_pyportal_m4_titano.menu.airlift.builtin=Built In
+adafruit_pyportal_m4_titano.menu.airlift.builtin.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT
 
 
 # -----------------------------------
@@ -1666,6 +1737,8 @@ adafruit_pybadge_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_pybadge_m4.menu.debug.off=Off
 adafruit_pybadge_m4.menu.debug.on=On
 adafruit_pybadge_m4.menu.debug.on.build.flags.debug=-g
+adafruit_pybadge_m4.menu.airlift.none=None
+adafruit_pybadge_m4.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -1739,6 +1812,10 @@ adafruit_metro_m4_airliftlite.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_T
 adafruit_metro_m4_airliftlite.menu.debug.off=Off
 adafruit_metro_m4_airliftlite.menu.debug.on=On
 adafruit_metro_m4_airliftlite.menu.debug.on.build.flags.debug=-g
+adafruit_metro_m4_airliftlite.menu.airlift.builtin=Built In
+adafruit_metro_m4_airliftlite.menu.airlift.builtin.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT
+adafruit_metro_m4_airliftlite.menu.airlift.shield=AirLift Shield
+adafruit_metro_m4_airliftlite.menu.airlift.shield.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=6 -DESP32_RESETN=5 -DSPIWIFI_SS=10 -DSPIWIFI_ACK=7 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -1814,6 +1891,10 @@ adafruit_pygamer_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_pygamer_m4.menu.debug.off=Off
 adafruit_pygamer_m4.menu.debug.on=On
 adafruit_pygamer_m4.menu.debug.on.build.flags.debug=-g
+adafruit_pygamer_m4.menu.airlift.none=None
+adafruit_pygamer_m4.menu.airlift.none.build.flags.airlift=
+adafruit_pygamer_m4.menu.airlift.wing=AirLift FeatherWing
+adafruit_pygamer_m4.menu.airlift.wing.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -1889,6 +1970,8 @@ adafruit_pybadge_airlift_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TIN
 adafruit_pybadge_airlift_m4.menu.debug.off=Off
 adafruit_pybadge_airlift_m4.menu.debug.on=On
 adafruit_pybadge_airlift_m4.menu.debug.on.build.flags.debug=-g
+adafruit_pybadge_airlift_m4.menu.airlift.builtin=Built In
+adafruit_pybadge_airlift_m4.menu.airlift.builtin.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT
 
 
 # -----------------------------------
@@ -1964,6 +2047,8 @@ adafruit_monster_m4sk.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_monster_m4sk.menu.debug.off=Off
 adafruit_monster_m4sk.menu.debug.on=On
 adafruit_monster_m4sk.menu.debug.on.build.flags.debug=-g
+adafruit_monster_m4sk.menu.airlift.none=None
+adafruit_monster_m4sk.menu.airlift.none.build.flags.airlift=
 
 
 # -----------------------------------
@@ -2039,6 +2124,10 @@ adafruit_hallowing_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
 adafruit_hallowing_m4.menu.debug.off=Off
 adafruit_hallowing_m4.menu.debug.on=On
 adafruit_hallowing_m4.menu.debug.on.build.flags.debug=-g
+adafruit_hallowing_m4.menu.airlift.none=None
+adafruit_hallowing_m4.menu.airlift.none.build.flags.airlift=
+adafruit_hallowing_m4.menu.airlift.wing=AirLift FeatherWing
+adafruit_hallowing_m4.menu.airlift.wing.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0
 
 
 # -----------------------------------
@@ -2114,4 +2203,6 @@ adafruit_matrixportal_m4.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUS
 adafruit_matrixportal_m4.menu.debug.off=Off
 adafruit_matrixportal_m4.menu.debug.on=On
 adafruit_matrixportal_m4.menu.debug.on.build.flags.debug=-g
+adafruit_matrixportal_m4.menu.airlift.builtin=Built In
+adafruit_matrixportal_m4.menu.airlift.builtin.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT
 

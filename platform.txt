@@ -60,6 +60,7 @@ build.flags.maxspi=
 build.flags.maxqspi=
 build.flags.usbstack=
 build.flags.debug=
+build.flags.airlift=
 
 # These can be overridden in platform.local.txt
 compiler.c.extra_flags=
@@ -91,10 +92,10 @@ build.usb_manufacturer="Unknown"
 # ----------------
 
 ## Compile c files
-recipe.c.o.pattern="{compiler.path}{compiler.c.cmd}" {compiler.c.flags} -DF_CPU={build.f_cpu} -DARDUINO={runtime.ide.version} -DARDUINO_{build.board} -DARDUINO_ARCH_{build.arch} -DARDUINO_SAMD_ADAFRUIT {compiler.c.extra_flags} {build.extra_flags} {build.cache_flags}  {build.flags.debug} {build.flags.optimize} {build.flags.maxspi} {build.flags.maxqspi} {compiler.arm.cmsis.c.flags} {includes} "{source_file}" -o "{object_file}"
+recipe.c.o.pattern="{compiler.path}{compiler.c.cmd}" {compiler.c.flags} -DF_CPU={build.f_cpu} -DARDUINO={runtime.ide.version} -DARDUINO_{build.board} -DARDUINO_ARCH_{build.arch} -DARDUINO_SAMD_ADAFRUIT {compiler.c.extra_flags} {build.extra_flags} {build.cache_flags}  {build.flags.debug} {build.flags.optimize} {build.flags.maxspi} {build.flags.maxqspi} {build.flags.airlift} {compiler.arm.cmsis.c.flags} {includes} "{source_file}" -o "{object_file}"
 
 ## Compile c++ files
-recipe.cpp.o.pattern="{compiler.path}{compiler.cpp.cmd}" {compiler.cpp.flags} -DF_CPU={build.f_cpu} -DARDUINO={runtime.ide.version} -DARDUINO_{build.board} -DARDUINO_ARCH_{build.arch} -DARDUINO_SAMD_ADAFRUIT {compiler.cpp.extra_flags} {build.extra_flags} {build.cache_flags} {build.flags.debug} {build.flags.optimize} {build.flags.maxspi} {build.flags.maxqspi} {build.extra_flags} {compiler.arm.cmsis.c.flags} {includes} "{source_file}" -o "{object_file}"
+recipe.cpp.o.pattern="{compiler.path}{compiler.cpp.cmd}" {compiler.cpp.flags} -DF_CPU={build.f_cpu} -DARDUINO={runtime.ide.version} -DARDUINO_{build.board} -DARDUINO_ARCH_{build.arch} -DARDUINO_SAMD_ADAFRUIT {compiler.cpp.extra_flags} {build.extra_flags} {build.cache_flags} {build.flags.debug} {build.flags.optimize} {build.flags.maxspi} {build.flags.maxqspi} {build.flags.airlift} {build.extra_flags} {compiler.arm.cmsis.c.flags} {includes} "{source_file}" -o "{object_file}"
 
 ## Compile S files
 recipe.S.o.pattern="{compiler.path}{compiler.S.cmd}" {compiler.S.flags} -DF_CPU={build.f_cpu} -DARDUINO={runtime.ide.version} -DARDUINO_{build.board} -DARDUINO_ARCH_{build.arch} -DARDUINO_SAMD_ADAFRUIT {compiler.S.extra_flags} {build.extra_flags} {build.cache_flags} {compiler.arm.cmsis.c.flags} {includes} "{source_file}" -o "{object_file}"
