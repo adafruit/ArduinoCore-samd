@@ -133,6 +133,7 @@ void USB_0_Handler               ( void ) __attribute__ ((weak));
 void USB_1_Handler               ( void ) __attribute__ ((weak));
 void USB_2_Handler               ( void ) __attribute__ ((weak));
 void USB_3_Handler               ( void ) __attribute__ ((weak));
+void GMAC_Handler                ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void TCC0_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void TCC0_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void TCC0_2_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
@@ -302,7 +303,7 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 	  (void*) USB_1_Handler,                 /* 81 Universal Serial Bus IRQ 1 */
 	  (void*) USB_2_Handler,                 /* 82 Universal Serial Bus IRQ 2 */
 	  (void*) USB_3_Handler,                 /* 83 Universal Serial Bus IRQ 3 */
-	  (void*) (0UL),
+	  (void*) GMAC_Handler,					 /* 84 Ethernet MAC */
 	  (void*) TCC0_0_Handler,                /* 85 Timer Counter Control 0 IRQ 0 */
 	  (void*) TCC0_1_Handler,                /* 86 Timer Counter Control 0 IRQ 1 */
 	  (void*) TCC0_2_Handler,                /* 87 Timer Counter Control 0 IRQ 2 */
