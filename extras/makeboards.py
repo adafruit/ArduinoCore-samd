@@ -152,6 +152,24 @@ def build_menu(mcu, name):
     print("{}.menu.debug.off=Off".format(name))
     print("{}.menu.debug.on=On".format(name))
     print("{}.menu.debug.on.build.flags.debug=-g".format(name))
+
+    if not ("airlift" in name or "portal_m" in name):
+        print("{}.menu.airlift.none=None".format(name))
+        print("{}.menu.airlift.none.build.flags.airlift=".format(name))
+    if ("airlift" in name or "portal_m" in name):
+        print("{}.menu.airlift.builtin=Built In".format(name))
+        print("{}.menu.airlift.builtin.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT".format(name))
+    if ("metro" in name or "grandcentral" in name):
+        print("{}.menu.airlift.shield=AirLift Shield".format(name))
+        print("{}.menu.airlift.shield.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=6 -DESP32_RESETN=5 -DSPIWIFI_SS=10 -DSPIWIFI_ACK=7 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0".format(name))
+    if ("feather" in name or "hallowing" in name or "pygamer" in name):
+        print("{}.menu.airlift.wing=AirLift FeatherWing".format(name))
+        print("{}.menu.airlift.wing.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0".format(name))
+    if "bitsy" in name:
+        print("{}.menu.airlift.bitsy=AirLift Bitsy".format(name))
+        print("{}.menu.airlift.bitsy.build.flags.airlift=-DHAS_ADAFRUIT_AIRLIFT -DSerialESP32=Serial1 -DSerialNina=Serial1 -DSPIWIFI=SPI -DESP32_GPIO0=10 -DESP32_RESETN=12 -DSPIWIFI_SS=13 -DSPIWIFI_ACK=11 -DSPIWIFI_RESET=ESP32_RESETN -DNINA_GPIO0=ESP32_GPIO0 -DNINA_RESETN=ESP32_RESETN -DNINA_ACK=SPIWIFI_ACK -DNINA_CTS=SPIWIFI_ACK -DNINA_RTS=NINA_GPIO0".format(name))
+    #print("{}.menu.airlift.Breakout=AirLift Breakout".format(name))
+    #print("{}.menu.airlift.Breakout.build.flags.airlift=".format(name))
     print()
 
 def build_global_menu():
@@ -161,6 +179,7 @@ def build_global_menu():
     print("menu.maxqspi=Max QSPI")    
     print("menu.usbstack=USB Stack")
     print("menu.debug=Debug")
+    print("menu.airlift=AirLift")
 
 def make_board(mcu, name, variant, vendor, product, vid, pid_list, boarddefine, extra_flags, bootloader):
     build_header(mcu, name, vendor, product, vid, pid_list)
