@@ -170,6 +170,10 @@ SECTIONS
 		KEEP(*(.fini_array))
 		PROVIDE_HIDDEN (__fini_array_end = .);
 
+		. = ALIGN(4);
+		/* Keep .ramfunc functions in RAM */
+		KEEP(*(.ramfunc))
+
 		KEEP(*(.jcr*))
 		. = ALIGN(16);
 		/* All data end */
