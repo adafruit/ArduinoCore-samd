@@ -35,7 +35,7 @@
 #define GENERIC_CLOCK_GENERATOR_12M_SYNC   GCLK_SYNCBUSY_GENCTRL4
 
 //USE DPLL0 for 120MHZ
-#define MAIN_CLOCK_SOURCE				  GCLK_GENCTRL_SRC_DPLL0
+#define MAIN_CLOCK_SOURCE				  GCLK_GENCTRL_SRC_DPLL0_Val
 
 #define GENERIC_CLOCK_GENERATOR_1M		  (5u)
 //#define CRYSTALLESS
@@ -82,13 +82,13 @@ void SystemInit( void )
   /* ----------------------------------------------------------------------------------------------
    * 2) Put XOSC32K as source of Generic Clock Generator 3
    */
-  GCLK->GENCTRL[GENERIC_CLOCK_GENERATOR_XOSC32K].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_XOSC32K) | //generic clock gen 3
+  GCLK->GENCTRL[GENERIC_CLOCK_GENERATOR_XOSC32K].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_XOSC32K_Val) | //generic clock gen 3
     GCLK_GENCTRL_GENEN;
   #else
   /* ----------------------------------------------------------------------------------------------
    * 2) Put OSCULP32K as source of Generic Clock Generator 3
    */
-  GCLK->GENCTRL[GENERIC_CLOCK_GENERATOR_XOSC32K].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_OSCULP32K) | GCLK_GENCTRL_GENEN; //generic clock gen 3
+  GCLK->GENCTRL[GENERIC_CLOCK_GENERATOR_XOSC32K].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_OSCULP32K_Val) | GCLK_GENCTRL_GENEN; //generic clock gen 3
   #endif
   
 
@@ -99,7 +99,7 @@ void SystemInit( void )
   /* ----------------------------------------------------------------------------------------------
    * 3) Put OSCULP32K as source for Generic Clock Generator 0
    */
-  GCLK->GENCTRL[0].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_OSCULP32K) | GCLK_GENCTRL_GENEN;
+  GCLK->GENCTRL[0].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_OSCULP32K_Val) | GCLK_GENCTRL_GENEN;
   
   /* ----------------------------------------------------------------------------------------------
    * 4) Enable DFLL48M clock
