@@ -252,6 +252,11 @@ void SPIClass::transfer(void *buf, size_t count)
 // a reference back to the originating SPIClass object.
 static SPIClass *spiPtr[DMAC_CH_NUM] = { 0 }; // Legit inits list to NULL
 
+// Pointer to a user-defined callback function, one per DMA channel. These
+// will be duplicated for read & write channels corresponding to the same
+// SPIClass (see SPIClass::dmaAllocate()). 
+static SPIClass::UserCallbackFunction* userActiveCallback[DMAC_CH_NUM] = { 0 };
+
 void SPIClass::dmaCallback(Adafruit_ZeroDMA *dma) {
   // dmaCallback() receives an Adafruit_ZeroDMA object. From this we can get
   // a channel number (0 to DMAC_CH_NUM-1, always unique per ZeroDMA object),
@@ -259,6 +264,10 @@ void SPIClass::dmaCallback(Adafruit_ZeroDMA *dma) {
   // the dma_busy element 'false' to indicate end of transfer. Doesn't matter
   // if it's a read or write transfer...both channels get pointers to it.
   spiPtr[dma->getChannel()]->dma_busy = false;
+
+  if (auto userCallback = userActiveCallback[dma->getChannel()]) {
+    userCallback(dma);
+  }
 }
 
 // For read-only and read+write transfers, a callback is assigned only
@@ -361,6 +370,24 @@ void SPIClass::dmaAllocate(void) {
 
   // NOT FATAL if channel or descriptor allocation fails.
   // transfer() function will fall back on a manual byte-by-byte loop.
+}
+
+// User defined callback
+// SPI uses two DMA channels (read & write), but only one is assigned 
+// a callback (see dmaCallback) for a given transfer, and the other gets
+// a dummy. Store the user's callback function on both channels, since
+// we don't know which one will be the source.
+// See also: Adafruit_ZeroDMA::getChannel()
+void SPIClass::dmaSetEndOfTransferCallback(UserCallbackFunction* callback)
+{
+  userActiveCallback[readChannel.getChannel()] = callback;
+  userActiveCallback[writeChannel.getChannel()] = callback;
+}
+
+void SPIClass::dmaClearEndOfTransferCallback() 
+{
+  userActiveCallback[readChannel.getChannel()] = nullptr;
+  userActiveCallback[writeChannel.getChannel()] = nullptr;
 }
 
 void SPIClass::transfer(const void *txbuf, void *rxbuf, size_t count,
