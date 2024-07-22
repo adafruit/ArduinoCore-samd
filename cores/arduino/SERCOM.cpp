@@ -559,6 +559,13 @@ bool SERCOM::startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag
     while( !sercom->I2CM.INTFLAG.bit.MB )
     {
       // Wait transmission complete
+
+		// If certain errors occur, the MB bit may never be set (RFTM: SAMD21 sec:28.10.6; SAMD51 sec:36.10.7).
+    	// The data transfer errors that can occur (including BUSERR) are all
+		// rolled up into INTFLAG.bit.ERROR from STATUS.reg
+		if (sercom->I2CM.INTFLAG.bit.ERROR) {
+		  return false;
+		}
     }
   }
   else  // Read mode
@@ -566,8 +573,9 @@ bool SERCOM::startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag
     while( !sercom->I2CM.INTFLAG.bit.SB )
     {
         // If the slave NACKS the address, the MB bit will be set.
+		// A variety of errors in the STATUS register can set the ERROR bit in the INTFLAG register
         // In that case, send a stop condition and return false.
-        if (sercom->I2CM.INTFLAG.bit.MB) {
+        if (sercom->I2CM.INTFLAG.bit.ERROR || sercom->I2CM.INTFLAG.bit.MB) {
             sercom->I2CM.CTRLB.bit.CMD = 3; // Stop condition
             return false;
         }
@@ -598,9 +606,11 @@ bool SERCOM::sendDataMasterWIRE(uint8_t data)
   //Wait transmission successful
   while(!sercom->I2CM.INTFLAG.bit.MB) {
 
-    // If a bus error occurs, the MB bit may never be set.
-    // Check the bus error bit and bail if it's set.
-    if (sercom->I2CM.STATUS.bit.BUSERR) {
+    // If a data transfer error occurs, the MB bit may never be set.
+    // Check the error bit and bail if it's set.
+    // The data transfer errors that can occur (including BUSERR) are all
+	// rolled up into INTFLAG.bit.ERROR from STATUS.reg
+    if (sercom->I2CM.INTFLAG.bit.ERROR) {
       return false;
     }
   }
@@ -704,6 +714,15 @@ uint8_t SERCOM::readDataWIRE( void )
     while( sercom->I2CM.INTFLAG.bit.SB == 0 )
     {
       // Waiting complete receive
+	  // A variety of errors in the STATUS register can set the ERROR bit in the INTFLAG register
+      // In that case, send a stop condition and return false.
+	  // readDataWIRE should really be able to indicate an error (which would never be used
+	  // because the readDataWIRE callers (in Wire.cpp) should have checked availableWIRE() first and timed it 
+	  // out if the data never showed up
+        if (sercom->I2CM.INTFLAG.bit.ERROR || sercom->I2CM.INTFLAG.bit.MB) {
+            sercom->I2CM.CTRLB.bit.CMD = 3; // Stop condition
+            return 0xFF;
+        }
     }
 
     return sercom->I2CM.DATA.bit.DATA ;
