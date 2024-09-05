@@ -132,6 +132,11 @@ class SPIClass {
   void attachInterrupt();
   void detachInterrupt();
 
+  // DMA Configuation methods
+  using UserCallbackFunction = void(Adafruit_ZeroDMA*);
+  void dmaSetEndOfTransferCallback(UserCallbackFunction* callback);
+  void dmaClearEndOfTransferCallback();
+
   void begin();
   void end();
 
