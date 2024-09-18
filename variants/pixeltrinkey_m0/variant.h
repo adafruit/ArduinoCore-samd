@@ -89,7 +89,11 @@ extern "C"
 #define PIN_A0               (0ul)
 #define PIN_DAC0             PIN_A0
 
+#define PIN_A6               (4ul)
+
 static const uint8_t A0  = PIN_A0;
+
+static const uint8_t A6  = PIN_A6;
 
 #define ADC_RESOLUTION		12
 
@@ -99,7 +103,7 @@ static const uint8_t A0  = PIN_A0;
  */
 #define SPI_INTERFACES_COUNT 1
 
-#define PIN_SPI_MISO         (4ul) // not actually broken out
+#define PIN_SPI_MISO         (4ul) // off 3-pin JST, broken out
 #define PIN_SPI_MOSI         (2ul)
 #define PIN_SPI_SCK          (3ul)
 #define PERIPH_SPI           sercom0
