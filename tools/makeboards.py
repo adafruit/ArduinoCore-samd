@@ -280,10 +280,10 @@ d21_board_list = [
      "PIXELTRINKEY_M0", "-D__SAMD21E18A__ -DCRYSTALLESS -DADAFRUIT_PIXELTRINKEY_M0",
      "pixeltrinkey_m0/bootloader-pixeltrinkey_m0.bin"],
 
-    ["adafruit_TRRStrinkey_m0", "TRRStrinkey_m0", "Adafruit", "TRRS Trinkey M0",
+    ["adafruit_TRRStrinkey_m0", "trrstrinkey_m0", "Adafruit", "TRRS Trinkey M0",
      "0x239A", ["0x8157", "0x0157", "0x8158"],
      "TRRSTRINKEY_M0", "-D__SAMD21E18A__ -DCRYSTALLESS -DADAFRUIT_TRRSTRINKEY_M0",
-     "TRRStrinkey_m0/bootloader-TRRStrinkey_m0.bin"],
+     "trrstrinkey_m0/bootloader-TRRStrinkey_m0.bin"],
 
     ["adafruit_thumbsticktrinkey_m0", "thumbsticktrinkey_m0", "Adafruit", "Thumbstick Trinkey M0",
      "0x239A", ["0x8159", "0x0159", "0x8160"],

@@ -9,29 +9,25 @@ jobs:
       matrix:
         board:
           # Alphabetical order
-          - 'metro_m0'
-          - 'hallowing'
           - 'circuitplayground_m0'
+          - 'feather_m4_can'
+          - 'hallowing'
+          - 'hallowing_m4'
+          - 'metro_m0'
           - 'metro_m4'
           - 'pybadge_m4'
           - 'pygamer_m4'
-          - 'hallowing_m4'
           - 'pyportal_m4'
           - 'pyportal_m4_titano'
-          - 'feather_m4_can'
+          # with TinyUSB
           - 'metro_m0:usbstack=tinyusb'
           - 'metro_m4:speed=120,usbstack=tinyusb'
 
     runs-on: ubuntu-latest
     
     steps:
-    - name: Setup Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.x'
-        
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: 'true'
 

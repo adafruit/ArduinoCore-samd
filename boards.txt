@@ -911,12 +911,12 @@ adafruit_TRRStrinkey_m0.build.core=arduino
 adafruit_TRRStrinkey_m0.build.extra_flags=-D__SAMD21E18A__ -DCRYSTALLESS -DADAFRUIT_TRRSTRINKEY_M0 -DARDUINO_SAMD_ZERO -DARM_MATH_CM0PLUS {build.usb_flags}
 adafruit_TRRStrinkey_m0.build.ldscript=linker_scripts/gcc/flash_with_bootloader.ld
 adafruit_TRRStrinkey_m0.build.openocdscript=scripts/openocd/daplink_samd21.cfg
-adafruit_TRRStrinkey_m0.build.variant=TRRStrinkey_m0
+adafruit_TRRStrinkey_m0.build.variant=trrstrinkey_m0
 adafruit_TRRStrinkey_m0.build.variant_system_lib=
 adafruit_TRRStrinkey_m0.build.vid=0x239A
 adafruit_TRRStrinkey_m0.build.pid=0x8157
 adafruit_TRRStrinkey_m0.bootloader.tool=openocd
-adafruit_TRRStrinkey_m0.bootloader.file=TRRStrinkey_m0/bootloader-TRRStrinkey_m0.bin
+adafruit_TRRStrinkey_m0.bootloader.file=trrstrinkey_m0/bootloader-TRRStrinkey_m0.bin
 
 # Menu: Optimization
 adafruit_TRRStrinkey_m0.menu.opt.small=Small (-Os) (standard)
@@ -1735,90 +1735,6 @@ adafruit_feather_m4_can.menu.debug.off=Off
 adafruit_feather_m4_can.menu.debug.on=On
 adafruit_feather_m4_can.menu.debug.on.build.flags.debug=-g
 
-
-# -----------------------------------
-# Adafruit Feather M4 Adalogger (SAMD51)
-# -----------------------------------
-#adafruit_feather_m4_log.name=Adafruit Feather M4 Adalogger (SAMD51)
-
-# VID/PID for Bootloader, Arduino & CircuitPython
-#adafruit_feather_m4_log.vid.0=0x239A
-#adafruit_feather_m4_log.pid.0=0x8115
-#adafruit_feather_m4_log.vid.1=0x239A
-#adafruit_feather_m4_log.pid.1=0x0115
-#adafruit_feather_m4_log.vid.2=0x239A
-#adafruit_feather_m4_log.pid.2=0x8116
-
-# Upload
-#adafruit_feather_m4_log.upload.tool=bossac18
-#adafruit_feather_m4_log.upload.protocol=sam-ba
-#adafruit_feather_m4_log.upload.maximum_size=1032192
-#adafruit_feather_m4_log.upload.offset=0x4000
-#adafruit_feather_m4_log.upload.use_1200bps_touch=true
-#adafruit_feather_m4_log.upload.wait_for_upload_port=true
-#adafruit_feather_m4_log.upload.native_usb=true
-
-# Build
-#adafruit_feather_m4_log.build.mcu=cortex-m4
-#adafruit_feather_m4_log.build.f_cpu=120000000L
-#adafruit_feather_m4_log.build.usb_product="Feather M4 Adalogger"
-#adafruit_feather_m4_log.build.usb_manufacturer="Adafruit"
-#adafruit_feather_m4_log.build.board=FEATHER_M4_ADALOGGER
-#adafruit_feather_m4_log.build.core=arduino
-#adafruit_feather_m4_log.build.extra_flags=-D__SAMD51J20A__ -DADAFRUIT_FEATHER_M4_ADALOGGER -D__SAMD51__ -D__FPU_PRESENT -DARM_MATH_CM4 -mfloat-abi=hard -mfpu=fpv4-sp-d16 {build.usb_flags}
-#adafruit_feather_m4_log.build.ldscript=linker_scripts/gcc/flash_with_bootloader.ld
-#adafruit_feather_m4_log.build.openocdscript=scripts/openocd/daplink_samd51.cfg
-#adafruit_feather_m4_log.build.variant=feather_m4
-#adafruit_feather_m4_log.build.variant_system_lib=
-#adafruit_feather_m4_log.build.vid=0x239A
-#adafruit_feather_m4_log.build.pid=0x8115
-#adafruit_feather_m4_log.bootloader.tool=openocd
-#adafruit_feather_m4_log.bootloader.file=featherM4/bootloader-feather_m4-v2.0.0-adafruit.5.bin
-#adafruit_feather_m4_log.compiler.arm.cmsis.ldflags="-L{runtime.tools.CMSIS-5.4.0.path}/CMSIS/Lib/GCC/" "-L{build.variant.path}" -larm_cortexM4lf_math -mfloat-abi=hard -mfpu=fpv4-sp-d16
-
-# Menu: Cache
-#adafruit_feather_m4_log.menu.cache.on=Enabled
-#adafruit_feather_m4_log.menu.cache.on.build.cache_flags=-DENABLE_CACHE
-#adafruit_feather_m4_log.menu.cache.off=Disabled
-#adafruit_feather_m4_log.menu.cache.off.build.cache_flags=
-
-# Menu: Speed
-#adafruit_feather_m4_log.menu.speed.120=120 MHz (standard)
-#adafruit_feather_m4_log.menu.speed.120.build.f_cpu=120000000L
-#adafruit_feather_m4_log.menu.speed.150=150 MHz (overclock)
-#adafruit_feather_m4_log.menu.speed.150.build.f_cpu=150000000L
-#adafruit_feather_m4_log.menu.speed.180=180 MHz (overclock)
-#adafruit_feather_m4_log.menu.speed.180.build.f_cpu=180000000L
-#adafruit_feather_m4_log.menu.speed.200=200 MHz (overclock)
-#adafruit_feather_m4_log.menu.speed.200.build.f_cpu=200000000L
-
-# Menu: Optimization
-#adafruit_feather_m4_log.menu.opt.small=Small (-Os) (standard)
-#adafruit_feather_m4_log.menu.opt.small.build.flags.optimize=-Os
-#adafruit_feather_m4_log.menu.opt.fast=Fast (-O2)
-#adafruit_feather_m4_log.menu.opt.fast.build.flags.optimize=-O2
-#adafruit_feather_m4_log.menu.opt.faster=Faster (-O3)
-#adafruit_feather_m4_log.menu.opt.faster.build.flags.optimize=-O3
-#adafruit_feather_m4_log.menu.opt.fastest=Fastest (-Ofast)
-#adafruit_feather_m4_log.menu.opt.fastest.build.flags.optimize=-Ofast
-#adafruit_feather_m4_log.menu.opt.dragons=Here be dragons (-Ofast -funroll-loops)
-#adafruit_feather_m4_log.menu.opt.dragons.build.flags.optimize=-Ofast -funroll-loops
-
-# Menu: QSPI Speed
-#adafruit_feather_m4_log.menu.maxqspi.50=50 MHz (standard)
-#adafruit_feather_m4_log.menu.maxqspi.50.build.flags.maxqspi=-DVARIANT_QSPI_BAUD_DEFAULT=50000000
-#adafruit_feather_m4_log.menu.maxqspi.fcpu=CPU Speed / 2
-#adafruit_feather_m4_log.menu.maxqspi.fcpu.build.flags.maxqspi=-DVARIANT_QSPI_BAUD_DEFAULT=({build.f_cpu})
-
-# Menu: USB Stack
-#adafruit_feather_m4_log.menu.usbstack.arduino=Arduino
-#adafruit_feather_m4_log.menu.usbstack.tinyusb=TinyUSB
-#adafruit_feather_m4_log.menu.usbstack.tinyusb.build.flags.usbstack=-DUSE_TINYUSB
-
-# Menu: Debug
-#adafruit_feather_m4_log.menu.debug.off=Off
-#adafruit_feather_m4_log.menu.debug.on=On
-#adafruit_feather_m4_log.menu.debug.on.build.flags.debug=-g
 
 # -----------------------------------
 # Adafruit Trellis M4 (SAMD51)
