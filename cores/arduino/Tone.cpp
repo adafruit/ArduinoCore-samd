@@ -126,11 +126,17 @@ void tone (uint32_t outputPin, uint32_t frequency, uint32_t duration)
     
     case 2: prescalerConfigBits = TC_CTRLA_PRESCALER_DIV8; break;
     
-    case 3: prescalerConfigBits = TC_CTRLA_PRESCALER_DIV16; break;
+    case 3:
+    case 4:
+      prescalerConfigBits = TC_CTRLA_PRESCALER_DIV16; break;
     
-    case 5: prescalerConfigBits = TC_CTRLA_PRESCALER_DIV64; break;
+    case 5:
+    case 6:
+      prescalerConfigBits = TC_CTRLA_PRESCALER_DIV64; break;
       
-    case 7: prescalerConfigBits = TC_CTRLA_PRESCALER_DIV256; break;
+    case 7:
+    case 8:
+      prescalerConfigBits = TC_CTRLA_PRESCALER_DIV256; break;
     
     case 9: prescalerConfigBits = TC_CTRLA_PRESCALER_DIV1024; break;
     
