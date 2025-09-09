@@ -195,7 +195,10 @@ void noTone (uint32_t outputPin)
    */
   if(firstTimeRunning)
   {
+    NVIC_DisableIRQ(TONE_TC_IRQn);
     resetTC(TONE_TC);
+    NVIC_EnableIRQ(TONE_TC_IRQn);
+
     digitalWrite(outputPin, LOW);
     toneIsActive = false;
   }
