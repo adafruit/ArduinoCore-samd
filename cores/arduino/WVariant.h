@@ -63,7 +63,7 @@ typedef enum _EAnalogChannel
 
 #if defined(__SAMD51__)
 
-#if defined(__SAMD51G19A__)
+#if defined(__SAMD51G19A__) || defined(__SAME51G19A__)
 
 typedef enum _ETCChannel
 {
