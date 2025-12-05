@@ -605,9 +605,7 @@ bool SERCOM::sendDataMasterWIRE(uint8_t data)
   while(!sercom->I2CM.INTFLAG.bit.MB) {
     // If a data transfer error occurs, the MB bit may never be set.
     // Check the error bit and bail if it's set.
-    // The data transfer errors that can occur (including BUSERR) are all
-    // rolled up into INTFLAG.bit.ERROR from STATUS.reg
-    if (sercom->I2CM.INTFLAG.bit.ERROR) {
+    if (sercom->I2CM.STATUS.bit.BUSERR) {
       return false;
     }
   }
