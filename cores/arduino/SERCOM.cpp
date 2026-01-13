@@ -31,7 +31,7 @@ SERCOM::SERCOM(Sercom* s)
 {
   sercom = s;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   // A briefly-available but now deprecated feature had the SPI clock source
   // set via a compile-time setting (MAX_SPI)...problem was this affected
   // ALL SERCOMs, whereas some (anything read/write, e.g. SD cards) should
@@ -40,8 +40,8 @@ SERCOM::SERCOM(Sercom* s)
   // per-peripheral basis.  Nonetheless, we check SERCOM_SPI_FREQ_REF here
   // (MAX_SPI * 2) to retain compatibility with any interim projects that
   // might have relied on the compile-time setting.  But please, don't.
- #if SERCOM_SPI_FREQ_REF == F_CPU       // F_CPU clock = GCLK0
-  clockSource = SERCOM_CLOCK_SOURCE_FCPU;
+#if SERCOM_SPI_FREQ_REF == F_CPU // F_CPU clock = GCLK0
+  clockSource = SERCOM_CLOCK_SOURCE_100M;
  #elif SERCOM_SPI_FREQ_REF == 48000000  // 48 MHz clock = GCLK1 (standard)
   clockSource = SERCOM_CLOCK_SOURCE_48M;
  #elif SERCOM_SPI_FREQ_REF == 100000000 // 100 MHz clock = GCLK2
@@ -80,11 +80,7 @@ void SERCOM::initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint
     // Asynchronous fractional mode (Table 24-2 in datasheet)
     //   BAUD = fref / (sampleRateValue * fbaud)
     // (multiply by 8, to calculate fractional piece)
-#if defined(__SAMD51__)
-    uint32_t baudTimes8 = (SERCOM_FREQ_REF * 8) / (sampleRateValue * baudrate);
-#else
-    uint32_t baudTimes8 = (SystemCoreClock * 8) / (sampleRateValue * baudrate);
-#endif
+    uint32_t baudTimes8 = (freqRef * 8) / (sampleRateValue * baudrate);
 
     sercom->USART.BAUD.FRAC.FP   = (baudTimes8 % 8);
     sercom->USART.BAUD.FRAC.BAUD = (baudTimes8 / 8);
@@ -230,8 +226,8 @@ void SERCOM::initSPI(SercomSpiTXPad mosi, SercomRXPad miso, SercomSpiCharSize ch
   resetSPI();
   initClockNVIC();
 
-#if defined(__SAMD51__)
-  sercom->SPI.CTRLA.reg = SERCOM_SPI_CTRLA_MODE(0x3)  |  // master mode
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+  sercom->SPI.CTRLA.reg = SERCOM_SPI_CTRLA_MODE(0x3) | // master mode
                           SERCOM_SPI_CTRLA_DOPO(mosi) |
                           SERCOM_SPI_CTRLA_DIPO(miso) |
                           dataOrder << SERCOM_SPI_CTRLA_DORD_Pos;
@@ -322,13 +318,7 @@ SercomDataOrder SERCOM::getDataOrderSPI()
 void SERCOM::setBaudrateSPI(uint8_t divider)
 {
   disableSPI(); // Register is enable-protected
-
-#if defined(__SAMD51__)
   sercom->SPI.BAUD.reg = calculateBaudrateSynchronous(freqRef / divider);
-#else
-  sercom->SPI.BAUD.reg = calculateBaudrateSynchronous(SERCOM_SPI_FREQ_REF / divider);
-#endif
-
   enableSPI();
 }
 
@@ -386,13 +376,11 @@ bool SERCOM::isDataRegisterEmptySPI()
 //  return sercom->SPI.INTFLAG.bit.RXC;
 //}
 
-uint8_t SERCOM::calculateBaudrateSynchronous(uint32_t baudrate) {
-#if defined(__SAMD51__)
+uint8_t SERCOM::calculateBaudrateSynchronous(uint32_t baudrate)
+{
   uint16_t b = freqRef / (2 * baudrate);
-#else
-  uint16_t b = SERCOM_SPI_FREQ_REF / (2 * baudrate);
-#endif
-  if(b > 0) b--; // Don't -1 on baud calc if already at 0
+  if (b > 0)
+    b--; // Don't -1 on baud calc if already at 0
   return b;
 }
 
@@ -490,12 +478,10 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
   // Enable all interrupts
 //  sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_ERROR ;
 
-  // Synchronous arithmetic baudrate
-#if defined(__SAMD51__)
-  sercom->I2CM.BAUD.bit.BAUD = SERCOM_FREQ_REF / ( 2 * baudrate) - 1 ;
-#else
-  sercom->I2CM.BAUD.bit.BAUD = SystemCoreClock / ( 2 * baudrate) - 5 - (((SystemCoreClock / 1000000) * WIRE_RISE_TIME_NANOSECONDS) / (2 * 1000));
-#endif
+  if (sercom->I2CM.CTRLA.bit.SPEED == 0x2)
+    sercom->I2CM.BAUD.bit.HSBAUD = freqRef / (2 * baudrate) - 1;
+  else
+    sercom->I2CM.BAUD.bit.BAUD = freqRef / (2 * baudrate) - 5 - freqRef * WIRE_RISE_TIME_NANOSECONDS / (2 * 1e9f);
 }
 
 void SERCOM::prepareNackBitWIRE( void )
@@ -727,7 +713,7 @@ uint8_t SERCOM::readDataWIRE( void )
   }
 }
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
 static const struct {
   Sercom   *sercomPtr;
@@ -785,7 +771,47 @@ int8_t SERCOM::getSercomIndex(void) {
   return -1;
 }
 
-#if defined(__SAMD51__)
+uint32_t SERCOM::getSercomFreqRef(void)
+{
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+  int8_t idx = getSercomIndex();
+  uint8_t gen = 1; // default to GCLK1 (48 MHz) if we can't resolve
+
+  if (idx >= 0)
+  {
+    uint8_t pch = sercomData[idx].id_core;
+    gen = GCLK->PCHCTRL[pch].bit.GEN;
+  }
+
+  switch (gen)
+  {
+  case 0:
+    freqRef = 100000000UL;
+    break;
+  case 1:
+    freqRef = 48000000UL;
+    break;
+  case 2:
+    freqRef = 100000000UL;
+    break;
+  case 3:
+    freqRef = 32768UL;
+    break;
+  case 4:
+    freqRef = 12000000UL;
+    break;
+  default:
+    freqRef = 48000000UL;
+    break;
+  }
+#else
+  freqRef = SystemCoreClock;
+#endif
+
+  return freqRef;
+}
+
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 // This is currently for overriding an SPI SERCOM's clock source only --
 // NOT for UART or WIRE SERCOMs, where it will have unintended consequences.
 // It does not check.
@@ -804,16 +830,19 @@ void SERCOM::setClockSource(int8_t idx, SercomClockSource src, bool core) {
   if(core) clockSource = src; // Save SercomClockSource value
 
   // From cores/arduino/startup.c:
-  // GCLK0 = F_CPU
+  // GCLK0 = F_CPU (this is 120 MHz and exceeds SERCOM maximum)
   // GCLK1 = 48 MHz
   // GCLK2 = 100 MHz
   // GCLK3 = XOSC32K
   // GCLK4 = 12 MHz
   if(src == SERCOM_CLOCK_SOURCE_FCPU) {
     GCLK->PCHCTRL[clk_id].reg =
-      GCLK_PCHCTRL_GEN_GCLK0_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
-    if(core) freqRef = F_CPU; // Save clock frequency value
-  } else if(src == SERCOM_CLOCK_SOURCE_48M) {
+        GCLK_PCHCTRL_GEN_GCLK2_Val | (1 << GCLK_PCHCTRL_CHEN_Pos); // Guard Sercom from exceeding 100 MHz maximum
+    if (core)
+      freqRef = 100000000; // Save clock frequency value
+  }
+  else if (src == SERCOM_CLOCK_SOURCE_48M)
+  {
     GCLK->PCHCTRL[clk_id].reg =
       GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
     if(core) freqRef = 48000000;
@@ -840,7 +869,7 @@ void SERCOM::initClockNVIC( void )
   int8_t idx = getSercomIndex();
   if(idx < 0) return; // We got a problem here
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
   for(uint8_t i=0; i<4; i++) {
     NVIC_ClearPendingIRQ(sercomData[idx].irq[i]);
@@ -848,13 +877,7 @@ void SERCOM::initClockNVIC( void )
     NVIC_EnableIRQ(sercomData[idx].irq[i]);
   }
 
-  // SPI DMA speed is dictated by the "slow clock" (I think...maybe) so
-  // BOTH are set to the same clock source (clk_slow isn't sourced from
-  // XOSC32K as in prior versions of SAMD core).
-  // This might have power implications for sleep code.
-
-  setClockSource(idx, clockSource, true);  // true  = core clock
-  setClockSource(idx, clockSource, false); // false = slow clock
+  setClockSource(idx, clockSource, true); // true  = core clock
 
 #else // end if SAMD51 (prob SAMD21)
 
@@ -875,4 +898,6 @@ void SERCOM::initClockNVIC( void )
   while(GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY); // Wait for synchronization
 
 #endif // end !SAMD51
+
+  getSercomFreqRef();
 }

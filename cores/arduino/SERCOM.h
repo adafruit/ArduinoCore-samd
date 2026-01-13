@@ -237,6 +237,7 @@ class SERCOM
 		int availableWIRE( void ) ;
 		uint8_t readDataWIRE( void ) ;
 		int8_t getSercomIndex(void);
+	uint32_t getSercomFreqRef(void);
 #if defined(__SAMD51__)
 		// SERCOM clock source override is only available on
 		// SAMD51 (not 21) ... but these functions are declared
@@ -254,10 +255,10 @@ class SERCOM
 #endif
 
 	private:
-		Sercom* sercom;
-#if defined(__SAMD51__)
+	Sercom *sercom;
+	uint32_t freqRef = 48000000; // Frequency corresponding to clockSource
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
                 SercomClockSource clockSource;
-                uint32_t freqRef; // Frequency corresponding to clockSource
 #endif
 		uint8_t calculateBaudrateSynchronous(uint32_t baudrate);
 		uint32_t division(uint32_t dividend, uint32_t divisor) ;
