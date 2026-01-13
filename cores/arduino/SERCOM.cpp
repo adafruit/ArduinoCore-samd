@@ -478,7 +478,13 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
   // Enable all interrupts
 //  sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_ERROR ;
 
-  if (sercom->I2CM.CTRLA.bit.SPEED == 0x2)
+  uint8_t speedBit = sercom->I2CM.CTRLA.bit.SPEED;
+  uint32_t topSpeeds[3] = {400000, 1000000, 3400000}; // {(sm/fm), (fm+), (hs)}
+  const uint32_t minBaudrate = freqRef / 512;         // BAUD = 255: SAMD51 ~195kHz, SAMD21 ~94kHz
+  const uint32_t maxBaudrate = topSpeeds[speedBit];
+  baudrate = max(minBaudrate, min(baudrate, maxBaudrate));
+
+  if (speedBit == 0x2)
     sercom->I2CM.BAUD.bit.HSBAUD = freqRef / (2 * baudrate) - 1;
   else
     sercom->I2CM.BAUD.bit.BAUD = freqRef / (2 * baudrate) - 5 - freqRef * WIRE_RISE_TIME_NANOSECONDS / (2 * 1e9f);
