@@ -479,7 +479,7 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
 //  sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_ERROR ;
 
   uint8_t speedBit = sercom->I2CM.CTRLA.bit.SPEED;
-  uint32_t topSpeeds[3] = {400000, 1000000, 3400000}; // {(sm/fm), (fm+), (hs)}
+  const uint32_t topSpeeds[3] = {400000, 1000000, 3400000}; // {(sm/fm), (fm+), (hs)}
   const uint32_t minBaudrate = freqRef / 512;         // BAUD = 255: SAMD51 ~195kHz, SAMD21 ~94kHz
   const uint32_t maxBaudrate = topSpeeds[speedBit];
   baudrate = max(minBaudrate, min(baudrate, maxBaudrate));
@@ -487,7 +487,8 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
   if (speedBit == 0x2)
     sercom->I2CM.BAUD.bit.HSBAUD = freqRef / (2 * baudrate) - 1;
   else
-    sercom->I2CM.BAUD.bit.BAUD = freqRef / (2 * baudrate) - 5 - freqRef * WIRE_RISE_TIME_NANOSECONDS / (2 * 1e9f);
+    sercom->I2CM.BAUD.bit.BAUD = freqRef / (2 * baudrate) - 5 -
+      (freqRef/2000000ul * WIRE_RISE_TIME_NANOSECONDS) / 1000;
 }
 
 void SERCOM::prepareNackBitWIRE( void )
@@ -789,10 +790,15 @@ uint32_t SERCOM::getSercomFreqRef(void)
     gen = GCLK->PCHCTRL[pch].bit.GEN;
   }
 
+  // GCLK0 = F_CPU
+  // GCLK1 = 48 MHz
+  // GCLK2 = 100 MHz
+  // GCLK3 = XOSC32K
+  // GCLK4 = 12 MHz
   switch (gen)
   {
   case 0:
-    freqRef = 100000000UL;
+    freqRef = 100000000UL; // F_CPU but limit at 100 Mhz for SERCOM ref clock
     break;
   case 1:
     freqRef = 48000000UL;
@@ -836,7 +842,7 @@ void SERCOM::setClockSource(int8_t idx, SercomClockSource src, bool core) {
   if(core) clockSource = src; // Save SercomClockSource value
 
   // From cores/arduino/startup.c:
-  // GCLK0 = F_CPU (this is 120 MHz and exceeds SERCOM maximum)
+  // GCLK0 = F_CPU (this is 120 MHz and exceeds SERCOM maximum, limit to 100Mhz)
   // GCLK1 = 48 MHz
   // GCLK2 = 100 MHz
   // GCLK3 = XOSC32K

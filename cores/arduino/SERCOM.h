@@ -214,10 +214,10 @@ class SERCOM
 
 		void resetWIRE( void ) ;
 		void enableWIRE( void ) ;
-    void disableWIRE( void );
-    void prepareNackBitWIRE( void ) ;
-    void prepareAckBitWIRE( void ) ;
-    void prepareCommandBitsWire(uint8_t cmd);
+                void disableWIRE( void );
+                void prepareNackBitWIRE( void ) ;
+                void prepareAckBitWIRE( void ) ;
+                void prepareCommandBitsWire(uint8_t cmd);
 		bool startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag) ;
 		bool sendDataMasterWIRE(uint8_t data) ;
 		bool sendDataSlaveWIRE(uint8_t data) ;
@@ -233,12 +233,12 @@ class SERCOM
 		bool isRestartDetectedWIRE( void ) ;
 		bool isAddressMatch( void ) ;
 		bool isMasterReadOperationWIRE( void ) ;
-    bool isRXNackReceivedWIRE( void ) ;
+                bool isRXNackReceivedWIRE( void ) ;
 		int availableWIRE( void ) ;
 		uint8_t readDataWIRE( void ) ;
 		int8_t getSercomIndex(void);
-	uint32_t getSercomFreqRef(void);
-#if defined(__SAMD51__)
+                uint32_t getSercomFreqRef(void);
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 		// SERCOM clock source override is only available on
 		// SAMD51 (not 21) ... but these functions are declared
 		// regardless so user code doesn't need ifdefs or lengthy
@@ -254,9 +254,9 @@ class SERCOM
 		uint32_t getFreqRef(void) { return F_CPU; };
 #endif
 
-	private:
-	Sercom *sercom;
-	uint32_t freqRef = 48000000; // Frequency corresponding to clockSource
+          private:
+                Sercom *sercom;
+                uint32_t freqRef = 48000000ul; // Frequency corresponding to clockSource
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
                 SercomClockSource clockSource;
 #endif
