@@ -488,7 +488,7 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
     sercom->I2CM.BAUD.bit.HSBAUD = freqRef / (2 * baudrate) - 1;
   else
     sercom->I2CM.BAUD.bit.BAUD = freqRef / (2 * baudrate) - 5 -
-      (freqRef/2000000ul * WIRE_RISE_TIME_NANOSECONDS) / 1000;
+      (freqRef/1000000ul * WIRE_RISE_TIME_NANOSECONDS) / 2000;
 }
 
 void SERCOM::prepareNackBitWIRE( void )
