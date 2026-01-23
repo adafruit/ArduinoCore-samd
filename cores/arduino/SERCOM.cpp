@@ -476,18 +476,38 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
 
 
   // Enable all interrupts
-//  sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_ERROR ;
+  // sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_ERROR ;
 
-  uint8_t speedBit = sercom->I2CM.CTRLA.bit.SPEED;
-  uint32_t topSpeeds[3] = {400000, 1000000, 3400000}; // {(sm/fm), (fm+), (hs)}
-  const uint32_t minBaudrate = freqRef / 512;         // BAUD = 255: SAMD51 ~195kHz, SAMD21 ~94kHz
-  const uint32_t maxBaudrate = topSpeeds[speedBit];
+ // Determine speed mode based on requested baudrate
+  const uint32_t topSpeeds[3] = {400000, 1000000, 3400000}; // {(sm/fm), (fm+), (hs)}
+  uint8_t speedBit = 0;
+  bool clockStretchMode = false;
+  sercom->I2CM.CTRLA.bit.SCLSM = 0; // See: 28.6.2.4.6
+
+  if (baudrate > topSpeeds[0] && baudrate <= topSpeeds[1])
+    {
+    speedBit = 1; // Fast mode+
+    clockStretchMode = false; // See: 28.6.2.4.6
+    }
+  else if (baudrate > topSpeeds[1])
+    {
+    speedBit = 2; // High speed
+    clockStretchMode = true; // See: 28.6.2.4.6
+    }
+  // else speedBit = 0 and clockStretchMode = false for Standard/Fast mode (up to 400kHz)
+  
+  sercom->I2CM.CTRLA.bit.SPEED = speedBit;
+  sercom->I2CM.CTRLA.bit.SCLSM = clockStretchMode; // See: 28.6.2.4.6
+
+  uint32_t minBaudrate = freqRef / 512;         // BAUD = 255: SAMD51(@100MHz) ~195kHz, SAMD21 ~94kHz
+  uint32_t maxBaudrate = topSpeeds[speedBit];
   baudrate = max(minBaudrate, min(baudrate, maxBaudrate));
 
   if (speedBit == 0x2)
     sercom->I2CM.BAUD.bit.HSBAUD = freqRef / (2 * baudrate) - 1;
   else
-    sercom->I2CM.BAUD.bit.BAUD = freqRef / (2 * baudrate) - 5 - freqRef * WIRE_RISE_TIME_NANOSECONDS / (2 * 1e9f);
+    sercom->I2CM.BAUD.bit.BAUD = freqRef / (2 * baudrate) - 5 -
+      (freqRef/1000000ul * WIRE_RISE_TIME_NANOSECONDS) / 2000;
 }
 
 void SERCOM::prepareNackBitWIRE( void )
@@ -543,7 +563,8 @@ bool SERCOM::startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag
   }
 
   // Send start and address
-  sercom->I2CM.ADDR.bit.ADDR = address;
+  sercom->I2CM.ADDR.reg = SERCOM_I2CM_ADDR_ADDR(address) | 
+                          ((sercom->I2CM.CTRLA.bit.SPEED == 0x2) ? SERCOM_I2CM_ADDR_HS : 0);
 
   // Address Transmitted
   if ( flag == WIRE_WRITE_FLAG ) // Write mode
