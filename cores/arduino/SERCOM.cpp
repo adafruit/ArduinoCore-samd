@@ -480,26 +480,25 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
 
  // Determine speed mode based on requested baudrate
   const uint32_t topSpeeds[3] = {400000, 1000000, 3400000}; // {(sm/fm), (fm+), (hs)}
-  uint8_t speedBit = 0;
-  bool clockStretchMode = false;
-  sercom->I2CM.CTRLA.bit.SCLSM = 0; // See: 28.6.2.4.6
+  uint8_t speedBit;
+  uint8_t clockStretchMode; // See: 28.6.2.4.6 (SERCOM I2C Highspeed mode)
 
-  if (baudrate > topSpeeds[0] && baudrate <= topSpeeds[1])
-    {
-    speedBit = 1; // Fast mode+
-    clockStretchMode = false; // See: 28.6.2.4.6
-    }
-  else if (baudrate > topSpeeds[1])
-    {
-    speedBit = 2; // High speed
-    clockStretchMode = true; // See: 28.6.2.4.6
-    }
-  // else speedBit = 0 and clockStretchMode = false for Standard/Fast mode (up to 400kHz)
-  
+  if (baudrate <= topSpeeds[0]) {
+    speedBit = 0; // Standard/Fast mode up to 400 khz
+    clockStretchMode = 0;
+  } else if (baudrate <= topSpeeds[1]) {
+    speedBit = 1; // Fast mode+ up to 1 Mhz
+    clockStretchMode = 0;
+  } else {
+    // High speed up to 3.4 Mhz
+    speedBit = 2;
+    clockStretchMode = 1;
+  }
+
   sercom->I2CM.CTRLA.bit.SPEED = speedBit;
-  sercom->I2CM.CTRLA.bit.SCLSM = clockStretchMode; // See: 28.6.2.4.6
+  sercom->I2CM.CTRLA.bit.SCLSM = clockStretchMode;
 
-  uint32_t minBaudrate = freqRef / 512;         // BAUD = 255: SAMD51(@100MHz) ~195kHz, SAMD21 ~94kHz
+  uint32_t minBaudrate = freqRef / 512; // BAUD = 255: SAMD51(@100MHz) ~195kHz, SAMD21 ~94kHz
   uint32_t maxBaudrate = topSpeeds[speedBit];
   baudrate = max(minBaudrate, min(baudrate, maxBaudrate));
 
