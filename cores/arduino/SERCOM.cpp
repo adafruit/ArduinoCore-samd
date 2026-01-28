@@ -814,6 +814,9 @@ void SERCOM::release(uint8_t sercomId)
   SercomState &state = s_states[sercomId];
   state.role = Role::None;
   state.service = nullptr;
+#ifdef SERCOM_STRICT_PADS
+  clearPads(sercomId);
+#endif // SERCOM_STRICT_PADS
   s_pendingMask &= ~(1u << sercomId);
 }
 
@@ -826,9 +829,58 @@ bool SERCOM::registerService(uint8_t sercomId, ServiceFn fn)
   return true;
 }
 
-void SERCOM::setPending(uint8_t sercomId)
+#ifdef SERCOM_STRICT_PADS
+bool SERCOM::registerPads(uint8_t sercomId, const PadFunc (&pads)[4], bool muxFunctionD)
 {
   if (sercomId >= kSercomCount)
+    return false;
+
+  SercomState &state = s_states[sercomId];
+  for (size_t i = 0; i < 4; ++i)
+  {
+    PadFunc desired = pads[i];
+    if (desired == PadFunc::None)
+      continue;
+    PadFunc existing = state.pads[i];
+    if (existing != PadFunc::None && existing != desired)
+      return false;
+  }
+  if (state.padsConfigured && state.muxFunctionD != muxFunctionD)
+    return false;
+
+  bool any = false;
+  for (size_t i = 0; i < 4; ++i)
+  {
+    PadFunc desired = pads[i];
+    if (desired == PadFunc::None)
+      continue;
+    state.pads[i] = desired;
+    any = true;
+  }
+  if (any)
+  {
+    state.padsConfigured = true;
+    state.muxFunctionD = muxFunctionD;
+  }
+  return true;
+}
+
+void SERCOM::clearPads(uint8_t sercomId)
+{
+  if (sercomId >= kSercomCount)
+    return;
+
+  SercomState &state = s_states[sercomId];
+  for (size_t i = 0; i < 4; ++i)
+    state.pads[i] = PadFunc::None;
+  state.padsConfigured = false;
+  state.muxFunctionD = false;
+}
+#endif // SERCOM_STRICT_PADS
+
+void SERCOM::setPending(uint8_t sercomId)
+{
+  if (sercomId >= kSercomCount || sercomId < 0)
     return;
 
   __disable_irq();
