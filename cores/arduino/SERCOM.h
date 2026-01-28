@@ -239,7 +239,8 @@ class SERCOM
 		int availableWIRE( void ) ;
 		uint8_t readDataWIRE( void ) ;
 		int8_t getSercomIndex(void);
-                uint32_t getSercomFreqRef(void);
+        uint32_t getSercomFreqRef(void);
+
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 		// SERCOM clock source override is only available on
 		// SAMD51 (not 21) ... but these functions are declared
@@ -266,21 +267,47 @@ class SERCOM
 		static void setPending(uint8_t sercomId);
 		static void dispatchPending(void);
 
-          private:
-                Sercom *sercom;
-                uint32_t freqRef = 48000000ul; // Frequency corresponding to clockSource
+#ifdef SERCOM_STRICT_PADS
+		enum class PadFunc : uint8_t {
+			None = 0,
+			UartTx,
+			UartRx,
+			SpiMosi,
+			SpiMiso,
+			SpiSck,
+			SpiSs,
+			WireSda,
+			WireScl
+		};
+
+		static bool registerPads(uint8_t sercomId, const PadFunc (&pads)[4], bool muxFunctionD);
+		static void clearPads(uint8_t sercomId);
+#endif // SERCOM_STRICT_PADS
+
+    private:
+        Sercom *sercom;
+        uint32_t freqRef = 48000000ul; // Frequency corresponding to clockSource
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
-                SercomClockSource clockSource;
+        SercomClockSource clockSource;
 #endif
-	#if defined(SERCOM_INST_NUM) && (SERCOM_INST_NUM > 0)
+
+#if defined(SERCOM_INST_NUM) && (SERCOM_INST_NUM > 0)
 		static constexpr size_t kSercomCount = SERCOM_INST_NUM;
-	#else
-		static constexpr size_t kSercomCount = 6;
-	#endif
+#else
+		#pragma message("SERCOM_INST_NUM not defined; SERCOM support disabled.")
+		static constexpr size_t kSercomCount = 0;
+#endif // SERCOM_INST_NUM
+
 		struct SercomState {
 			Role role = Role::None;
 			ServiceFn service = nullptr;
+#ifdef SERCOM_STRICT_PADS
+			PadFunc pads[4] = { PadFunc::None, PadFunc::None, PadFunc::None, PadFunc::None };
+			bool padsConfigured = false;
+			bool muxFunctionD = false;
+#endif // SERCOM_STRICT_PADS
 		};
+
 		static std::array<SercomState, kSercomCount> s_states;
 		static volatile uint32_t s_pendingMask;
 		uint8_t calculateBaudrateSynchronous(uint32_t baudrate);
