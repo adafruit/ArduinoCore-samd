@@ -20,6 +20,7 @@
 #define _SERCOM_CLASS_
 
 #include "sam.h"
+#include "SERCOM_Txn.h"
 
 // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
 // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
