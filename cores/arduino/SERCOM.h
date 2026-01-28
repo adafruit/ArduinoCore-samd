@@ -23,6 +23,10 @@
 #include "SERCOM_Txn.h"
 #include <array>
 
+#ifdef USE_ZERODMA
+class Adafruit_ZeroDMA;
+#endif
+
 // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
 // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
 // this affects ALL SPI peripherals including some that should NOT be
@@ -267,6 +271,34 @@ class SERCOM
 		static void setPending(uint8_t sercomId);
 		static void dispatchPending(void);
 
+#ifdef USE_ZERODMA
+		// --- SERCOM ZeroDMA helpers (Phase 1) ---
+		using DmaCallback = void (*)(Adafruit_ZeroDMA*);
+		enum class DmaStatus : uint8_t {
+			Ok = 0,
+			NotConfigured,
+			NullPtr,
+			ZeroLen,
+			AllocateFailed,
+			DescriptorFailed,
+			StartFailed
+		};
+
+		DmaStatus dmaInit(uint8_t txTrigger, uint8_t rxTrigger);
+		void dmaSetCallbacks(DmaCallback txCb, DmaCallback rxCb);
+		DmaStatus dmaStartTx(const void* src, void* dstReg, size_t len);
+		DmaStatus dmaStartRx(void* dst, void* srcReg, size_t len);
+		DmaStatus dmaStartDuplex(const void* txSrc, void* rxDst, void* txReg, void* rxReg, size_t len,
+		                    const uint8_t* dummyTx = nullptr);
+		void dmaRelease();
+		void dmaResetDescriptors();
+		void dmaAbortTx();
+		void dmaAbortRx();
+		bool dmaTxBusy() const;
+		bool dmaRxBusy() const;
+		DmaStatus dmaLastError() const;
+#endif
+
 #ifdef SERCOM_STRICT_PADS
 		enum class PadFunc : uint8_t {
 			None = 0,
@@ -313,6 +345,21 @@ class SERCOM
 		uint8_t calculateBaudrateSynchronous(uint32_t baudrate);
 		uint32_t division(uint32_t dividend, uint32_t divisor) ;
 		void initClockNVIC( void ) ;
+
+#ifdef USE_ZERODMA
+		Adafruit_ZeroDMA* _dmaTx = nullptr;
+		Adafruit_ZeroDMA* _dmaRx = nullptr;
+		DmacDescriptor* _dmaTxDesc = nullptr;
+		DmacDescriptor* _dmaRxDesc = nullptr;
+		DmaCallback _dmaTxCb = nullptr;
+		DmaCallback _dmaRxCb = nullptr;
+		uint8_t _dmaTxTrigger = 0;
+		uint8_t _dmaRxTrigger = 0;
+		bool _dmaConfigured = false;
+		bool _dmaTxActive = false;
+		bool _dmaRxActive = false;
+		DmaStatus _dmaLastError = DmaStatus::Ok;
+#endif
 };
 
 #endif
