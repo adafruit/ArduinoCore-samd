@@ -21,6 +21,7 @@
 
 #include "sam.h"
 #include "SERCOM_Txn.h"
+#include <array>
 
 // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
 // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
@@ -255,12 +256,33 @@ class SERCOM
 		uint32_t getFreqRef(void) { return F_CPU; };
 #endif
 
+		// --- Async SERCOM scaffolding (Phase 1) ---
+		enum class Role : uint8_t { None = 0, UART, SPI, I2C };
+		using ServiceFn = void (*)();
+
+		static bool claim(uint8_t sercomId, Role role);
+		static void release(uint8_t sercomId);
+		static bool registerService(uint8_t sercomId, ServiceFn fn);
+		static void setPending(uint8_t sercomId);
+		static void dispatchPending(void);
+
           private:
                 Sercom *sercom;
                 uint32_t freqRef = 48000000ul; // Frequency corresponding to clockSource
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
                 SercomClockSource clockSource;
 #endif
+	#if defined(SERCOM_INST_NUM) && (SERCOM_INST_NUM > 0)
+		static constexpr size_t kSercomCount = SERCOM_INST_NUM;
+	#else
+		static constexpr size_t kSercomCount = 6;
+	#endif
+		struct SercomState {
+			Role role = Role::None;
+			ServiceFn service = nullptr;
+		};
+		static std::array<SercomState, kSercomCount> s_states;
+		static volatile uint32_t s_pendingMask;
 		uint8_t calculateBaudrateSynchronous(uint32_t baudrate);
 		uint32_t division(uint32_t dividend, uint32_t divisor) ;
 		void initClockNVIC( void ) ;

@@ -790,6 +790,79 @@ static const struct {
 
 #endif // end !SAMD51
 
+std::array<SERCOM::SercomState, SERCOM::kSercomCount> SERCOM::s_states = {};
+volatile uint32_t SERCOM::s_pendingMask = 0;
+
+bool SERCOM::claim(uint8_t sercomId, Role role)
+{
+  if (sercomId >= kSercomCount)
+    return false;
+
+  SercomState &state = s_states[sercomId];
+  if (state.role != Role::None && state.role != role)
+    return false;
+
+  state.role = role;
+  return true;
+}
+
+void SERCOM::release(uint8_t sercomId)
+{
+  if (sercomId >= kSercomCount)
+    return;
+
+  SercomState &state = s_states[sercomId];
+  state.role = Role::None;
+  state.service = nullptr;
+  s_pendingMask &= ~(1u << sercomId);
+}
+
+bool SERCOM::registerService(uint8_t sercomId, ServiceFn fn)
+{
+  if (sercomId >= kSercomCount)
+    return false;
+
+  s_states[sercomId].service = fn;
+  return true;
+}
+
+void SERCOM::setPending(uint8_t sercomId)
+{
+  if (sercomId >= kSercomCount)
+    return;
+
+  __disable_irq();
+  s_pendingMask |= (1u << sercomId);
+  __enable_irq();
+  __DMB();
+  SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
+}
+
+void SERCOM::dispatchPending(void)
+{
+  uint32_t pending;
+
+  __disable_irq();
+  pending = s_pendingMask;
+  s_pendingMask = 0;
+  __enable_irq();
+
+  for (size_t i = 0; i < kSercomCount; ++i)
+  {
+    if ((pending & (1u << i)) == 0)
+      continue;
+
+    ServiceFn fn = s_states[i].service;
+    if (fn)
+      fn();
+  }
+}
+
+extern "C" void PendSV_Handler(void)
+{
+  SERCOM::dispatchPending();
+}
+
 int8_t SERCOM::getSercomIndex(void) {
   for(uint8_t i=0; i<(sizeof(sercomData) / sizeof(sercomData[0])); i++) {
     if(sercom == sercomData[i].sercomPtr) return i;
