@@ -21,6 +21,10 @@
 #include "variant.h"
 #include "Arduino.h"
 
+#ifdef USE_ZERODMA
+#include <Adafruit_ZeroDMA.h>
+#endif
+
 #ifndef WIRE_RISE_TIME_NANOSECONDS
 // Default rise time in nanoseconds, based on 4.7K ohm pull up resistors
 // you can override this value in your variant if needed
@@ -828,6 +832,253 @@ bool SERCOM::registerService(uint8_t sercomId, ServiceFn fn)
   s_states[sercomId].service = fn;
   return true;
 }
+
+#ifdef USE_ZERODMA
+SERCOM::DmaStatus SERCOM::dmaInit(uint8_t txTrigger, uint8_t rxTrigger)
+{
+  if (_dmaConfigured)
+    return DmaStatus::Ok;
+
+  _dmaTxTrigger = txTrigger;
+  _dmaRxTrigger = rxTrigger;
+
+  if (!_dmaTx)
+    _dmaTx = new Adafruit_ZeroDMA();
+  if (!_dmaRx)
+    _dmaRx = new Adafruit_ZeroDMA();
+  if (!_dmaTx || !_dmaRx)
+  {
+    _dmaLastError = DmaStatus::AllocateFailed;
+    dmaRelease();
+    return _dmaLastError;
+  }
+
+  if (_dmaTx->allocate() != DMA_STATUS_OK)
+  {
+    _dmaLastError = DmaStatus::AllocateFailed;
+    dmaRelease();
+    return _dmaLastError;
+  }
+  if (_dmaRx->allocate() != DMA_STATUS_OK)
+  {
+    _dmaLastError = DmaStatus::AllocateFailed;
+    dmaRelease();
+    return _dmaLastError;
+  }
+
+  _dmaTx->setTrigger(_dmaTxTrigger);
+  _dmaTx->setAction(DMA_TRIGGER_ACTON_BEAT);
+  _dmaRx->setTrigger(_dmaRxTrigger);
+  _dmaRx->setAction(DMA_TRIGGER_ACTON_BEAT);
+
+  if (_dmaTxCb)
+    _dmaTx->setCallback(_dmaTxCb);
+  if (_dmaRxCb)
+    _dmaRx->setCallback(_dmaRxCb);
+
+  _dmaConfigured = true;
+  _dmaLastError = DmaStatus::Ok;
+  return _dmaLastError;
+}
+
+void SERCOM::dmaSetCallbacks(DmaCallback txCb, DmaCallback rxCb)
+{
+  _dmaTxCb = txCb;
+  _dmaRxCb = rxCb;
+
+  if (_dmaConfigured)
+  {
+    if (_dmaTxCb)
+      _dmaTx->setCallback(_dmaTxCb);
+    if (_dmaRxCb)
+      _dmaRx->setCallback(_dmaRxCb);
+  }
+}
+
+SERCOM::DmaStatus SERCOM::dmaStartTx(const void* src, void* dstReg, size_t len)
+{
+  if (!_dmaConfigured || !_dmaTx)
+  {
+    _dmaLastError = DmaStatus::NotConfigured;
+    return _dmaLastError;
+  }
+  if (src == nullptr || dstReg == nullptr)
+  {
+    _dmaLastError = DmaStatus::NullPtr;
+    return _dmaLastError;
+  }
+  if (len == 0)
+  {
+    _dmaLastError = DmaStatus::ZeroLen;
+    return _dmaLastError;
+  }
+
+  if (_dmaTxDesc == nullptr)
+    _dmaTxDesc = _dmaTx->addDescriptor((void*)src, dstReg, len, DMA_BEAT_SIZE_BYTE, true, false);
+  else
+    _dmaTx->changeDescriptor(_dmaTxDesc, (void*)src, dstReg, len);
+
+  if (_dmaTxDesc == nullptr)
+  {
+    _dmaLastError = DmaStatus::DescriptorFailed;
+    return _dmaLastError;
+  }
+
+  ZeroDMAstatus status = _dmaTx->startJob();
+  if (status != DMA_STATUS_OK)
+  {
+    _dmaTx->abort();
+    _dmaLastError = DmaStatus::StartFailed;
+    return _dmaLastError;
+  }
+
+  _dmaTxActive = true;
+  _dmaLastError = DmaStatus::Ok;
+  return _dmaLastError;
+}
+
+SERCOM::DmaStatus SERCOM::dmaStartRx(void* dst, void* srcReg, size_t len)
+{
+  if (!_dmaConfigured || !_dmaRx)
+  {
+    _dmaLastError = DmaStatus::NotConfigured;
+    return _dmaLastError;
+  }
+  if (dst == nullptr || srcReg == nullptr)
+  {
+    _dmaLastError = DmaStatus::NullPtr;
+    return _dmaLastError;
+  }
+  if (len == 0)
+  {
+    _dmaLastError = DmaStatus::ZeroLen;
+    return _dmaLastError;
+  }
+
+  if (_dmaRxDesc == nullptr)
+    _dmaRxDesc = _dmaRx->addDescriptor(srcReg, dst, len, DMA_BEAT_SIZE_BYTE, false, true);
+  else
+    _dmaRx->changeDescriptor(_dmaRxDesc, srcReg, dst, len);
+
+  if (_dmaRxDesc == nullptr)
+  {
+    _dmaLastError = DmaStatus::DescriptorFailed;
+    return _dmaLastError;
+  }
+
+  ZeroDMAstatus status = _dmaRx->startJob();
+  if (status != DMA_STATUS_OK)
+  {
+    _dmaRx->abort();
+    _dmaLastError = DmaStatus::StartFailed;
+    return _dmaLastError;
+  }
+
+  _dmaRxActive = true;
+  _dmaLastError = DmaStatus::Ok;
+  return _dmaLastError;
+}
+
+SERCOM::DmaStatus SERCOM::dmaStartDuplex(const void* txSrc, void* rxDst, void* txReg, void* rxReg, size_t len,
+                                         const uint8_t* dummyTx)
+{
+  if (len == 0)
+  {
+    _dmaLastError = DmaStatus::ZeroLen;
+    return _dmaLastError;
+  }
+  DmaStatus st = dmaStartRx(rxDst, rxReg, len);
+  if (st != DmaStatus::Ok)
+    return st;
+  static const uint8_t kDummyByte = 0xFF;
+  const void* txPtr = txSrc ? txSrc : (dummyTx ? dummyTx : &kDummyByte);
+  st = dmaStartTx(txPtr, txReg, len);
+  if (st != DmaStatus::Ok)
+  {
+    dmaAbortRx();
+    return st;
+  }
+  return DmaStatus::Ok;
+}
+
+void SERCOM::dmaAbortTx()
+{
+  if (_dmaTx)
+    _dmaTx->abort();
+  _dmaTxActive = false;
+}
+
+void SERCOM::dmaAbortRx()
+{
+  if (_dmaRx)
+    _dmaRx->abort();
+  _dmaRxActive = false;
+}
+
+void SERCOM::dmaRelease()
+{
+  if (!_dmaConfigured)
+  {
+    dmaResetDescriptors();
+    if (_dmaTx)
+    {
+      delete _dmaTx;
+      _dmaTx = nullptr;
+    }
+    if (_dmaRx)
+    {
+      delete _dmaRx;
+      _dmaRx = nullptr;
+    }
+    _dmaLastError = DmaStatus::Ok;
+    return;
+  }
+
+  dmaAbortTx();
+  dmaAbortRx();
+
+  if (_dmaTx)
+    _dmaTx->free();
+  if (_dmaRx)
+    _dmaRx->free();
+
+  dmaResetDescriptors();
+
+  _dmaConfigured = false;
+  if (_dmaTx)
+  {
+    delete _dmaTx;
+    _dmaTx = nullptr;
+  }
+  if (_dmaRx)
+  {
+    delete _dmaRx;
+    _dmaRx = nullptr;
+  }
+  _dmaLastError = DmaStatus::Ok;
+}
+
+void SERCOM::dmaResetDescriptors()
+{
+  _dmaTxDesc = nullptr;
+  _dmaRxDesc = nullptr;
+}
+
+bool SERCOM::dmaTxBusy() const
+{
+  return _dmaTxActive;
+}
+
+bool SERCOM::dmaRxBusy() const
+{
+  return _dmaRxActive;
+}
+
+SERCOM::DmaStatus SERCOM::dmaLastError() const
+{
+  return _dmaLastError;
+}
+#endif
 
 #ifdef SERCOM_STRICT_PADS
 bool SERCOM::registerPads(uint8_t sercomId, const PadFunc (&pads)[4], bool muxFunctionD)
