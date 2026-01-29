@@ -406,17 +406,25 @@ void SERCOM::resetWIRE()
   _wire = WireConfig{};
 }
 
-void SERCOM::initSlaveWIRE( uint8_t ucAddress, bool enableGeneralCall, uint8_t speed )
+void SERCOM::initSlaveWIRE( uint8_t ucAddress, bool enableGeneralCall )
+{
+  initSlaveWIRE(  ucAddress & 0x7Fu, enableGeneralCall,  false, 0x0, false );
+}
+
+void SERCOM::initSlaveWIRE( uint16_t ucAddress, bool enableGeneralCall, uint8_t speed, bool enable10Bit )
 {
   if (!_wire.inited) {
     initClockNVIC();
     _wire.inited = true;
   }
 
+  uint16_t mask = enable10Bit ? 0x03FFul : 0x007Ful;
+
   _wire.slaveSpeed = speed;
-  _wire.addr = SERCOM_I2CS_ADDR_ADDR(ucAddress & 0x7Ful) | // 0x7F, select only 7 bits
-               SERCOM_I2CS_ADDR_ADDRMASK(0x00ul) |         // 0x00, only match exact address
-               enableGeneralCall;                          // enable general call (address 0x00)
+  _wire.addr = SERCOM_I2CS_ADDR_ADDR(ucAddress & mask) |       // select either 7 or 10-bits
+               SERCOM_I2CS_ADDR_ADDRMASK(0x00ul) |             // 0x00, only match exact address
+               (enable10Bit ? SERCOM_I2CS_ADDR_TENBITEN : 0) | // 10-bit addressing
+               enableGeneralCall;                              // enable general call (address 0x00)
   setSlaveWIRE();
 }
 
