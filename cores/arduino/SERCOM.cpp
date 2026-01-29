@@ -402,87 +402,90 @@ void SERCOM::resetWIRE()
 
   //Wait both bits Software Reset from CTRLA and SYNCBUSY are equal to 0
   while(sercom->I2CM.CTRLA.bit.SWRST || sercom->I2CM.SYNCBUSY.bit.SWRST);
+
+  _wire = WireConfig{};
 }
 
-void SERCOM::enableWIRE()
+void SERCOM::initSlaveWIRE( uint8_t ucAddress, bool enableGeneralCall, uint8_t speed )
 {
-  // I2C Master and Slave modes share the ENABLE bit function.
-
-  // Enable the I2C master mode
-  sercom->I2CM.CTRLA.bit.ENABLE = 1 ;
-
-  while ( sercom->I2CM.SYNCBUSY.bit.ENABLE != 0 )
-  {
-    // Waiting the enable bit from SYNCBUSY is equal to 0;
+  if (!_wire.inited) {
+    initClockNVIC();
+    _wire.inited = true;
   }
 
-  // Setting bus idle mode
-  sercom->I2CM.STATUS.bit.BUSSTATE = 1 ;
-
-  while ( sercom->I2CM.SYNCBUSY.bit.SYSOP != 0 )
-  {
-    // Wait the SYSOP bit from SYNCBUSY coming back to 0
-  }
-}
-
-void SERCOM::disableWIRE()
-{
-  // I2C Master and Slave modes share the ENABLE bit function.
-
-  // Enable the I2C master mode
-  sercom->I2CM.CTRLA.bit.ENABLE = 0 ;
-
-  while ( sercom->I2CM.SYNCBUSY.bit.ENABLE != 0 )
-  {
-    // Waiting the enable bit from SYNCBUSY is equal to 0;
-  }
-}
-
-void SERCOM::initSlaveWIRE( uint8_t ucAddress, bool enableGeneralCall )
-{
-  // Initialize the peripheral clock and interruption
-  initClockNVIC() ;
-  resetWIRE() ;
-
-  // Set slave mode
-  sercom->I2CS.CTRLA.bit.MODE = I2C_SLAVE_OPERATION;
-
-  sercom->I2CS.ADDR.reg = SERCOM_I2CS_ADDR_ADDR( ucAddress & 0x7Ful ) | // 0x7F, select only 7 bits
-                          SERCOM_I2CS_ADDR_ADDRMASK( 0x00ul );          // 0x00, only match exact address
-  if (enableGeneralCall) {
-    sercom->I2CS.ADDR.reg |= SERCOM_I2CS_ADDR_GENCEN;                   // enable general call (address 0x00)
-  }
-
-  // Set the interrupt register
-  sercom->I2CS.INTENSET.reg = SERCOM_I2CS_INTENSET_PREC |   // Stop
-                              SERCOM_I2CS_INTENSET_AMATCH | // Address Match
-                              SERCOM_I2CS_INTENSET_DRDY ;   // Data Ready
-
-  while ( sercom->I2CM.SYNCBUSY.bit.SYSOP != 0 )
-  {
-    // Wait the SYSOP bit from SYNCBUSY to come back to 0
-  }
+  _wire.slaveSpeed = speed;
+  _wire.addr = SERCOM_I2CS_ADDR_ADDR(ucAddress & 0x7Ful) | // 0x7F, select only 7 bits
+               SERCOM_I2CS_ADDR_ADDRMASK(0x00ul) |         // 0x00, only match exact address
+               enableGeneralCall;                          // enable general call (address 0x00)
+  setSlaveWIRE();
 }
 
 void SERCOM::initMasterWIRE( uint32_t baudrate )
 {
-  // Initialize the peripheral clock and interruption
-  initClockNVIC() ;
+  if (!_wire.inited) {
+    initClockNVIC();
+    _wire.inited = true;
+  }
 
-  resetWIRE() ;
+  setBaudrateWIRE(baudrate);
+  setMasterWIRE();
+}
 
-  // Set master mode and enable SCL Clock Stretch mode (stretch after ACK bit)
-  sercom->I2CM.CTRLA.reg =  SERCOM_I2CM_CTRLA_MODE( I2C_MASTER_OPERATION )/* |
-                            SERCOM_I2CM_CTRLA_SCLSM*/ ;
+void SERCOM::setMasterWIRE(void)
+{
+  disableWIRE();
 
-  // Enable Smart mode and Quick Command
-  //sercom->I2CM.CTRLB.reg =  SERCOM_I2CM_CTRLB_SMEN /*| SERCOM_I2CM_CTRLB_QCEN*/ ;
+  sercom->I2CM.CTRLB.reg = _wire.ctrlb |SERCOM_I2CM_CTRLB_QCEN;
+  sercom->I2CM.BAUD.reg = _wire.baud;
+  bool sclsm = (_wire.masterSpeed == 0x2);
 
+  // Set master mode and clock settings
+  sercom->I2CM.CTRLA.reg = _wire.ctrla |
+                           SERCOM_I2CM_CTRLA_MODE(I2C_MASTER_OPERATION) |
+                           SERCOM_I2CM_CTRLA_SPEED(_wire.masterSpeed) |
+                           (sclsm ? SERCOM_I2CM_CTRLA_SCLSM : 0 );
 
-  // Enable all interrupts
-  // sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_ERROR ;
+  while (sercom->I2CM.SYNCBUSY.bit.ENABLE != 0) ;
 
- // Determine speed mode based on requested baudrate
+  // Setting bus idle mode
+  sercom->I2CM.STATUS.bit.BUSSTATE = 1 ;
+  while (sercom->I2CM.SYNCBUSY.bit.SYSOP != 0) ;
+
+  // Disable slave interrupts: address match, data ready, stop/restart.
+  sercom->I2CS.INTENCLR.reg = SERCOM_I2CS_INTENSET_AMATCH |
+                              SERCOM_I2CS_INTENSET_DRDY |
+                              SERCOM_I2CS_INTENSET_PREC;
+}
+
+void SERCOM::setSlaveWIRE(void)
+{
+  disableWIRE();
+
+  sercom->I2CS.ADDR.reg = _wire.addr;
+  sercom->I2CS.CTRLB.reg = _wire.ctrlb;
+  bool sclsm = (_wire.slaveSpeed == 0x2);
+
+  // Set master mode and clock settings
+  sercom->I2CS.CTRLA.reg = _wire.ctrla |
+                           SERCOM_I2CS_CTRLA_MODE(I2C_SLAVE_OPERATION) |
+                           SERCOM_I2CS_CTRLA_SPEED(_wire.slaveSpeed) |
+                           (sclsm ? SERCOM_I2CS_CTRLA_SCLSM : 0 );
+
+  while (sercom->I2CS.SYNCBUSY.bit.ENABLE != 0) ;
+
+  // Setting bus idle mode
+  sercom->I2CS.STATUS.bit.BUSSTATE = 1 ;
+  while (sercom->I2CS.SYNCBUSY.bit.SYSOP != 0) ;
+
+  // Enable slave interrupts: address match, data ready, stop/restart.
+  sercom->I2CS.INTENSET.reg = SERCOM_I2CS_INTENSET_PREC |   // Stop
+                              SERCOM_I2CS_INTENSET_AMATCH | // Address Match
+                              SERCOM_I2CS_INTENSET_DRDY;    // Data Ready
+}
+
+void SERCOM::setBaudrateWIRE(uint32_t baudrate)
+{
+// Determine speed mode based on requested baudrate
   const uint32_t topSpeeds[3] = {400000, 1000000, 3400000}; // {(sm/fm), (fm+), (hs)}
   uint8_t speedBit;
   uint8_t clockStretchMode; // See: 28.6.2.4.6 (SERCOM I2C Highspeed mode)
@@ -499,18 +502,21 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
     clockStretchMode = 1;
   }
 
-  sercom->I2CM.CTRLA.bit.SPEED = speedBit;
-  sercom->I2CM.CTRLA.bit.SCLSM = clockStretchMode;
+  _wire.masterSpeed = speedBit;
 
-  uint32_t minBaudrate = freqRef / 512; // BAUD = 255: SAMD51(@100MHz) ~195kHz, SAMD21 ~94kHz
+  uint32_t fREF = getSercomFreqRef();
+  uint32_t minBaudrate = fREF / 512; // BAUD = 255: SAMD51(@100MHz) ~195kHz, SAMD21 ~94kHz
   uint32_t maxBaudrate = topSpeeds[speedBit];
   baudrate = max(minBaudrate, min(baudrate, maxBaudrate));
 
   if (speedBit == 0x2)
-    sercom->I2CM.BAUD.bit.HSBAUD = freqRef / (2 * baudrate) - 1;
+    _wire.baud = SERCOM_I2CM_BAUD_HSBAUD(fREF / (2 * baudrate) - 1);
   else
-    sercom->I2CM.BAUD.bit.BAUD = freqRef / (2 * baudrate) - 5 -
-      (freqRef/1000000ul * WIRE_RISE_TIME_NANOSECONDS) / 2000;
+    _wire.baud = SERCOM_I2CM_BAUD_BAUD(fREF / (2 * baudrate) - 5 -
+                 (fREF/1000000ul * WIRE_RISE_TIME_NANOSECONDS) / 2000);
+
+  if (isMasterWIRE())
+    setMasterWIRE();
 }
 
 void SERCOM::prepareNackBitWIRE( void )
@@ -567,7 +573,7 @@ bool SERCOM::startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag
 
   // Send start and address
   sercom->I2CM.ADDR.reg = SERCOM_I2CM_ADDR_ADDR(address) | 
-                          ((sercom->I2CM.CTRLA.bit.SPEED == 0x2) ? SERCOM_I2CM_ADDR_HS : 0);
+                          ((_wire.masterSpeed == 0x2) ? SERCOM_I2CM_ADDR_HS : 0);
 
   // Address Transmitted
   if ( flag == WIRE_WRITE_FLAG ) // Write mode
@@ -647,7 +653,7 @@ bool SERCOM::sendDataSlaveWIRE(uint8_t data)
 
 bool SERCOM::isMasterWIRE( void )
 {
-  return sercom->I2CS.CTRLA.bit.MODE == I2C_MASTER_OPERATION;
+  return sercom->I2CM.CTRLA.bit.MODE == I2C_MASTER_OPERATION;
 }
 
 bool SERCOM::isSlaveWIRE( void )
