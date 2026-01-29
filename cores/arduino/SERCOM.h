@@ -215,15 +215,32 @@ class SERCOM
 		bool isReceiveCompleteSPI( void ) ;
 
 		/* ========== WIRE ========== */
-		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false) ;
+		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false, uint8_t speed = 0x0) ;
 		void initMasterWIRE(uint32_t baudrate) ;
+		void setSlaveWIRE( void ) ;
+		void setMasterWIRE( void ) ;
 
 		void resetWIRE( void ) ;
-		void enableWIRE( void ) ;
-                void disableWIRE( void );
-                void prepareNackBitWIRE( void ) ;
-                void prepareAckBitWIRE( void ) ;
-                void prepareCommandBitsWire(uint8_t cmd);
+		inline void enableWIRE( void )
+		{
+			// I2C Master and Slave modes share the ENABLE bit function.
+			sercom->I2CM.CTRLA.bit.ENABLE = 1 ;
+			while (sercom->I2CM.SYNCBUSY.bit.ENABLE != 0) ;
+
+			// Setting bus idle mode
+			sercom->I2CM.STATUS.bit.BUSSTATE = 1 ;
+			while (sercom->I2CM.SYNCBUSY.bit.SYSOP != 0) ;
+		}
+		inline void disableWIRE( void )
+		{
+			// I2C Master and Slave modes share the ENABLE bit function.
+			sercom->I2CM.CTRLA.bit.ENABLE = 0 ;
+			while (sercom->I2CM.SYNCBUSY.bit.ENABLE != 0) ;
+		}
+		void setBaudrateWIRE(uint32_t baudrate) ;
+        void prepareNackBitWIRE( void ) ;
+        void prepareAckBitWIRE( void ) ;
+        void prepareCommandBitsWire(uint8_t cmd) ;
 		bool startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag) ;
 		bool sendDataMasterWIRE(uint8_t data) ;
 		bool sendDataSlaveWIRE(uint8_t data) ;
@@ -239,9 +256,10 @@ class SERCOM
 		bool isRestartDetectedWIRE( void ) ;
 		bool isAddressMatch( void ) ;
 		bool isMasterReadOperationWIRE( void ) ;
-                bool isRXNackReceivedWIRE( void ) ;
+        bool isRXNackReceivedWIRE( void ) ;
 		int availableWIRE( void ) ;
 		uint8_t readDataWIRE( void ) ;
+
 		int8_t getSercomIndex(void);
         uint32_t getSercomFreqRef(void);
 
@@ -345,6 +363,17 @@ class SERCOM
 		uint8_t calculateBaudrateSynchronous(uint32_t baudrate);
 		uint32_t division(uint32_t dividend, uint32_t divisor) ;
 		void initClockNVIC( void ) ;
+
+		// Cached I2C master/slave configuration for fast role switching
+		struct WireConfig {
+            uint32_t ctrla = 0x00000002; // default CTRLA value: auto ENABLE
+			uint32_t ctrlb = 0x00000500; // default CTRLB value: SMEN | AACKEN
+			uint32_t baud  = 0x000000FF; // default to lowest supported speed
+			uint32_t addr  = 0x00000000; // default address no GCEN, no ADDRMASK, 7-bit address only
+			uint8_t masterSpeed = 0x0;   // default to lowest speed
+			uint8_t slaveSpeed = 0x0;    // default to lowest speed
+			bool inited = false;
+		} _wire;
 
 #ifdef USE_ZERODMA
 		Adafruit_ZeroDMA* _dmaTx = nullptr;
