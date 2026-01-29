@@ -21,6 +21,7 @@
 
 #include "sam.h"
 #include "SERCOM_Txn.h"
+#include "RingBuffer.h"
 #include <array>
 
 #ifdef USE_ZERODMA
@@ -40,6 +41,10 @@ class Adafruit_ZeroDMA;
 // Other SERCOM peripherals always use the 48 MHz clock
 #define SERCOM_FREQ_REF       48000000ul
 #define SERCOM_NVIC_PRIORITY  ((1<<__NVIC_PRIO_BITS) - 1)
+
+#ifndef SERCOM_QUEUE_LENGTH
+#define SERCOM_QUEUE_LENGTH 8
+#endif
 
 typedef enum
 {
@@ -241,7 +246,10 @@ class SERCOM
         void prepareNackBitWIRE( void ) ;
         void prepareAckBitWIRE( void ) ;
         void prepareCommandBitsWire(uint8_t cmd) ;
-		bool startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag) ;
+		bool startTransmissionWIRE( void ) ;
+		bool startTransmissionWIRE( uint8_t address, SercomWireReadWriteFlag flag ) = delete;
+		SercomTxn* stopTransmissionWIRE( void ) ;
+		SercomTxn* stopTransmissionWIRE( SercomWireError error ) ;
 		bool sendDataMasterWIRE(uint8_t data) ;
 		bool sendDataSlaveWIRE(uint8_t data) ;
 		bool isMasterWIRE( void ) ;
@@ -364,16 +372,22 @@ class SERCOM
 		uint32_t division(uint32_t dividend, uint32_t divisor) ;
 		void initClockNVIC( void ) ;
 
-		// Cached I2C master/slave configuration for fast role switching
+		// Cached I2C master/slave configuration for fast role switching.
+		// This can be expanded to support additional configuration options
+		// as needed in the future. For now, it just provides default support
+		// for (hs) mode and DMA.
 		struct WireConfig {
             uint32_t ctrla = 0x00000002; // default CTRLA value: auto ENABLE
-			uint32_t ctrlb = 0x00000500; // default CTRLB value: SMEN | AACKEN
+			uint32_t ctrlb = 0x00000500; // default CTRLB value: SMEN (both) | AACKEN (Slave only)
 			uint32_t baud  = 0x000000FF; // default to lowest supported speed
 			uint32_t addr  = 0x00000000; // default address no GCEN, no ADDRMASK, 7-bit address only
 			uint8_t masterSpeed = 0x0;   // default to lowest speed
 			uint8_t slaveSpeed = 0x0;    // default to lowest speed
 			bool inited = false;
+			SercomWireError returnValue = SercomWireError::SUCCESS;
 		} _wire;
+
+		RingBufferN<SERCOM_QUEUE_LENGTH, SercomTxn*> _txnQueue;
 
 #ifdef USE_ZERODMA
 		Adafruit_ZeroDMA* _dmaTx = nullptr;
