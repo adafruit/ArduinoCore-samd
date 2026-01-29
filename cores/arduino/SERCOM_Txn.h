@@ -14,6 +14,25 @@ struct SercomTxn {
   void* user;
 };
 
+// Mirrors WireDMA I2CError values for SERCOM-level reporting.
+enum class SercomWireError : uint8_t
+{
+  SUCCESS = 0,           // No error/operation successful/ACK received
+  DATA_TOO_LONG = 1,     // Payload exceeds DMA buffer or queue slot
+  NACK_ON_ADDRESS = 2,   // Target NACKed during address phase
+  NACK_ON_DATA = 3,      // Target NACKed during data phase
+  OTHER = 4,             // Generic catch-all
+  BUS_CONFLICT = 5,      // Local transaction blocked by active bus use
+  QUEUE_FULL = 6,        // No room in transaction queue
+  ARBITRATION_LOST = 7,  // Lost multi-master arbitration (STATUS.ARBLOST)
+  BUS_ERROR = 8,         // Misplaced START/STOP or illegal bus condition (STATUS.BUSERR)
+  BUS_STATE_UNKNOWN = 9, // BUSSTATE = 0b00 (unknown/idle state reported)
+  MASTER_TIMEOUT = 10,   // Master timeout (STATUS.MEXTTOUT)
+  SLAVE_TIMEOUT = 11,    // Slave timeout (STATUS.SEXTTOUT)
+  LENGTH_ERROR = 12,     // LENERR when LEN/LENEN mismatch (STATUS.LENERR)
+  UNKNOWN_ERROR = 13     // Error flag set but no specific bit matched
+};
+
 // I2C config flags and helpers
 enum : uint16_t {
   I2C_CFG_READ    = 1u << 0,

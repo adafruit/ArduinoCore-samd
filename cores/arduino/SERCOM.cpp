@@ -478,7 +478,8 @@ void SERCOM::setSlaveWIRE(void)
   while (sercom->I2CS.SYNCBUSY.bit.SYSOP != 0) ;
 
   // Enable slave interrupts: address match, data ready, stop/restart.
-  sercom->I2CS.INTENSET.reg = SERCOM_I2CS_INTENSET_PREC |   // Stop
+  sercom->I2CS.INTENSET.reg = SERCOM_I2CS_INTENSET_ERROR  | // Error
+                              SERCOM_I2CS_INTENSET_PREC   | // Stop
                               SERCOM_I2CS_INTENSET_AMATCH | // Address Match
                               SERCOM_I2CS_INTENSET_DRDY;    // Data Ready
 }
@@ -553,10 +554,15 @@ void SERCOM::prepareCommandBitsWire(uint8_t cmd)
   }
 }
 
-bool SERCOM::startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag)
+bool SERCOM::startTransmissionWIRE(void)
 {
-  // 7-bits address + 1-bits R/W
-  address = (address << 0x1ul) | flag;
+  SercomTxn* txn = nullptr;
+  if (!_txnQueue.peek(txn) || txn == nullptr)
+    return false;
+
+  const bool read = (txn->config & I2C_CFG_READ) != 0;
+  uint16_t addr = (txn->config & I2C_CFG_10BIT) ? I2C_ADDR(txn->address) : I2C_ADDR7(txn->address);
+  addr = (uint16_t)((addr << 1) | (read ? 1u : 0u));
 
   // If another master owns the bus or the last bus owner has not properly
   // sent a stop, return failure early. This will prevent some misbehaved
@@ -565,57 +571,90 @@ bool SERCOM::startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag
   // possible bus states.
   if(!isBusOwnerWIRE())
   {
-    if( isBusBusyWIRE() || (isArbLostWIRE() && !isBusIdleWIRE()) || isBusUnknownWIRE() )
-    {
+    if (isArbLostWIRE() && !isBusIdleWIRE()) {
+      stopTransmissionWIRE(SercomWireError::ARBITRATION_LOST);
+      return false;
+    }
+    if (isBusUnknownWIRE()) {
+      stopTransmissionWIRE(SercomWireError::BUS_STATE_UNKNOWN);
       return false;
     }
   }
 
-  // Send start and address
-  sercom->I2CM.ADDR.reg = SERCOM_I2CM_ADDR_ADDR(address) | 
-                          ((_wire.masterSpeed == 0x2) ? SERCOM_I2CM_ADDR_HS : 0);
+  uint32_t addrReg = SERCOM_I2CM_ADDR_ADDR(addr) |
+                     ((txn->config & I2C_CFG_10BIT) ? SERCOM_I2CM_ADDR_TENBITEN : 0) |
+                     ((_wire.masterSpeed == 0x2) ? SERCOM_I2CM_ADDR_HS : 0);
 
-  // Address Transmitted
-  if ( flag == WIRE_WRITE_FLAG ) // Write mode
+#ifdef USE_ZERODMA
+  if (txn->length > 0 && txn->length < 256 && (txn->config & I2C_CFG_STOP))
   {
-    while( !sercom->I2CM.INTFLAG.bit.MB ) {
-      // Wait transmission complete
+    if (!_dmaConfigured)
+      dmaInit(_dmaTxTrigger, _dmaRxTrigger);
 
-      // If certain errors occur, the MB bit may never be set (RFTM: SAMD21 sec:28.10.6; SAMD51 sec:36.10.7).
-      // The data transfer errors that can occur (including BUSERR) are all
-      // rolled up into INTFLAG.bit.ERROR from STATUS.reg
-      if (sercom->I2CM.INTFLAG.bit.ERROR) {
-        return false;
-      }
+    if (!_dmaConfigured || !_dmaTx || !_dmaRx) {
+      stopTransmissionWIRE(SercomWireError::OTHER);
+      return false;
     }
+    
+    addrReg |= SERCOM_I2CM_ADDR_LENEN | SERCOM_I2CM_ADDR_LEN((uint8_t)txn->length);
   }
-  else  // Read mode
-  {
-    while( !sercom->I2CM.INTFLAG.bit.SB ) {
-      // Wait transmission complete
+#endif
+  
+  // Send start and address (non-blocking; ISR handles MB/SB)
+  sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_ERROR | SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB;
+  sercom->I2CM.ADDR.reg = addrReg;
 
-      // If the slave NACKS the address, the MB bit will be set.
-      // A variety of errors in the STATUS register can set the ERROR bit in the INTFLAG register
-      // In that case, send a stop condition and return false.
-      if (sercom->I2CM.INTFLAG.bit.MB || sercom->I2CM.INTFLAG.bit.ERROR) {
-        sercom->I2CM.CTRLB.bit.CMD = 3; // Stop condition
-        return false;
-      }
-    }
+  return true;
+}
 
-    // Clean the 'Slave on Bus' flag, for further usage.
-    //sercom->I2CM.INTFLAG.bit.SB = 0x1ul;
+SercomTxn* SERCOM::stopTransmissionWIRE( void )
+{
+  return stopTransmissionWIRE( _wire.returnValue );
+}
+
+SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
+{
+  // Policy: only auto-retry recoverable bus-state errors here. All other
+  // errors are surfaced to the transaction callback for protocol handling.
+  // Retry/backoff policy is intentionally deferred; a future change may add
+  // a retry budget or tick-based delay if needed.
+
+  SercomTxn* txn = nullptr;
+  _txnQueue.peek(txn);
+
+  if (error == SercomWireError::BUS_STATE_UNKNOWN) {
+    sercom->I2CM.STATUS.bit.BUSSTATE = 1;
+
+    while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ;
+
+    if (txn)
+      startTransmissionWIRE();
+
+    return txn;
   }
 
-  //ACK received (0: ACK, 1: NACK)
-  if(sercom->I2CM.STATUS.bit.RXNACK)
-  {
-    return false;
+  if (error == SercomWireError::ARBITRATION_LOST || error == SercomWireError::BUS_ERROR) {
+    sercom->I2CM.STATUS.bit.ARBLOST = 1; // Clear arbitration lost flag
+    sercom->I2CM.INTFLAG.reg = SERCOM_I2CM_INTFLAG_ERROR;
+
+    if (txn)
+      startTransmissionWIRE();
+
+    return txn;
   }
-  else
-  {
-    return true;
+
+  // Callbacks are expected to run in non-ISR context (main loop/PendSV).
+  if (_txnQueue.read(txn) && txn != nullptr) {
+    if (txn->onComplete)
+      txn->onComplete(txn->user, static_cast<int>(error));
   }
+
+  SercomTxn* next = nullptr;
+
+  if (_txnQueue.peek(next) && next)
+    startTransmissionWIRE();
+
+  return txn;
 }
 
 bool SERCOM::sendDataMasterWIRE(uint8_t data)
