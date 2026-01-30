@@ -34,6 +34,9 @@
 SERCOM::SERCOM(Sercom* s)
 {
   sercom = s;
+  int8_t idx = getSercomIndex();
+  if (idx >= 0 && idx < (int8_t)kSercomCount)
+    s_instances[idx] = this;
 
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   // A briefly-available but now deprecated feature had the SPI clock source
@@ -405,21 +408,50 @@ void SERCOM::resetWIRE()
 
   _wire = WireConfig{};
 }
-
-void SERCOM::initSlaveWIRE( uint8_t ucAddress, bool enableGeneralCall )
+void SERCOM::initWIRE(void)
 {
-  initSlaveWIRE(  ucAddress & 0x7Fu, enableGeneralCall,  false, 0x0, false );
+  if (!_wire.inited) {
+    uint8_t idx = getSercomIndex();
+    initClockNVIC();
+    registerService(idx, static_cast<ServiceFn>(&SERCOM::stopTransmissionWIRE));
+    _wire.inited = true;
+  }
+#ifdef USE_ZERODMA
+  initWireDma();
+#endif
+}
+
+#ifdef USE_ZERODMA
+void SERCOM::initWireDma(void)
+{
+#ifdef SERCOM0_DMAC_ID_TX
+  if (_dmaConfigured)
+    return;
+
+  int8_t id = getSercomIndex();
+  if (id < 0)
+    return;
+
+  _dmaTxTrigger = SERCOM0_DMAC_ID_TX + (id * 2);
+  _dmaRxTrigger = SERCOM0_DMAC_ID_RX + (id * 2);
+  dmaSetCallbacks(SERCOM::dmaTxCallbackWIRE, SERCOM::dmaRxCallbackWIRE);
+  dmaInit(_dmaTxTrigger, _dmaRxTrigger);
+#else
+  (void)0;
+#endif
+}
+#endif
+
+void SERCOM::initSlaveWIRE( uint8_t ucAddress, bool enableGeneralCall, uint8_t speed )
+{
+  initSlaveWIRE( ucAddress & 0x7Fu, enableGeneralCall, speed, false );
 }
 
 void SERCOM::initSlaveWIRE( uint16_t ucAddress, bool enableGeneralCall, uint8_t speed, bool enable10Bit )
 {
-  if (!_wire.inited) {
-    initClockNVIC();
-    _wire.inited = true;
-  }
+  initWIRE();
 
   uint16_t mask = enable10Bit ? 0x03FFul : 0x007Ful;
-
   _wire.slaveSpeed = speed;
   _wire.addr = SERCOM_I2CS_ADDR_ADDR(ucAddress & mask) |       // select either 7 or 10-bits
                SERCOM_I2CS_ADDR_ADDRMASK(0x00ul) |             // 0x00, only match exact address
@@ -430,10 +462,7 @@ void SERCOM::initSlaveWIRE( uint16_t ucAddress, bool enableGeneralCall, uint8_t 
 
 void SERCOM::initMasterWIRE( uint32_t baudrate )
 {
-  if (!_wire.inited) {
-    initClockNVIC();
-    _wire.inited = true;
-  }
+  initWIRE();
 
   setBaudrateWIRE(baudrate);
   setMasterWIRE();
@@ -568,6 +597,10 @@ bool SERCOM::startTransmissionWIRE(void)
   if (!_txnQueue.peek(txn) || txn == nullptr)
     return false;
 
+  _wire.currentTxn = txn;
+  _wire.txnIndex = 0;
+  _wire.txnLength = txn->length;
+  
   const bool read = (txn->config & I2C_CFG_READ) != 0;
   uint16_t addr = (txn->config & I2C_CFG_10BIT) ? I2C_ADDR(txn->address) : I2C_ADDR7(txn->address);
   addr = (uint16_t)((addr << 1) | (read ? 1u : 0u));
@@ -594,7 +627,9 @@ bool SERCOM::startTransmissionWIRE(void)
                      ((_wire.masterSpeed == 0x2) ? SERCOM_I2CM_ADDR_HS : 0);
 
 #ifdef USE_ZERODMA
-  if (txn->length > 0 && txn->length < 256 && (txn->config & I2C_CFG_STOP))
+  _wire.useDma = txn->length > 0 && txn->length < 256 && (txn->config & I2C_CFG_STOP);
+
+  if (_wire.useDma)
   {
     if (!_dmaConfigured)
       dmaInit(_dmaTxTrigger, _dmaRxTrigger);
@@ -665,49 +700,6 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
   return txn;
 }
 
-bool SERCOM::sendDataMasterWIRE(uint8_t data)
-{
-  //Send data
-  sercom->I2CM.DATA.bit.DATA = data;
-
-  //Wait transmission successful
-  while(!sercom->I2CM.INTFLAG.bit.MB) {
-    // If a data transfer error occurs, the MB bit may never be set.
-    // Check the error bit and bail if it's set.
-    if (sercom->I2CM.STATUS.bit.BUSERR) {
-      return false;
-    }
-  }
-
-  //Problems on line? nack received?
-  if(sercom->I2CM.STATUS.bit.RXNACK)
-    return false;
-  else
-    return true;
-}
-
-bool SERCOM::sendDataSlaveWIRE(uint8_t data)
-{
-  //Send data
-  sercom->I2CS.DATA.bit.DATA = data;
-
-  //Problems on line? nack received?
-  if(!sercom->I2CS.INTFLAG.bit.DRDY || sercom->I2CS.STATUS.bit.RXNACK)
-    return false;
-  else
-    return true;
-}
-
-bool SERCOM::isMasterWIRE( void )
-{
-  return sercom->I2CM.CTRLA.bit.MODE == I2C_MASTER_OPERATION;
-}
-
-bool SERCOM::isSlaveWIRE( void )
-{
-  return sercom->I2CS.CTRLA.bit.MODE == I2C_SLAVE_OPERATION;
-}
-
 bool SERCOM::isBusIdleWIRE( void )
 {
   return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_IDLE_STATE;
@@ -771,30 +763,6 @@ int SERCOM::availableWIRE( void )
     return sercom->I2CS.INTFLAG.bit.DRDY;
 }
 
-uint8_t SERCOM::readDataWIRE( void )
-{
-  if(isMasterWIRE())
-  {
-    while (sercom->I2CM.INTFLAG.bit.SB == 0) {
-      // Waiting complete receive
-      // A variety of errors in the STATUS register can set the ERROR bit in the INTFLAG register
-      // In that case, send a stop condition and return false.
-      // readDataWIRE should really be able to indicate an error (which would never be used
-      // because the readDataWIRE callers (in Wire.cpp) should have checked availableWIRE() first and timed it
-      // out if the data never showed up
-      if (sercom->I2CM.INTFLAG.bit.MB || sercom->I2CM.INTFLAG.bit.ERROR) {
-        sercom->I2CM.CTRLB.bit.CMD = 3; // Stop condition
-        return 0xFF;
-      }
-    }
-
-    return sercom->I2CM.DATA.bit.DATA ;
-  }
-  else
-  {
-    return sercom->I2CS.DATA.reg ;
-  }
-}
 
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
@@ -848,6 +816,7 @@ static const struct {
 #endif // end !SAMD51
 
 std::array<SERCOM::SercomState, SERCOM::kSercomCount> SERCOM::s_states = {};
+std::array<SERCOM*, SERCOM::kSercomCount> SERCOM::s_instances = {};
 volatile uint32_t SERCOM::s_pendingMask = 0;
 
 bool SERCOM::claim(uint8_t sercomId, Role role)
@@ -929,6 +898,17 @@ SERCOM::DmaStatus SERCOM::dmaInit(uint8_t txTrigger, uint8_t rxTrigger)
   if (_dmaRxCb)
     _dmaRx->setCallback(_dmaRxCb);
 
+  if (_dmaTxDesc == nullptr)
+    _dmaTxDesc = _dmaTx->addDescriptor(&_dmaDummy, (void*)&sercom->I2CM.DATA.reg, 1, DMA_BEAT_SIZE_BYTE, true, false);
+  if (_dmaRxDesc == nullptr)
+    _dmaRxDesc = _dmaRx->addDescriptor((void*)&sercom->I2CM.DATA.reg, &_dmaDummy, 1, DMA_BEAT_SIZE_BYTE, false, true);
+  if (_dmaTxDesc == nullptr || _dmaRxDesc == nullptr)
+  {
+    _dmaLastError = DmaStatus::DescriptorFailed;
+    dmaRelease();
+    return _dmaLastError;
+  }
+
   _dmaConfigured = true;
   _dmaLastError = DmaStatus::Ok;
   return _dmaLastError;
@@ -946,90 +926,6 @@ void SERCOM::dmaSetCallbacks(DmaCallback txCb, DmaCallback rxCb)
     if (_dmaRxCb)
       _dmaRx->setCallback(_dmaRxCb);
   }
-}
-
-SERCOM::DmaStatus SERCOM::dmaStartTx(const void* src, void* dstReg, size_t len)
-{
-  if (!_dmaConfigured || !_dmaTx)
-  {
-    _dmaLastError = DmaStatus::NotConfigured;
-    return _dmaLastError;
-  }
-  if (src == nullptr || dstReg == nullptr)
-  {
-    _dmaLastError = DmaStatus::NullPtr;
-    return _dmaLastError;
-  }
-  if (len == 0)
-  {
-    _dmaLastError = DmaStatus::ZeroLen;
-    return _dmaLastError;
-  }
-
-  if (_dmaTxDesc == nullptr)
-    _dmaTxDesc = _dmaTx->addDescriptor((void*)src, dstReg, len, DMA_BEAT_SIZE_BYTE, true, false);
-  else
-    _dmaTx->changeDescriptor(_dmaTxDesc, (void*)src, dstReg, len);
-
-  if (_dmaTxDesc == nullptr)
-  {
-    _dmaLastError = DmaStatus::DescriptorFailed;
-    return _dmaLastError;
-  }
-
-  ZeroDMAstatus status = _dmaTx->startJob();
-  if (status != DMA_STATUS_OK)
-  {
-    _dmaTx->abort();
-    _dmaLastError = DmaStatus::StartFailed;
-    return _dmaLastError;
-  }
-
-  _dmaTxActive = true;
-  _dmaLastError = DmaStatus::Ok;
-  return _dmaLastError;
-}
-
-SERCOM::DmaStatus SERCOM::dmaStartRx(void* dst, void* srcReg, size_t len)
-{
-  if (!_dmaConfigured || !_dmaRx)
-  {
-    _dmaLastError = DmaStatus::NotConfigured;
-    return _dmaLastError;
-  }
-  if (dst == nullptr || srcReg == nullptr)
-  {
-    _dmaLastError = DmaStatus::NullPtr;
-    return _dmaLastError;
-  }
-  if (len == 0)
-  {
-    _dmaLastError = DmaStatus::ZeroLen;
-    return _dmaLastError;
-  }
-
-  if (_dmaRxDesc == nullptr)
-    _dmaRxDesc = _dmaRx->addDescriptor(srcReg, dst, len, DMA_BEAT_SIZE_BYTE, false, true);
-  else
-    _dmaRx->changeDescriptor(_dmaRxDesc, srcReg, dst, len);
-
-  if (_dmaRxDesc == nullptr)
-  {
-    _dmaLastError = DmaStatus::DescriptorFailed;
-    return _dmaLastError;
-  }
-
-  ZeroDMAstatus status = _dmaRx->startJob();
-  if (status != DMA_STATUS_OK)
-  {
-    _dmaRx->abort();
-    _dmaLastError = DmaStatus::StartFailed;
-    return _dmaLastError;
-  }
-
-  _dmaRxActive = true;
-  _dmaLastError = DmaStatus::Ok;
-  return _dmaLastError;
 }
 
 SERCOM::DmaStatus SERCOM::dmaStartDuplex(const void* txSrc, void* rxDst, void* txReg, void* rxReg, size_t len,
@@ -1209,8 +1105,9 @@ void SERCOM::dispatchPending(void)
       continue;
 
     ServiceFn fn = s_states[i].service;
-    if (fn)
-      fn();
+    SERCOM* inst = s_instances[i];
+    if (fn && inst)
+      (inst->*fn)();
   }
 }
 
