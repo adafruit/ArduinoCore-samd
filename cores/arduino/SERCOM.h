@@ -220,46 +220,31 @@ class SERCOM
 		bool isReceiveCompleteSPI( void ) ;
 
 		/* ========== WIRE ========== */
-		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false) ;
+		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false, uint8_t speed = 0x0) ;
 		void initSlaveWIRE(uint16_t address, bool enableGeneralCall = false, uint8_t speed = 0x0, bool enable10Bit = false) ;
 		void initMasterWIRE(uint32_t baudrate) ;
 		void setSlaveWIRE( void ) ;
 		void setMasterWIRE( void ) ;
 
 		void resetWIRE( void ) ;
-		inline void enableWIRE( void )
-		{
-			// I2C Master and Slave modes share the ENABLE bit function.
-			sercom->I2CM.CTRLA.bit.ENABLE = 1 ;
-			while (sercom->I2CM.SYNCBUSY.bit.ENABLE != 0) ;
-
-			// Setting bus idle mode
-			sercom->I2CM.STATUS.bit.BUSSTATE = 1 ;
-			while (sercom->I2CM.SYNCBUSY.bit.SYSOP != 0) ;
-		}
-		inline void disableWIRE( void )
-		{
-			// I2C Master and Slave modes share the ENABLE bit function.
-			sercom->I2CM.CTRLA.bit.ENABLE = 0 ;
-			while (sercom->I2CM.SYNCBUSY.bit.ENABLE != 0) ;
-		}
+		inline void enableWIRE( void ) ;
+		inline void disableWIRE( void ) ;
 		void setBaudrateWIRE(uint32_t baudrate) ;
         void prepareNackBitWIRE( void ) ;
         void prepareAckBitWIRE( void ) ;
         void prepareCommandBitsWire(uint8_t cmd) ;
 		bool startTransmissionWIRE( void ) ;
-		bool startTransmissionWIRE( uint8_t address, SercomWireReadWriteFlag flag ) = delete;
+		bool startTransmissionWIRE( uint8_t address, SercomWireReadWriteFlag flag ) = delete ;
 		SercomTxn* stopTransmissionWIRE( void ) ;
 		SercomTxn* stopTransmissionWIRE( SercomWireError error ) ;
-		bool sendDataMasterWIRE(uint8_t data) ;
-		bool sendDataSlaveWIRE(uint8_t data) ;
-		bool isMasterWIRE( void ) ;
-		bool isSlaveWIRE( void ) ;
+		inline bool sendDataWIRE( void ) ;
+		inline bool isMasterWIRE( void ) ;
+		inline bool isSlaveWIRE( void ) ;
 		bool isBusIdleWIRE( void ) ;
 		bool isBusOwnerWIRE( void ) ;
 		bool isBusUnknownWIRE( void ) ;
-		bool isArbLostWIRE( void );
-		bool isBusBusyWIRE( void );
+		bool isArbLostWIRE( void ) ;
+		bool isBusBusyWIRE( void ) ;
 		bool isDataReadyWIRE( void ) ;
 		bool isStopDetectedWIRE( void ) ;
 		bool isRestartDetectedWIRE( void ) ;
@@ -267,10 +252,10 @@ class SERCOM
 		bool isMasterReadOperationWIRE( void ) ;
         bool isRXNackReceivedWIRE( void ) ;
 		int availableWIRE( void ) ;
-		uint8_t readDataWIRE( void ) ;
+		inline bool readDataWIRE( void );
 
-		int8_t getSercomIndex(void);
-        uint32_t getSercomFreqRef(void);
+		int8_t getSercomIndex(void) ;
+        uint32_t getSercomFreqRef(void) ;
 
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 		// SERCOM clock source override is only available on
@@ -290,7 +275,7 @@ class SERCOM
 
 		// --- Async SERCOM scaffolding (Phase 1) ---
 		enum class Role : uint8_t { None = 0, UART, SPI, I2C };
-		using ServiceFn = void (*)();
+		using ServiceFn = void (SERCOM::*)();
 
 		static bool claim(uint8_t sercomId, Role role);
 		static void release(uint8_t sercomId);
@@ -313,8 +298,8 @@ class SERCOM
 
 		DmaStatus dmaInit(uint8_t txTrigger, uint8_t rxTrigger);
 		void dmaSetCallbacks(DmaCallback txCb, DmaCallback rxCb);
-		DmaStatus dmaStartTx(const void* src, void* dstReg, size_t len);
-		DmaStatus dmaStartRx(void* dst, void* srcReg, size_t len);
+		inline DmaStatus dmaStartTx(const void* src, void* dstReg, size_t len);
+		inline DmaStatus dmaStartRx(void* dst, void* srcReg, size_t len);
 		DmaStatus dmaStartDuplex(const void* txSrc, void* rxDst, void* txReg, void* rxReg, size_t len,
 		                    const uint8_t* dummyTx = nullptr);
 		void dmaRelease();
@@ -324,6 +309,12 @@ class SERCOM
 		bool dmaTxBusy() const;
 		bool dmaRxBusy() const;
 		DmaStatus dmaLastError() const;
+		// DMA callbacks are protocol-owned (Wire/SPI/UART) and registered via dmaSetCallbacks().
+		static inline SERCOM* findDmaOwner(Adafruit_ZeroDMA* dma, bool tx);
+
+		// --- WIRE DMA callbacks (ISR-safe, PendSV-only completion) ---
+		static inline void dmaTxCallbackWIRE(Adafruit_ZeroDMA* dma);
+		static inline void dmaRxCallbackWIRE(Adafruit_ZeroDMA* dma);
 #endif
 
 #ifdef SERCOM_STRICT_PADS
@@ -368,10 +359,15 @@ class SERCOM
 		};
 
 		static std::array<SercomState, kSercomCount> s_states;
+		static std::array<SERCOM*, kSercomCount> s_instances;
 		static volatile uint32_t s_pendingMask;
 		uint8_t calculateBaudrateSynchronous(uint32_t baudrate);
 		uint32_t division(uint32_t dividend, uint32_t divisor) ;
 		void initClockNVIC( void ) ;
+#ifdef USE_ZERODMA
+		void initWireDma(void);
+#endif
+		void initWIRE(void);
 
 		// Cached I2C master/slave configuration for fast role switching.
 		// This can be expanded to support additional configuration options
@@ -384,8 +380,12 @@ class SERCOM
 			uint32_t addr  = 0x00000000; // default address no GCEN, no ADDRMASK, 7-bit address only
 			uint8_t masterSpeed = 0x0;   // default to lowest speed
 			uint8_t slaveSpeed = 0x0;    // default to lowest speed
-			bool inited = false;
+			bool inited = false;		 // whether initMaster/SlaveWIRE has been called
+			bool useDma = false;		 // per transaction DMA use flag for Host/Client modes
 			SercomWireError returnValue = SercomWireError::SUCCESS;
+			SercomTxn* currentTxn = nullptr;
+			size_t txnIndex = 0;
+			size_t txnLength = 0;
 		} _wire;
 
 		RingBufferN<SERCOM_QUEUE_LENGTH, SercomTxn*> _txnQueue;
@@ -397,6 +397,7 @@ class SERCOM
 		DmacDescriptor* _dmaRxDesc = nullptr;
 		DmaCallback _dmaTxCb = nullptr;
 		DmaCallback _dmaRxCb = nullptr;
+		uint8_t _dmaDummy = 0;
 		uint8_t _dmaTxTrigger = 0;
 		uint8_t _dmaRxTrigger = 0;
 		bool _dmaConfigured = false;
@@ -405,5 +406,7 @@ class SERCOM
 		DmaStatus _dmaLastError = DmaStatus::Ok;
 #endif
 };
+
+#include "SERCOM_inline.h"
 
 #endif
