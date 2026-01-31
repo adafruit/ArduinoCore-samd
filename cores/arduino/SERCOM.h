@@ -223,6 +223,11 @@ class SERCOM
 		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false, uint8_t speed = 0x0) ;
 		void initSlaveWIRE(uint16_t address, bool enableGeneralCall = false, uint8_t speed = 0x0, bool enable10Bit = false) ;
 		void initMasterWIRE(uint32_t baudrate) ;
+		inline void setWireTxn(SercomTxn* txn, size_t length, bool useDma);
+		inline void setWireDma(bool useDma);
+		inline bool isWireDma(void) const;
+		void registerWireReceive(void (*cb)(void* user, int length), void* user);
+		void deferWireReceive(int length);
 		void setSlaveWIRE( void ) ;
 		void setMasterWIRE( void ) ;
 
@@ -230,29 +235,36 @@ class SERCOM
 		inline void enableWIRE( void ) ;
 		inline void disableWIRE( void ) ;
 		void setBaudrateWIRE(uint32_t baudrate) ;
-        void prepareNackBitWIRE( void ) ;
-        void prepareAckBitWIRE( void ) ;
-        void prepareCommandBitsWire(uint8_t cmd) ;
+        inline void prepareNackBitWIRE( void ) ;
+		inline void prepareAckBitWIRE( void ) ;
+        inline void prepareCommandBitsWire(uint8_t cmd) ;
 		bool startTransmissionWIRE( void ) ;
 		bool startTransmissionWIRE( uint8_t address, SercomWireReadWriteFlag flag ) = delete ;
 		SercomTxn* stopTransmissionWIRE( void ) ;
 		SercomTxn* stopTransmissionWIRE( SercomWireError error ) ;
+		bool enqueueWIRE(SercomTxn* txn);
+		void deferStopWIRE(SercomWireError error);
+		inline uint8_t getINTFLAG( void ) const;
+		inline uint16_t getSTATUS( void ) const;
+		inline void clearINTFLAG( void );
 		inline bool sendDataWIRE( void ) ;
 		inline bool isMasterWIRE( void ) ;
 		inline bool isSlaveWIRE( void ) ;
-		bool isBusIdleWIRE( void ) ;
-		bool isBusOwnerWIRE( void ) ;
-		bool isBusUnknownWIRE( void ) ;
-		bool isArbLostWIRE( void ) ;
-		bool isBusBusyWIRE( void ) ;
-		bool isDataReadyWIRE( void ) ;
-		bool isStopDetectedWIRE( void ) ;
-		bool isRestartDetectedWIRE( void ) ;
-		bool isAddressMatch( void ) ;
-		bool isMasterReadOperationWIRE( void ) ;
-        bool isRXNackReceivedWIRE( void ) ;
-		int availableWIRE( void ) ;
+		inline bool isBusIdleWIRE( void ) ;
+		inline bool isBusOwnerWIRE( void ) ;
+		inline bool isBusUnknownWIRE( void ) ;
+		inline bool isArbLostWIRE( void ) ;
+		inline bool isBusBusyWIRE( void ) ;
+		inline bool isDataReadyWIRE( void ) ;
+		inline bool isStopDetectedWIRE( void ) ;
+		inline bool isRestartDetectedWIRE( void ) ;
+		inline bool isAddressMatch( void ) ;
+		inline bool isMasterReadOperationWIRE( void ) ;
+        inline bool isRXNackReceivedWIRE( void ) ;
+		inline int availableWIRE( void ) ;
 		inline bool readDataWIRE( void );
+		inline void writeDataWIRE(uint8_t data);
+		inline uint8_t readDataWIREByte(void);
 
 		int8_t getSercomIndex(void) ;
         uint32_t getSercomFreqRef(void) ;
@@ -382,6 +394,7 @@ class SERCOM
 			uint8_t slaveSpeed = 0x0;    // default to lowest speed
 			bool inited = false;		 // whether initMaster/SlaveWIRE has been called
 			bool useDma = false;		 // per transaction DMA use flag for Host/Client modes
+			bool active = false;         // active transaction in progress
 			SercomWireError returnValue = SercomWireError::SUCCESS;
 			SercomTxn* currentTxn = nullptr;
 			size_t txnIndex = 0;
@@ -389,6 +402,10 @@ class SERCOM
 		} _wire;
 
 		RingBufferN<SERCOM_QUEUE_LENGTH, SercomTxn*> _txnQueue;
+		void (*_wireDeferredCb)(void* user, int length) = nullptr;
+		void* _wireDeferredUser = nullptr;
+		int _wireDeferredLength = 0;
+		bool _wireDeferredPending = false;
 
 #ifdef USE_ZERODMA
 		Adafruit_ZeroDMA* _dmaTx = nullptr;

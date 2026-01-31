@@ -25,6 +25,7 @@
 
 #include "SERCOM.h"
 #include "RingBuffer.h"
+#include <stddef.h>
 
  // WIRE_HAS_END means Wire has end()
 #define WIRE_HAS_END 1
@@ -43,6 +44,7 @@ class TwoWire : public Stream
     uint8_t endTransmission(void);
 
     uint8_t requestFrom(uint8_t address, size_t quantity, bool stopBit);
+    uint8_t requestFrom(uint8_t address, size_t quantity, uint8_t* rxBuffer, bool stopBit = true);
     uint8_t requestFrom(uint8_t address, size_t quantity);
 
     size_t write(uint8_t data);
@@ -54,6 +56,11 @@ class TwoWire : public Stream
     virtual void flush(void);
     void onReceive(void(*)(int));
     void onRequest(void(*)(void));
+    void setRxBuffer(uint8_t* buffer, size_t length);
+    void clearRxBuffer(void);
+    void resetRxBuffer(void);
+    uint8_t* getRxBuffer(void);
+    size_t getRxLength(void) const;
 
     inline size_t write(unsigned long n) { return write((uint8_t)n); }
     inline size_t write(long n) { return write((uint8_t)n); }
@@ -70,16 +77,32 @@ class TwoWire : public Stream
 
     bool transmissionBegun;
 
-    // RX Buffer
-    RingBufferN<256> rxBuffer;
-
-    //TX buffer
-    RingBufferN<256> txBuffer;
+    // RX/TX buffers (sync compatibility, async staging)
+    static constexpr size_t WIRE_TX_BUFFER_LENGTH = 255;
+    static constexpr size_t WIRE_RX_BUFFER_LENGTH = SERIAL_BUFFER_SIZE;
+    uint8_t rxBuffer[WIRE_RX_BUFFER_LENGTH];
+    uint8_t txBuffer[WIRE_TX_BUFFER_LENGTH];
+    uint8_t* rxBufferPtr;
+    size_t rxBufferCapacity;
+    size_t rxLength;
+    size_t rxIndex;
+    size_t txLength;
+    size_t txIndex;
+    size_t masterIndex;
+    bool awaitingAddressAck;
     uint8_t txAddress;
+    volatile bool txnDone;
+    volatile int txnStatus;
+    bool pendingReceive;
+    int pendingReceiveLength;
+    SercomTxn txn;
 
     // Callback user functions
     void (*onRequestCallback)(void);
     void (*onReceiveCallback)(int);
+
+    static void onTxnComplete(void* user, int status);
+    static void onDeferredReceive(void* user, int length);
 
     // TWI clock frequency
     static const uint32_t TWI_CLOCK = 100000;
