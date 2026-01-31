@@ -468,6 +468,19 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
   setMasterWIRE();
 }
 
+void SERCOM::registerWireReceive(void (*cb)(void* user, int length), void* user)
+{
+  _wireDeferredCb = cb;
+  _wireDeferredUser = user;
+}
+
+void SERCOM::deferWireReceive(int length)
+{
+  _wireDeferredLength = length;
+  _wireDeferredPending = true;
+  setPending((uint8_t)getSercomIndex());
+}
+
 void SERCOM::setMasterWIRE(void)
 {
   disableWIRE();
@@ -557,45 +570,12 @@ void SERCOM::setBaudrateWIRE(uint32_t baudrate)
     setMasterWIRE();
 }
 
-void SERCOM::prepareNackBitWIRE( void )
-{
-  if(isMasterWIRE()) {
-    // Send a NACK
-    sercom->I2CM.CTRLB.bit.ACKACT = 1;
-  } else {
-    sercom->I2CS.CTRLB.bit.ACKACT = 1;
-  }
-}
 
-void SERCOM::prepareAckBitWIRE( void )
-{
-  if(isMasterWIRE()) {
-    // Send an ACK
-    sercom->I2CM.CTRLB.bit.ACKACT = 0;
-  } else {
-    sercom->I2CS.CTRLB.bit.ACKACT = 0;
-  }
-}
-
-void SERCOM::prepareCommandBitsWire(uint8_t cmd)
-{
-  if(isMasterWIRE()) {
-    sercom->I2CM.CTRLB.bit.CMD = cmd;
-
-    while(sercom->I2CM.SYNCBUSY.bit.SYSOP)
-    {
-      // Waiting for synchronization
-    }
-  } else {
-    sercom->I2CS.CTRLB.bit.CMD = cmd;
-  }
-}
-
-bool SERCOM::startTransmissionWIRE(void)
+SercomTxn* SERCOM::startTransmissionWIRE(void)
 {
   SercomTxn* txn = nullptr;
   if (!_txnQueue.peek(txn) || txn == nullptr)
-    return false;
+    return nullptr;
 
   _wire.currentTxn = txn;
   _wire.txnIndex = 0;
@@ -614,11 +594,11 @@ bool SERCOM::startTransmissionWIRE(void)
   {
     if (isArbLostWIRE() && !isBusIdleWIRE()) {
       stopTransmissionWIRE(SercomWireError::ARBITRATION_LOST);
-      return false;
+      return nullptr;
     }
     if (isBusUnknownWIRE()) {
       stopTransmissionWIRE(SercomWireError::BUS_STATE_UNKNOWN);
-      return false;
+      return nullptr;
     }
   }
 
@@ -627,16 +607,16 @@ bool SERCOM::startTransmissionWIRE(void)
                      ((_wire.masterSpeed == 0x2) ? SERCOM_I2CM_ADDR_HS : 0);
 
 #ifdef USE_ZERODMA
-  _wire.useDma = txn->length > 0 && txn->length < 256 && (txn->config & I2C_CFG_STOP);
+  setWireDma(txn->length > 0 && txn->length < 256 && (txn->config & I2C_CFG_STOP));
 
-  if (_wire.useDma)
+  if (isWireDma())
   {
     if (!_dmaConfigured)
       dmaInit(_dmaTxTrigger, _dmaRxTrigger);
 
     if (!_dmaConfigured || !_dmaTx || !_dmaRx) {
       stopTransmissionWIRE(SercomWireError::OTHER);
-      return false;
+      return nullptr;
     }
     
     addrReg |= SERCOM_I2CM_ADDR_LENEN | SERCOM_I2CM_ADDR_LEN((uint8_t)txn->length);
@@ -644,10 +624,28 @@ bool SERCOM::startTransmissionWIRE(void)
 #endif
   
   // Send start and address (non-blocking; ISR handles MB/SB)
+  _wire.active = true;
   sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_ERROR | SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB;
   sercom->I2CM.ADDR.reg = addrReg;
 
+  return txn;
+}
+
+bool SERCOM::enqueueWIRE(SercomTxn* txn)
+{
+  if (txn == nullptr)
+    return false;
+  if (!_txnQueue.store(txn))
+    return false;
+  if (!_wire.active)
+    return startTransmissionWIRE() != nullptr;
   return true;
+}
+
+void SERCOM::deferStopWIRE(SercomWireError error)
+{
+  _wire.returnValue = error;
+  setPending((uint8_t)getSercomIndex());
 }
 
 SercomTxn* SERCOM::stopTransmissionWIRE( void )
@@ -688,6 +686,8 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
 
   // Callbacks are expected to run in non-ISR context (main loop/PendSV).
   if (_txnQueue.read(txn) && txn != nullptr) {
+    _wire.active = false;
+    _wire.currentTxn = nullptr;
     if (txn->onComplete)
       txn->onComplete(txn->user, static_cast<int>(error));
   }
@@ -697,72 +697,13 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
   if (_txnQueue.peek(next) && next)
     startTransmissionWIRE();
 
+  if (_wireDeferredPending && _wireDeferredCb) {
+    _wireDeferredPending = false;
+    _wireDeferredCb(_wireDeferredUser, _wireDeferredLength);
+  }
+
   return txn;
 }
-
-bool SERCOM::isBusIdleWIRE( void )
-{
-  return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_IDLE_STATE;
-}
-
-bool SERCOM::isBusOwnerWIRE( void )
-{
-  return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_OWNER_STATE;
-}
-
-bool SERCOM::isBusUnknownWIRE( void )
-{
-  return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_UNKNOWN_STATE;
-}
-
-bool SERCOM::isArbLostWIRE( void )
-{
-  return sercom->I2CM.STATUS.bit.ARBLOST == 1;
-}
-
-bool SERCOM::isBusBusyWIRE( void )
-{
-  return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_BUSY_STATE;
-}
-
-bool SERCOM::isDataReadyWIRE( void )
-{
-  return sercom->I2CS.INTFLAG.bit.DRDY;
-}
-
-bool SERCOM::isStopDetectedWIRE( void )
-{
-  return sercom->I2CS.INTFLAG.bit.PREC;
-}
-
-bool SERCOM::isRestartDetectedWIRE( void )
-{
-  return sercom->I2CS.STATUS.bit.SR;
-}
-
-bool SERCOM::isAddressMatch( void )
-{
-  return sercom->I2CS.INTFLAG.bit.AMATCH;
-}
-
-bool SERCOM::isMasterReadOperationWIRE( void )
-{
-  return sercom->I2CS.STATUS.bit.DIR;
-}
-
-bool SERCOM::isRXNackReceivedWIRE( void )
-{
-  return sercom->I2CM.STATUS.bit.RXNACK;
-}
-
-int SERCOM::availableWIRE( void )
-{
-  if(isMasterWIRE())
-    return sercom->I2CM.INTFLAG.bit.SB;
-  else
-    return sercom->I2CS.INTFLAG.bit.DRDY;
-}
-
 
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
