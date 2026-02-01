@@ -243,6 +243,28 @@ inline void SERCOM::dmaRxCallbackWIRE(Adafruit_ZeroDMA* dma)
 	inst->_dmaRxActive = false;
 	SERCOM::setPending((uint8_t)inst->getSercomIndex());
 }
+
+inline void SERCOM::dmaTxCallbackSPI(Adafruit_ZeroDMA* dma)
+{
+	SERCOM* inst = findDmaOwner(dma, true);
+	if (!inst) return;
+	inst->_spi.dmaTxDone = true;
+	if (inst->_spi.dmaNeedRx && !inst->_spi.dmaRxDone)
+		return;
+	inst->_spi.returnValue = SercomSpiError::SUCCESS;
+	SERCOM::setPending((uint8_t)inst->getSercomIndex());
+}
+
+inline void SERCOM::dmaRxCallbackSPI(Adafruit_ZeroDMA* dma)
+{
+	SERCOM* inst = findDmaOwner(dma, false);
+	if (!inst) return;
+	inst->_spi.dmaRxDone = true;
+	if (inst->_spi.dmaNeedTx && !inst->_spi.dmaTxDone)
+		return;
+	inst->_spi.returnValue = SercomSpiError::SUCCESS;
+	SERCOM::setPending((uint8_t)inst->getSercomIndex());
+}
 #endif
 
 #endif // __cplusplus

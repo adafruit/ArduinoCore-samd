@@ -233,6 +233,12 @@ void SERCOM::initSPI(SercomSpiTXPad mosi, SercomRXPad miso, SercomSpiCharSize ch
   resetSPI();
   initClockNVIC();
 
+#ifdef USE_ZERODMA
+  dmaSetCallbacks(SERCOM::dmaTxCallbackSPI, SERCOM::dmaRxCallbackSPI);
+#endif
+
+  registerService(getSercomIndex(), &SERCOM::stopTransmissionSPI);
+
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   sercom->SPI.CTRLA.reg = SERCOM_SPI_CTRLA_MODE(0x3) | // master mode
                           SERCOM_SPI_CTRLA_DOPO(mosi) |
@@ -251,6 +257,137 @@ void SERCOM::initSPI(SercomSpiTXPad mosi, SercomRXPad miso, SercomSpiCharSize ch
                           SERCOM_SPI_CTRLB_RXEN; //Active the SPI receiver.
 
   while( sercom->SPI.SYNCBUSY.bit.CTRLB == 1 );
+}
+
+bool SERCOM::startTransmissionSPI(void)
+{
+  SercomTxn* txn = nullptr;
+  if (!_txnQueue.peek(txn) || txn == nullptr)
+    return false;
+
+  _spi.currentTxn = txn;
+  _spi.index = 0;
+  _spi.length = txn->length;
+  _spi.active = true;
+
+#ifdef USE_ZERODMA
+  _spi.useDma = _dmaConfigured;
+#else
+  _spi.useDma = false;
+#endif
+
+  if (_spi.useDma) {
+#ifdef USE_ZERODMA
+    void* dataReg = (void*)&sercom->SPI.DATA.reg;
+    _spi.dmaNeedTx = (txn->txPtr != nullptr);
+    _spi.dmaNeedRx = (txn->rxPtr != nullptr);
+    _spi.dmaTxDone = !_spi.dmaNeedTx;
+    _spi.dmaRxDone = !_spi.dmaNeedRx;
+
+    DmaStatus st = DmaStatus::Ok;
+    if (_spi.dmaNeedTx && _spi.dmaNeedRx)
+      st = dmaStartDuplex(txn->txPtr, txn->rxPtr, dataReg, dataReg, txn->length, nullptr);
+    else if (_spi.dmaNeedTx)
+      st = dmaStartTx(txn->txPtr, dataReg, txn->length);
+    else
+      st = dmaStartDuplex(nullptr, txn->rxPtr, dataReg, dataReg, txn->length, nullptr);
+
+    if (st != DmaStatus::Ok) {
+      _spi.returnValue = SercomSpiError::UNKNOWN_ERROR;
+      deferStopSPI(_spi.returnValue);
+      return false;
+    }
+    return true;
+#endif
+  }
+
+  sercom->SPI.INTENSET.reg = SERCOM_SPI_INTENSET_DRE |
+                             SERCOM_SPI_INTENSET_RXC |
+                             SERCOM_SPI_INTENSET_ERROR;
+  return true;
+}
+
+bool SERCOM::enqueueSPI(SercomTxn* txn)
+{
+  if (txn == nullptr)
+    return false;
+  if (!_txnQueue.store(txn))
+    return false;
+  if (!_spi.active) {
+    startTransmissionSPI();
+  }
+  return true;
+}
+
+void SERCOM::serviceSPI(void)
+{
+  if (!_spi.active || _spi.currentTxn == nullptr)
+    return;
+
+  uint8_t flags = sercom->SPI.INTFLAG.reg;
+
+  if (flags & SERCOM_SPI_INTFLAG_ERROR)
+  {
+    _spi.returnValue = SercomSpiError::BUF_OVERFLOW;
+    sercom->SPI.INTFLAG.reg = SERCOM_SPI_INTFLAG_ERROR;
+    deferStopSPI(_spi.returnValue);
+    return;
+  }
+
+  SercomTxn* txn = _spi.currentTxn;
+
+  if (flags & SERCOM_SPI_INTFLAG_RXC) {
+    uint8_t rx = sercom->SPI.DATA.reg;
+    if (txn->rxPtr && _spi.index > 0 && (_spi.index - 1) < _spi.length)
+      txn->rxPtr[_spi.index - 1] = rx;
+    if (_spi.index >= _spi.length) {
+      sercom->SPI.INTENCLR.reg = SERCOM_SPI_INTENCLR_DRE | SERCOM_SPI_INTENCLR_RXC | SERCOM_SPI_INTENCLR_ERROR;
+      _spi.returnValue = SercomSpiError::SUCCESS;
+      deferStopSPI(_spi.returnValue);
+      return;
+    }
+  }
+
+  if (flags & SERCOM_SPI_INTFLAG_DRE) {
+    if (_spi.index < _spi.length) {
+      uint8_t out = 0xFF;
+      if (txn->txPtr)
+        out = txn->txPtr[_spi.index];
+      sercom->SPI.DATA.reg = out;
+      _spi.index++;
+      return;
+    }
+    sercom->SPI.INTENCLR.reg = SERCOM_SPI_INTENCLR_DRE;
+  }
+}
+
+void SERCOM::deferStopSPI(SercomSpiError error)
+{
+  _spi.returnValue = error;
+  setPending((uint8_t)getSercomIndex());
+}
+
+SercomTxn* SERCOM::stopTransmissionSPI(void)
+{
+  return stopTransmissionSPI(_spi.returnValue);
+}
+
+SercomTxn* SERCOM::stopTransmissionSPI(SercomSpiError error)
+{
+  SercomTxn* txn = nullptr;
+  if (_txnQueue.read(txn) && txn != nullptr)
+  {
+    _spi.active = false;
+    _spi.currentTxn = nullptr;
+    if (txn->onComplete)
+      txn->onComplete(txn->user, static_cast<int>(error));
+  }
+
+  SercomTxn* next = nullptr;
+  if (_txnQueue.peek(next) && next)
+    startTransmissionSPI();
+
+  return txn;
 }
 
 void SERCOM::initSPIClock(SercomSpiClockMode clockMode, uint32_t baudrate)

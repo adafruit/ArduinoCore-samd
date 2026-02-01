@@ -21,7 +21,7 @@
 #define _SPI_H_INCLUDED
 
 #include <Arduino.h>
-#include <Adafruit_ZeroDMA.h>
+#include "SERCOM.h"
 
 // SPI_HAS_TRANSACTION means SPI has
 //   - beginTransaction()
@@ -118,7 +118,10 @@ class SPIClass {
   uint16_t transfer16(uint16_t data);
   void transfer(void *buf, size_t count);
   void transfer(const void* txbuf, void* rxbuf, size_t count,
-         bool block = true);
+         bool block = true,
+         void (*onComplete)(void* user, int status) = nullptr,
+         void* user = nullptr);
+  void onService(void);
   void waitForTransfer(void);
   bool isBusy(void);
 
@@ -169,17 +172,10 @@ class SPIClass {
   char interruptSave;
   uint32_t interruptMask;
 
-  // transfer(txbuf, rxbuf, count, block) uses DMA when possible
-  Adafruit_ZeroDMA readChannel;
-  Adafruit_ZeroDMA writeChannel;
-  DmacDescriptor  *firstReadDescriptor   = NULL;  // List entry point
-  DmacDescriptor  *firstWriteDescriptor  = NULL;
-  DmacDescriptor  *extraReadDescriptors  = NULL;  // Add'l descriptors
-  DmacDescriptor  *extraWriteDescriptors = NULL;
-  bool             use_dma               = false; // true on successful alloc
-  volatile bool    dma_busy              = false;
-  void             dmaAllocate(void);
-  static void      dmaCallback(Adafruit_ZeroDMA *dma);
+  volatile bool    txnDone               = false;
+  volatile int     txnStatus             = 0;
+  SercomTxn        _txn;
+  static void      onTxnComplete(void* user, int status);
 };
 
 #if SPI_INTERFACES_COUNT > 0
