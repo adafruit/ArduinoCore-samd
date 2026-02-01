@@ -218,6 +218,12 @@ class SERCOM
 		bool isDataRegisterEmptySPI( void ) ;
 		bool isTransmitCompleteSPI( void ) ;
 		bool isReceiveCompleteSPI( void ) ;
+		bool enqueueSPI(SercomTxn* txn);
+		bool startTransmissionSPI(void);
+		void serviceSPI(void);
+		void deferStopSPI(SercomSpiError error);
+		SercomTxn* stopTransmissionSPI(void);
+		SercomTxn* stopTransmissionSPI(SercomSpiError error);
 
 		/* ========== WIRE ========== */
 		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false, uint8_t speed = 0x0) ;
@@ -327,6 +333,9 @@ class SERCOM
 		// --- WIRE DMA callbacks (ISR-safe, PendSV-only completion) ---
 		static inline void dmaTxCallbackWIRE(Adafruit_ZeroDMA* dma);
 		static inline void dmaRxCallbackWIRE(Adafruit_ZeroDMA* dma);
+		// --- SPI DMA callbacks (protocol-owned) ---
+		static inline void dmaTxCallbackSPI(Adafruit_ZeroDMA* dma);
+		static inline void dmaRxCallbackSPI(Adafruit_ZeroDMA* dma);
 #endif
 
 #ifdef SERCOM_STRICT_PADS
@@ -400,6 +409,19 @@ class SERCOM
 			size_t txnIndex = 0;
 			size_t txnLength = 0;
 		} _wire;
+
+		struct SpiConfig {
+			bool active = false;
+			bool useDma = false;
+			bool dmaNeedTx = false;
+			bool dmaNeedRx = false;
+			bool dmaTxDone = false;
+			bool dmaRxDone = false;
+			size_t index = 0;
+			size_t length = 0;
+			SercomTxn* currentTxn = nullptr;
+			SercomSpiError returnValue = SercomSpiError::SUCCESS;
+		} _spi;
 
 		RingBufferN<SERCOM_QUEUE_LENGTH, SercomTxn*> _txnQueue;
 		void (*_wireDeferredCb)(void* user, int length) = nullptr;

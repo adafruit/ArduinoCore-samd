@@ -33,6 +33,14 @@ enum class SercomWireError : uint8_t
   UNKNOWN_ERROR = 13     // Error flag set but no specific bit matched
 };
 
+// SPI error reporting (async callbacks)
+enum class SercomSpiError : uint8_t
+{
+  SUCCESS = 0,
+  BUF_OVERFLOW = 1,
+  UNKNOWN_ERROR = 2
+};
+
 // I2C config flags and helpers
 enum : uint16_t {
   I2C_CFG_READ    = 1u << 0,
