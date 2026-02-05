@@ -562,6 +562,7 @@ bool SERCOM::startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag
   }
 
   // Send start and address
+  sercom->I2CM.INTFLAG.bit.ERROR = 1;
   sercom->I2CM.ADDR.reg = SERCOM_I2CM_ADDR_ADDR(address) | 
                           ((sercom->I2CM.CTRLA.bit.SPEED == 0x2) ? SERCOM_I2CM_ADDR_HS : 0);
 
@@ -611,13 +612,16 @@ bool SERCOM::startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag
 bool SERCOM::sendDataMasterWIRE(uint8_t data)
 {
   //Send data
+  sercom->I2CM.INTFLAG.bit.ERROR = 1;
   sercom->I2CM.DATA.bit.DATA = data;
 
   //Wait transmission successful
   while(!sercom->I2CM.INTFLAG.bit.MB) {
     // If a data transfer error occurs, the MB bit may never be set.
     // Check the error bit and bail if it's set.
-    if (sercom->I2CM.STATUS.bit.BUSERR) {
+    // The data transfer errors that can occur (including BUSERR) are all
+    // rolled up into INTFLAG.bit.ERROR from STATUS.reg
+    if (sercom->I2CM.INTFLAG.bit.ERROR) {
       return false;
     }
   }
