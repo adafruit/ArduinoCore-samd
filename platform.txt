@@ -20,7 +20,7 @@
 # https://arduino.github.io/arduino-cli/0.33/platform-specification/
 
 name=Adafruit SAMD (32-bits ARM Cortex-M0+ and Cortex-M4) Boards
-version=1.7.16
+version=1.7.17
 
 # Compile variables
 # -----------------
