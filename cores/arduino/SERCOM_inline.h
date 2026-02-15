@@ -46,10 +46,8 @@ inline bool SERCOM::sendDataWIRE( void )
 	}
 #endif
 
+	// Wait for DATA to sync out of the ISR and clear MB
 	sercom->I2CM.DATA.reg = txn->txPtr[_wire.txnIndex++];
-
-	if(isMasterWIRE())
-		while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ; // Wait for DATA to sync and clear MB
 		
 	// Return false when the last byte has been consumed so the caller can
 	// issue STOP / complete the transaction without waiting for another SB.
@@ -83,18 +81,20 @@ inline bool SERCOM::readDataWIRE( void )
 		if (_wire.txnIndex == (_wire.txnLength - 1)) {
 			uint8_t cmd = txn->config & I2C_CFG_STOP ? WIRE_MASTER_ACT_STOP : WIRE_MASTER_ACT_NO_ACTION;
 			sercom->I2CM.CTRLB.reg |= SERCOM_I2CM_CTRLB_ACKACT | SERCOM_I2CM_CTRLB_CMD(cmd); // NACK the last byte and send STOP if requested
-			if (cmd == WIRE_MASTER_ACT_STOP)
-				while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ; // Wait for CMD to sync and clear SB
 		}
 		else
 			prepareAckBitWIRE(); // ACK bytes otherwise for non-SCLSM mode
 	}
+	else {
+		// Slave mode: set ACKACT BEFORE reading DATA (SMEN auto-receives based on ACKACT)
+		if (_wire.txnIndex >= _wire.txnLength)
+			prepareNackBitWIRE(); // NACK if buffer full
+		else 
+			prepareAckBitWIRE();  // ACK if room available
+	}
 
-	// Read DATA register (clears SB in Smart Mode)
+	// Read DATA register (accesses auto-trigger bus operation based on ACKACT/SMEN)
 	txn->rxPtr[_wire.txnIndex++] = sercom->I2CM.DATA.reg;
-
-	if(isMaster)
-		while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ; // Wait for DATA to sync and clear SB
 
 	return (_wire.txnIndex < _wire.txnLength);
 }
@@ -141,12 +141,29 @@ inline bool SERCOM::readDataSPI(void)
 	return (_spi.index < _spi.length);
 }
 
-inline void SERCOM::setTxnWIRE(SercomTxn* txn, size_t length, bool useDma)
+inline void SERCOM::setTxnWIRE(SercomTxn* txn)
 {
 	_wire.currentTxn = txn;
-	_wire.txnLength = length;
 	_wire.txnIndex = 0;
-	_wire.useDma = useDma;
+
+	if (txn)
+		_wire.txnLength = txn->length;
+#ifdef USE_ZERODMA
+	setDmaWIRE((txn && txn->length > 0 && txn->length < 256) || sercom->I2CM.CTRLA.bit.SCLSM);
+
+	if (isDmaWIRE())
+		_wire.txnLength = (_wire.txnLength < 255u) ? _wire.txnLength : 255u;
+#else
+	_wire.useDma = false;
+
+	if (sercom->I2CM.CTRLA.bit.SCLSM)
+		_wire.currentTxn = nullptr; // SCLSM requires DMA for proper operation (true for master; I think for slave)
+#endif
+	if (!_wire.active)
+		_wire.retryCount = 0;
+
+	_wire.returnValue = SercomWireError::SUCCESS;
+	_wire.active = true;
 }
 
 #ifdef USE_ZERODMA

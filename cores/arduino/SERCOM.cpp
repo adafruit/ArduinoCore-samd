@@ -865,6 +865,9 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
     _wire.retryCount = 0;
   }
 
+  if(isMasterWIRE())
+		while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ; // Wait for DATA to sync from last transaction
+
   // Callbacks are expected to run in non-ISR context (main loop/PendSV).
   if (txn &&txn->onComplete)
       txn->onComplete(txn->user, static_cast<int>(error));

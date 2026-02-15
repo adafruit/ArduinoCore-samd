@@ -251,7 +251,7 @@ class SERCOM
 		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false, uint8_t speed = 0x0) ;
 		void initSlaveWIRE(uint16_t address, bool enableGeneralCall = false, uint8_t speed = 0x0, bool enable10Bit = false) ;
 		void initMasterWIRE(uint32_t baudrate) ;
-		inline void setTxnWIRE(SercomTxn* txn, size_t length, bool useDma);
+		inline void setTxnWIRE(SercomTxn* txn);
 		inline void setDmaWIRE(bool useDma) { _wire.useDma = useDma; }
 		inline bool isDmaWIRE(void) const { return _wire.useDma; }
 		void registerReceiveWIRE(void (*cb)(void* user, int length), void* user);
