@@ -30,21 +30,37 @@
  // WIRE_HAS_END means Wire has end()
 #define WIRE_HAS_END 1
 
+// NOTE: SAMD21/SAMD51 silicon errata: when I2C master uses SCLSM=1, CTRLB.CMD
+// (STOP/RESTART) is ignored, so interrupt-driven byte mode cannot reliably end
+// transfers or issue repeated starts. Hs-mode requires SCLSM=1, therefore Hs-mode
+// is DMA-only and STOP-only (no repeated starts). The non-DMA Wire path should
+// not enable Hs-mode. Also per errata, do not enable QCEN when SCLSM=1 (bus error).
+
 class TwoWire : public Stream
 {
   public:
     TwoWire(SERCOM *s, uint8_t pinSDA, uint8_t pinSCL);
     void begin();
+    void begin(uint16_t, bool enableGeneralCall = false, uint8_t speed = 0x0, bool enable10Bit = false);
     void begin(uint8_t, bool enableGeneralCall = false);
     void end();
     void setClock(uint32_t);
 
     void beginTransmission(uint8_t);
-    uint8_t endTransmission(bool stopBit);
+    // If onComplete is nullptr, this blocks for legacy sync behavior.
+    // If onComplete is non-null, this enqueues and returns immediately (async).
+    uint8_t endTransmission(bool stopBit = true,
+                            void (*onComplete)(void* user, int status) = nullptr,
+                            void* user = nullptr);
     uint8_t endTransmission(void);
 
-    uint8_t requestFrom(uint8_t address, size_t quantity, bool stopBit);
-    uint8_t requestFrom(uint8_t address, size_t quantity, uint8_t* rxBuffer, bool stopBit = true);
+    // If onComplete is nullptr, this blocks for legacy sync behavior.
+    // If onComplete is non-null, this enqueues and returns immediately (async).
+    // If rxBuffer is nullptr, the internal buffer is used; otherwise rxBuffer is used.
+    uint8_t requestFrom(uint8_t address, size_t quantity, uint8_t* rxBuffer = nullptr,
+                        bool stopBit = true,
+                        void (*onComplete)(void* user, int status) = nullptr,
+                        void* user = nullptr);
     uint8_t requestFrom(uint8_t address, size_t quantity);
 
     size_t write(uint8_t data);
@@ -68,7 +84,7 @@ class TwoWire : public Stream
     inline size_t write(int n) { return write((uint8_t)n); }
     using Print::write;
 
-    void onService(void);
+    inline void onService(void);
 
   private:
     SERCOM * sercom;
@@ -88,6 +104,9 @@ class TwoWire : public Stream
     size_t rxIndex;
     size_t txLength;
     size_t txIndex;
+    const uint8_t* txExternalPtr;
+    size_t txExternalLength;
+    bool txExternalActive;
     size_t masterIndex;
     bool awaitingAddressAck;
     uint8_t txAddress;
@@ -126,5 +145,159 @@ class TwoWire : public Stream
 #if WIRE_INTERFACES_COUNT > 5
   extern TwoWire Wire5;
 #endif
+
+inline void TwoWire::onService(void)
+{
+  uint8_t flags = (uint8_t)sercom->getINTFLAG();
+  uint16_t status = (uint16_t)sercom->getSTATUS();
+  bool isMaster = sercom->isMasterWIRE();
+
+  if ((!isMaster && !sercom->isSlaveWIRE()) || flags == 0) {
+      sercom->clearINTFLAG();
+      return;
+    }
+
+  if (status & SERCOM_I2CM_STATUS_RXNACK) {
+    sercom->prepareCommandBitsWIRE(WIRE_MASTER_ACT_STOP);
+    SercomWireError err = awaitingAddressAck ? SercomWireError::NACK_ON_ADDRESS
+                                             : SercomWireError::NACK_ON_DATA;
+    sercom->deferStopWIRE(err);
+    return;
+  }
+
+  if (isMaster) {
+    SercomTxn* txn = sercom->getCurrentTxnWIRE();
+    if (!txn) {
+      sercom->clearINTFLAG();
+      return;
+    }
+
+    if (flags & SERCOM_I2CM_INTFLAG_ERROR) {
+      sercom->prepareCommandBitsWIRE(WIRE_MASTER_ACT_STOP);
+      uint8_t busState = (status & SERCOM_I2CM_STATUS_BUSSTATE_Msk) >> SERCOM_I2CM_STATUS_BUSSTATE_Pos;
+      SercomWireError err = SercomWireError::UNKNOWN_ERROR;
+
+      if (status & SERCOM_I2CM_STATUS_ARBLOST)
+        err = SercomWireError::ARBITRATION_LOST;
+      if (status & SERCOM_I2CM_STATUS_BUSERR)
+        err = SercomWireError::BUS_ERROR;
+      if (status & SERCOM_I2CM_STATUS_MEXTTOUT)
+        err = SercomWireError::MASTER_TIMEOUT;
+      if (status & SERCOM_I2CM_STATUS_SEXTTOUT)
+        err = SercomWireError::SLAVE_TIMEOUT;
+      if (status & SERCOM_I2CM_STATUS_LENERR)
+        err = SercomWireError::LENGTH_ERROR;
+      if (busState == 0x0)
+        err = SercomWireError::BUS_STATE_UNKNOWN;
+      
+      sercom->clearINTFLAG();
+      sercom->deferStopWIRE(err);
+      return;
+    }
+
+    bool isRead = (txn->config & I2C_CFG_READ);
+
+    if (sercom->getTxnIndexWIRE() < sercom->getTxnLengthWIRE()) {
+      isRead ? sercom->readDataWIRE() : sercom->sendDataWIRE();
+      awaitingAddressAck = false;
+      return;
+    }
+
+    if ((txn->config & I2C_CFG_STOP) && !isRead)
+      sercom->prepareCommandBitsWIRE(WIRE_MASTER_ACT_STOP);
+    else
+      sercom->clearINTFLAG();
+
+    awaitingAddressAck = true;
+    sercom->deferStopWIRE(SercomWireError::SUCCESS);
+    return;
+  }
+  else {
+    if (flags & SERCOM_I2CS_INTFLAG_ERROR) {
+      SercomWireError err = SercomWireError::UNKNOWN_ERROR;;
+
+      if (status & SERCOM_I2CS_STATUS_BUSERR)
+        err = SercomWireError::BUS_ERROR;
+      if (status & SERCOM_I2CS_STATUS_COLL)
+        err = SercomWireError::ARBITRATION_LOST;
+      if (status & SERCOM_I2CS_STATUS_SEXTTOUT)
+        err = SercomWireError::SLAVE_TIMEOUT;
+      if (status & SERCOM_I2CS_STATUS_LOWTOUT)
+        err = SercomWireError::SLAVE_TIMEOUT;
+
+      sercom->clearINTFLAG();
+      sercom->deferStopWIRE(err);
+      return;
+    }
+
+    // To avoid unnecessary clock cycles for register reads, avoid using inline getters
+    bool isMasterRead = (status & SERCOM_I2CS_STATUS_DIR);  // Master Read / Slave Transmit
+    bool sr = (status & SERCOM_I2CS_STATUS_SR);             // Repeated Start detected
+    bool prec = (flags & SERCOM_I2CS_INTFLAG_PREC);         // Stop detected
+    bool amatch = (flags & SERCOM_I2CS_INTFLAG_AMATCH);     // Address Match detected
+    bool drdy = (flags & SERCOM_I2CS_INTFLAG_DRDY);         // Data Ready detected
+        
+    // Stop or Restart detected - defer receive callback
+    if(prec || (amatch && sr && !isMasterRead))
+    {
+      pendingReceive = true;
+      pendingReceiveLength = available();
+      sercom->deferReceiveWIRE(pendingReceiveLength);
+      return;
+    }
+    
+    // Address Match - setup transaction
+    // AACKEN enabled: address ACK is automatic, no manual ACK/clear needed
+    else if(amatch)
+    {
+      if(isMasterRead) // Master Read / Slave TX
+      {
+        // onRequestCallback runs in ISR context here. Deferring to PendSV
+        // would require stalling DRDY or returning 0xFF until the buffer is filled.
+        // onRequestCallback is what will set TwoWire::txn for the transaction.
+        if(onRequestCallback)
+          onRequestCallback();
+        
+        // Ensure callback actually set txn.length; if not, stall with 0-length txn
+        if (txn.length == 0) 
+          return;
+
+        if (!(txn.config & I2C_CFG_READ)) 
+          txn.config |= I2C_CFG_READ;
+      }
+      else // Master Write / Slave RX
+      {
+        // rxLength needs to be set in the rxCallback so the user has runtime control
+        // setting rxLength to 0 will default to the internal buffer
+        rxIndex = 0;
+        txn.txPtr = nullptr;
+        txn.rxPtr = rxLength ? rxBufferPtr : rxBuffer;
+        txn.length = rxLength ? rxLength : WIRE_RX_BUFFER_LENGTH;
+        txn.config = 0;
+      }
+
+      sercom->setTxnWIRE(&txn);
+
+      // SCLSM=0 (Smart Mode disabled): AMATCH and DRDY never fire together
+      //   → return now, DRDY will fire in next interrupt
+      // SCLSM=1 (Smart Mode enabled) + Master Read: AMATCH+DRDY fire together  
+      //   → fall through to handle data immediately
+      // SCLSM=1 + Master Write: DRDY not set yet
+      //   → return now, DRDY fires later
+      if (!drdy)
+          return;
+      // else: DRDY is set (SCLSM=1 Master Read case), fall through
+    }
+
+    // Data Ready - handle byte transfer
+    if(drdy)
+    {
+      isMasterRead ? sercom->sendDataWIRE() : sercom->readDataWIRE();
+
+      if (!isMasterRead)
+        rxLength = sercom->getTxnIndexWIRE();      
+    }
+  }
+}
 
 #endif
