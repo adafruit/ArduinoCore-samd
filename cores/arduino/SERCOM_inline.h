@@ -58,10 +58,10 @@ inline bool SERCOM::sendDataWIRE( void )
 
 inline void SERCOM::prepareCommandBitsWIRE(uint8_t cmd)
 {
-		sercom->I2CM.CTRLB.bit.CMD = cmd;
+	sercom->I2CM.CTRLB.bit.CMD = cmd;
 	if (isMasterWIRE())
 		while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ; // Waiting for synchronization
-		}
+}
 
 inline bool SERCOM::readDataWIRE( void )
 {
@@ -193,8 +193,8 @@ inline void SERCOM::dmaTxCallbackWIRE(Adafruit_ZeroDMA* dma)
 inline void SERCOM::dmaRxCallbackWIRE(Adafruit_ZeroDMA* dma)
 {
 	SERCOM* inst = findDmaOwner(dma, false);
-	if (!inst) return; 
-
+	if (!inst) return;
+	
 	// When using ADDR.LENEN mode, the hardware automatically generates NACK+STOP
 	// after ADDR.LEN bytes are transferred (datasheet §28.6.4.1.2).
 	// Do NOT issue a manual STOP command - it conflicts with the automatic sequence.
