@@ -41,14 +41,27 @@ enum class SercomSpiError : uint8_t
   UNKNOWN_ERROR = 2
 };
 
+// UART error reporting (async callbacks)
+enum class SercomUartError : uint8_t
+{
+  SUCCESS = 0,
+  UNKNOWN_ERROR = 1
+};
+
 // I2C config flags and helpers
 enum : uint16_t {
   I2C_CFG_READ    = 1u << 0,
   I2C_CFG_STOP    = 1u << 1,
   I2C_CFG_CRC     = 1u << 2,
   I2C_CFG_10BIT   = 1u << 3,
-  I2C_CFG_RESTART = 1u << 4,
+  I2C_CFG_NODMA   = 1u << 4,
 };
+
+// I2C STATUS register error-clear masks (write to I2CM.STATUS or I2CS.STATUS)
+// Master: LENERR|SEXTTOUT|MEXTTOUT|LOWTOUT|BUSSTATE_IDLE|ARBLOST|BUSERR
+static constexpr uint16_t I2CM_STATUS_ERR_CLEAR = 0x753u;
+// Slave: SEXTTOUT|LOWTOUT|COLL|BUSERR (preserves HS high-speed detection)
+static constexpr uint16_t I2CS_STATUS_ERR_CLEAR = 0x243u;
 
 static inline uint16_t I2C_ADDR(uint16_t addr10) { return addr10 & 0x03FFu; }
 static inline uint8_t I2C_ADDR7(uint16_t addr) { return (uint8_t)(addr & 0x7Fu); }

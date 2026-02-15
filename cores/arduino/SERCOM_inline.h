@@ -3,22 +3,33 @@
 
 #ifdef __cplusplus
 
-inline void SERCOM::enableWIRE( void )
+inline void SERCOM::enableSERCOM( void )
 {
-	// I2C Master and Slave modes share the ENABLE bit function.
+	// UART, SPI, I2CS, and I2CM use the same enable bit
 	sercom->I2CM.CTRLA.bit.ENABLE = 1;
 	while (sercom->I2CM.SYNCBUSY.bit.ENABLE != 0) ;
+}
+
+inline void SERCOM::disableSERCOM( void )
+{
+	// UART, SPI, I2CS, and I2CM use the same enable bit
+	sercom->I2CM.CTRLA.bit.ENABLE = 0;
+	while (sercom->I2CM.SYNCBUSY.bit.ENABLE != 0) ;
+}
+
+inline void SERCOM::enableWIRE( void )
+{
+	enableSERCOM();
 
 	// Setting bus idle mode
 	sercom->I2CM.STATUS.bit.BUSSTATE = 1;
 	while (sercom->I2CM.SYNCBUSY.bit.SYSOP != 0) ;
 }
 
-inline void SERCOM::disableWIRE( void )
+inline void SERCOM::deferStopWIRE(SercomWireError error)
 {
-	// I2C Master and Slave modes share the ENABLE bit function.
-	sercom->I2CM.CTRLA.bit.ENABLE = 0;
-	while (sercom->I2CM.SYNCBUSY.bit.ENABLE != 0) ;
+	_wire.returnValue = error;
+	setPending((uint8_t)getSercomIndex());
 }
 
 inline bool SERCOM::sendDataWIRE( void )
@@ -99,7 +110,7 @@ inline uint8_t SERCOM::getINTFLAG( void ) const { return sercom->I2CM.INTFLAG.re
 inline uint16_t SERCOM::getSTATUS( void ) const { return sercom->I2CM.STATUS.reg; }
 inline void SERCOM::clearINTFLAG( void ) { sercom->I2CM.INTFLAG.reg = 0xFF; }
 
-inline void SERCOM::setWireTxn(SercomTxn* txn, size_t length, bool useDma)
+inline void SERCOM::setTxnWIRE(SercomTxn* txn, size_t length, bool useDma)
 {
 	_wire.currentTxn = txn;
 	_wire.txnLength = length;
@@ -107,31 +118,11 @@ inline void SERCOM::setWireTxn(SercomTxn* txn, size_t length, bool useDma)
 	_wire.useDma = useDma;
 }
 
-inline void SERCOM::setWireDma(bool useDma)
-{
-	_wire.useDma = useDma;
-}
-
-inline bool SERCOM::isWireDma(void) const
-{
-	return _wire.useDma;
-}
-
-inline bool SERCOM::isMasterReadOperationWIRE( void )
-{
-	return sercom->I2CS.STATUS.bit.DIR;
-}
-
-inline bool SERCOM::isRXNackReceivedWIRE( void )
-{
-	return sercom->I2CM.STATUS.bit.RXNACK;
-}
-
 #ifdef USE_ZERODMA
 inline SERCOM* SERCOM::findDmaOwner(Adafruit_ZeroDMA* dma, bool tx)
 {
-	if (dma == nullptr)
-		return nullptr;
+	if (dma == nullptr) return nullptr;
+
 	for (size_t i = 0; i < kSercomCount; ++i)
 	{
 		SERCOM* inst = s_instances[i];
@@ -148,71 +139,8 @@ inline SERCOM* SERCOM::findDmaOwner(Adafruit_ZeroDMA* dma, bool tx)
 				return inst;
 		}
 	}
+
 	return nullptr;
-}
-
-inline SERCOM::DmaStatus SERCOM::dmaStartTx(const void* src, void* dstReg, size_t len)
-{
-   if (!_dmaConfigured || !_dmaTx) {
-		_dmaLastError = DmaStatus::NotConfigured;
-		return _dmaLastError;
-  	}
-	if (src == nullptr || dstReg == nullptr) {
-		_dmaLastError = DmaStatus::NullPtr;
-		return _dmaLastError;
-	}
-	if (len == 0) {
-		_dmaLastError = DmaStatus::ZeroLen;
-		return _dmaLastError;
-	}
-	if (_dmaTxDesc == nullptr) {
-		_dmaLastError = DmaStatus::DescriptorFailed;
-		return _dmaLastError;
-	}
-
-	_dmaTx->changeDescriptor(_dmaTxDesc, (void*)src, dstReg, len);
-
-	if (_dmaTx->startJob() != DMA_STATUS_OK) {
-		_dmaTx->abort();
-		_dmaLastError = DmaStatus::StartFailed;
-		return _dmaLastError;
-	}
-
-	_dmaTxActive = true;
-	_dmaLastError = DmaStatus::Ok;
-	return _dmaLastError;
-}
-
-inline SERCOM::DmaStatus SERCOM::dmaStartRx(void* dst, void* srcReg, size_t len)
-{
-	if (!_dmaConfigured || !_dmaRx) {
-		_dmaLastError = DmaStatus::NotConfigured;
-		return _dmaLastError;
-	}
-	if (dst == nullptr || srcReg == nullptr) {
-		_dmaLastError = DmaStatus::NullPtr;
-		return _dmaLastError;
-	}
-	if (len == 0) {
-		_dmaLastError = DmaStatus::ZeroLen;
-		return _dmaLastError;
-	}
-	if (_dmaRxDesc == nullptr) {
-		_dmaLastError = DmaStatus::DescriptorFailed;
-		return _dmaLastError;
-	}
-	
-	_dmaRx->changeDescriptor(_dmaRxDesc, srcReg, dst, len);
-
-	if (_dmaRx->startJob() != DMA_STATUS_OK) {
-		_dmaRx->abort();
-		_dmaLastError = DmaStatus::StartFailed;
-		return _dmaLastError;
-	}
-
-	_dmaRxActive = true;
-	_dmaLastError = DmaStatus::Ok;
-	return _dmaLastError;
 }
 
 inline void SERCOM::dmaTxCallbackWIRE(Adafruit_ZeroDMA* dma)
