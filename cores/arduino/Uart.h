@@ -36,8 +36,13 @@ class Uart : public HardwareSerial
     int availableForWrite();
     int peek();
     int read();
+    size_t read(uint8_t* buffer, size_t size,
+                void (*onComplete)(void* user, int status) = nullptr,
+                void* user = nullptr);
     void flush();
     size_t write(const uint8_t data);
+    size_t write(const uint8_t* buffer, size_t size);
+    size_t writeAsync(const uint8_t* buffer, size_t size, void (*onComplete)(void* user, int status), void* user);
     using Print::write; // pull in write(str) and write(buf, size) from Print
 
     void IrqHandler();
@@ -58,6 +63,14 @@ class Uart : public HardwareSerial
     volatile uint32_t* pul_outclrRTS;
     uint32_t ul_pinMaskRTS;
     uint8_t uc_pinCTS;
+
+    volatile bool txnDone = false;
+    volatile int txnStatus = 0;
+    SercomTxn _txn;
+    static void onTxnComplete(void* user, int status);
+    bool rxExternalActive = false;
+    void (*pendingRxCb)(void* user, int status) = nullptr;
+    void* pendingRxUser = nullptr;
 
     SercomNumberStopBit extractNbStopBit(uint16_t config);
     SercomUartCharSize extractCharSize(uint16_t config);

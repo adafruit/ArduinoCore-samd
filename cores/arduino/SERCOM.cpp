@@ -66,6 +66,27 @@ void SERCOM::initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint
   initClockNVIC();
   resetUART();
 
+#ifdef USE_ZERODMA
+#ifdef SERCOM0_DMAC_ID_TX
+  int8_t id = getSercomIndex();
+  if (id < 0)
+    return;
+
+  dmaSetCallbacks(SERCOM::dmaTxCallbackUART, SERCOM::dmaRxCallbackUART);
+
+  if (_dmaConfigured)
+    return;
+
+  _dmaTxTrigger = SERCOM0_DMAC_ID_TX + (id * 2);
+  _dmaRxTrigger = SERCOM0_DMAC_ID_RX + (id * 2);
+  dmaInit(_dmaTxTrigger, _dmaRxTrigger);
+#else
+  (void)0;
+#endif // SERCOM0_DMAC_ID_TX
+#endif // USE_ZERODMA
+
+  registerService(getSercomIndex(), &SERCOM::stopTransmissionUART);
+
   //Setting the CTRLA register
   sercom->USART.CTRLA.reg = SERCOM_USART_CTRLA_MODE(mode) |
                             SERCOM_USART_CTRLA_SAMPR(sampleRate);
@@ -93,6 +114,7 @@ void SERCOM::initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint
     sercom->USART.BAUD.FRAC.BAUD = (baudTimes8 / 8);
   }
 }
+
 void SERCOM::initFrame(SercomUartCharSize charSize, SercomDataOrder dataOrder, SercomParityMode parityMode, SercomNumberStopBit nbStopBits)
 {
   //Setting the CTRLA register
@@ -224,14 +246,111 @@ void SERCOM::disableDataRegisterEmptyInterruptUART()
   sercom->USART.INTENCLR.reg = SERCOM_USART_INTENCLR_DRE;
 }
 
+bool SERCOM::startTransmissionUART(void)
+{
+  SercomTxn* txn = nullptr;
+  if (!_txnQueue.peek(txn) || txn == nullptr)
+    return false;
+
+  _uart.currentTxn = txn;
+  _uart.index = 0;
+  _uart.length = txn->length;
+  _uart.active = true;
+
+#ifdef USE_ZERODMA
+  _uart.useDma = _dmaConfigured;
+#else
+  _uart.useDma = false;
+#endif
+
+  if (!_uart.useDma)
+    return false;
+
+#ifdef USE_ZERODMA
+  void* dataReg = (void*)&sercom->USART.DATA.reg;
+  _uart.dmaNeedTx = (txn->txPtr != nullptr);
+  _uart.dmaNeedRx = (txn->rxPtr != nullptr);
+  _uart.dmaTxDone = !_uart.dmaNeedTx;
+  _uart.dmaRxDone = !_uart.dmaNeedRx;
+
+  DmaStatus st = DmaStatus::Ok;
+  if (_uart.dmaNeedTx)
+    st = dmaStartTx(txn->txPtr, dataReg, txn->length);
+  else if (_uart.dmaNeedRx)
+    st = dmaStartRx(txn->rxPtr, dataReg, txn->length);
+
+  if (st != DmaStatus::Ok) {
+    _uart.returnValue = SercomUartError::UNKNOWN_ERROR;
+    deferStopUART(_uart.returnValue);
+    return false;
+  }
+  return true;
+#else
+  return false;
+#endif
+}
+
+bool SERCOM::enqueueUART(SercomTxn* txn)
+{
+  if (txn == nullptr)
+    return false;
+#ifdef USE_ZERODMA
+  if (!_dmaConfigured)
+    return false;
+#else
+  return false;
+#endif
+  if (!_txnQueue.store(txn))
+    return false;
+  if (!_uart.active) {
+    if (!startTransmissionUART()) {
+      SercomTxn* tmp = nullptr;
+      _txnQueue.read(tmp);
+      if (tmp && tmp->onComplete)
+        tmp->onComplete(tmp->user, static_cast<int>(SercomUartError::UNKNOWN_ERROR));
+      return false;
+    }
+  }
+  return true;
+}
+
+void SERCOM::deferStopUART(SercomUartError error)
+{
+  _uart.returnValue = error;
+  setPending((uint8_t)getSercomIndex());
+}
+
+SercomTxn* SERCOM::stopTransmissionUART(void)
+{
+  return stopTransmissionUART(_uart.returnValue);
+}
+
+SercomTxn* SERCOM::stopTransmissionUART(SercomUartError error)
+{
+  SercomTxn* txn = nullptr;
+  if (_txnQueue.read(txn) && txn != nullptr)
+  {
+    _uart.active = false;
+    _uart.currentTxn = nullptr;
+    if (txn->onComplete)
+      txn->onComplete(txn->user, static_cast<int>(error));
+  }
+
+  SercomTxn* next = nullptr;
+  if (_txnQueue.peek(next) && next)
+    startTransmissionUART();
+
+  return txn;
+}
+
 /* =========================
  * ===== Sercom SPI
  * =========================
 */
 void SERCOM::initSPI(SercomSpiTXPad mosi, SercomRXPad miso, SercomSpiCharSize charSize, SercomDataOrder dataOrder)
 {
-  resetSPI();
   initClockNVIC();
+  resetSPI();
 
 #ifdef USE_ZERODMA
   dmaSetCallbacks(SERCOM::dmaTxCallbackSPI, SERCOM::dmaRxCallbackSPI);
@@ -497,16 +616,8 @@ uint8_t SERCOM::transferDataSPI(uint8_t data)
   return sercom->SPI.DATA.bit.DATA;  // Reading data
 }
 
-bool SERCOM::isBufferOverflowErrorSPI()
-{
-  return sercom->SPI.STATUS.bit.BUFOVF;
-}
-
-bool SERCOM::isDataRegisterEmptySPI()
-{
-  //DRE : Data Register Empty
-  return sercom->SPI.INTFLAG.bit.DRE;
-}
+bool SERCOM::isBufferOverflowErrorSPI() { return sercom->SPI.STATUS.bit.BUFOVF; }
+bool SERCOM::isDataRegisterEmptySPI() { return sercom->SPI.INTFLAG.bit.DRE; }
 
 //bool SERCOM::isTransmitCompleteSPI()
 //{
