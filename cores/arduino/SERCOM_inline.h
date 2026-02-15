@@ -35,80 +35,111 @@ inline void SERCOM::deferStopWIRE(SercomWireError error)
 inline bool SERCOM::sendDataWIRE( void )
 {
 	SercomTxn* txn = _wire.currentTxn;
-	if (txn && txn->txPtr == nullptr) return false;
+	if (txn == nullptr || txn->txPtr == nullptr) return false;
 	
 #ifdef USE_ZERODMA
-	if (isWireDma()) {
-		if (!_dmaTxActive)
-			dmaStartTx(txn->txPtr, &sercom->I2CM.DATA.reg, _wire.txnLength);
-		return true;
+	if (isDmaWIRE()) {
+		DmaStatus value  = DmaStatus::StartFailed;
+		if (!_dmaTxActive && !_dmaRxActive)
+			value = dmaStartTx(txn->txPtr, &sercom->I2CM.DATA.reg, _wire.txnLength);
+		return value == DmaStatus::Ok;
 	}
 #endif
-	if (_wire.txnIndex < _wire.txnLength) {
-		sercom->I2CM.DATA.bit.DATA = txn->txPtr[_wire.txnIndex++];
-		return true;
-	}
 
-	return false;
+	sercom->I2CM.DATA.reg = txn->txPtr[_wire.txnIndex++];
+
+	if(isMasterWIRE())
+		while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ; // Wait for DATA to sync and clear MB
+		
+	// Return false when the last byte has been consumed so the caller can
+	// issue STOP / complete the transaction without waiting for another SB.
+	return (_wire.txnIndex < _wire.txnLength);
 }
 
-inline bool SERCOM::isMasterWIRE( void ) { return sercom->I2CM.CTRLA.bit.MODE == I2C_MASTER_OPERATION; }
-inline bool SERCOM::isSlaveWIRE( void ) { return sercom->I2CS.CTRLA.bit.MODE == I2C_SLAVE_OPERATION; }
-
-inline bool SERCOM::isBusIdleWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_IDLE_STATE; }
-inline bool SERCOM::isBusOwnerWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_OWNER_STATE; }
-inline bool SERCOM::isBusUnknownWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_UNKNOWN_STATE; }
-inline bool SERCOM::isArbLostWIRE( void ) { return sercom->I2CM.STATUS.bit.ARBLOST == 1; }
-inline bool SERCOM::isBusBusyWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_BUSY_STATE; }
-inline bool SERCOM::isDataReadyWIRE( void ) { return sercom->I2CS.INTFLAG.bit.DRDY; }
-inline bool SERCOM::isStopDetectedWIRE( void ) { return sercom->I2CS.INTFLAG.bit.PREC; }
-inline bool SERCOM::isRestartDetectedWIRE( void ) { return sercom->I2CS.INTFLAG.bit.SR; }
-inline bool SERCOM::isAddressMatch( void ) { return sercom->I2CS.INTFLAG.bit.AMATCH; }
-
-inline void SERCOM::prepareNackBitWIRE( void ) { sercom->I2CM.CTRLB.bit.ACKACT = 1; }
-inline void SERCOM::prepareAckBitWIRE( void ) { sercom->I2CM.CTRLB.bit.ACKACT = 0; }
-inline void SERCOM::prepareCommandBitsWire(uint8_t cmd)
+inline void SERCOM::prepareCommandBitsWIRE(uint8_t cmd)
 {
-	if (isMasterWIRE()) {
 		sercom->I2CM.CTRLB.bit.CMD = cmd;
-		while (sercom->I2CM.SYNCBUSY.bit.SYSOP)
-		{
-			// Waiting for synchronization
+	if (isMasterWIRE())
+		while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ; // Waiting for synchronization
 		}
-	} else {
-		sercom->I2CS.CTRLB.bit.CMD = cmd;
-	}
-}
-inline int SERCOM::availableWIRE( void ) { return isMasterWIRE() ? sercom->I2CM.INTFLAG.bit.SB : sercom->I2CS.INTFLAG.bit.DRDY; }
 
 inline bool SERCOM::readDataWIRE( void )
 {
 	SercomTxn* txn = _wire.currentTxn;
-	if (txn && txn->rxPtr == nullptr) return false;
-
-	if (isMasterWIRE() && (_wire.txnIndex + 1 >= _wire.txnLength))
-		sercom->I2CM.CTRLB.reg |= SERCOM_I2CM_CTRLB_ACKACT;
-	else
-		sercom->I2CM.CTRLB.reg &= ~SERCOM_I2CM_CTRLB_ACKACT;
+	if (txn == nullptr || txn->rxPtr == nullptr) return false;
 
 #ifdef USE_ZERODMA
-	if (isWireDma()) {
-		if (!_dmaRxActive)
-			dmaStartRx(txn->rxPtr, &sercom->I2CM.DATA.reg, _wire.txnLength);
-		return true;
+	if (isDmaWIRE()) {
+		DmaStatus value = DmaStatus::StartFailed;
+		if (!_dmaRxActive && !_dmaTxActive)
+			value = dmaStartRx(txn->rxPtr, &sercom->I2CM.DATA.reg, _wire.txnLength);
+		return value == DmaStatus::Ok;
 	}
 #endif
 
-	if ( _wire.txnIndex >= _wire.txnLength)
-		return false;
+	bool isMaster = isMasterWIRE();
 
-	txn->rxPtr[_wire.txnIndex++] = sercom->I2CM.DATA.bit.DATA;
-	return true;
+	if (isMaster) {
+		if (_wire.txnIndex == (_wire.txnLength - 1)) {
+			uint8_t cmd = txn->config & I2C_CFG_STOP ? WIRE_MASTER_ACT_STOP : WIRE_MASTER_ACT_NO_ACTION;
+			sercom->I2CM.CTRLB.reg |= SERCOM_I2CM_CTRLB_ACKACT | SERCOM_I2CM_CTRLB_CMD(cmd); // NACK the last byte and send STOP if requested
+			if (cmd == WIRE_MASTER_ACT_STOP)
+				while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ; // Wait for CMD to sync and clear SB
+		}
+		else
+			prepareAckBitWIRE(); // ACK bytes otherwise for non-SCLSM mode
+	}
+
+	// Read DATA register (clears SB in Smart Mode)
+	txn->rxPtr[_wire.txnIndex++] = sercom->I2CM.DATA.reg;
+
+	if(isMaster)
+		while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ; // Wait for DATA to sync and clear SB
+
+	return (_wire.txnIndex < _wire.txnLength);
 }
 
-inline uint8_t SERCOM::getINTFLAG( void ) const { return sercom->I2CM.INTFLAG.reg; }
-inline uint16_t SERCOM::getSTATUS( void ) const { return sercom->I2CM.STATUS.reg; }
-inline void SERCOM::clearINTFLAG( void ) { sercom->I2CM.INTFLAG.reg = 0xFF; }
+inline bool SERCOM::sendDataSPI(void)
+{
+	SercomTxn* txn = _spi.currentTxn;
+	if (txn == nullptr || txn->txPtr == nullptr) return false;
+
+#ifdef USE_ZERODMA
+	if (_spi.useDma) {
+		DmaStatus value = DmaStatus::StartFailed;
+		if (!_dmaTxActive && !_dmaRxActive)
+			value = dmaStartTx(txn->txPtr, &sercom->SPI.DATA.reg, _spi.length);
+		return value == DmaStatus::Ok;
+	}
+#endif
+
+	// Byte-by-byte: Write DATA register
+	sercom->SPI.DATA.bit.DATA = txn->txPtr[_spi.index++];
+
+	// Return false when last byte consumed so caller can complete transaction
+	return (_spi.index < _spi.length);
+}
+
+inline bool SERCOM::readDataSPI(void)
+{
+	SercomTxn* txn = _spi.currentTxn;
+	if (txn == nullptr || txn->rxPtr == nullptr) return false;
+
+#ifdef USE_ZERODMA
+	if (_spi.useDma) {
+		DmaStatus value = DmaStatus::StartFailed;
+		if (!_dmaRxActive && !_dmaTxActive)
+			value = dmaStartRx(txn->rxPtr, &sercom->SPI.DATA.reg, _spi.length);
+		return value == DmaStatus::Ok;
+	}
+#endif
+
+	// Byte-by-byte: Read DATA register
+	txn->rxPtr[_spi.index - 1] = sercom->SPI.DATA.bit.DATA;
+
+	// Return false when all bytes consumed
+	return (_spi.index < _spi.length);
+}
 
 inline void SERCOM::setTxnWIRE(SercomTxn* txn, size_t length, bool useDma)
 {
@@ -148,13 +179,15 @@ inline void SERCOM::dmaTxCallbackWIRE(Adafruit_ZeroDMA* dma)
 	SERCOM* inst = findDmaOwner(dma, true);
 	if (!inst) return;
 
-	if (inst->isMasterWIRE())
-		inst->sercom->I2CM.CTRLB.reg |= SERCOM_I2CM_CTRLB_CMD(WIRE_MASTER_ACT_STOP);
-	else
-		inst->sercom->I2CS.CTRLB.reg |= SERCOM_I2CS_CTRLB_CMD(0x3);
-	inst->_wire.returnValue = SercomWireError::SUCCESS;
+	// When using ADDR.LENEN mode, the hardware automatically generates STOP
+	// after ADDR.LEN bytes are transferred (datasheet §28.6.4.1.2).
+	// If a NACK TOPis received by the client for a host write transaction before
+	// ADDR.LEN bytes, a STOP will be automatically generated and the length error
+	// (STATUS.LENERR) will be raised along with the INTFLAG.ERROR interrupt.re
+
+	inst->_wire.txnIndex = inst->_wire.txnLength;
 	inst->_dmaTxActive = false;
-	SERCOM::setPending((uint8_t)inst->getSercomIndex());
+	inst->deferStopWIRE(SercomWireError::SUCCESS);
 }
 
 inline void SERCOM::dmaRxCallbackWIRE(Adafruit_ZeroDMA* dma)
@@ -162,14 +195,14 @@ inline void SERCOM::dmaRxCallbackWIRE(Adafruit_ZeroDMA* dma)
 	SERCOM* inst = findDmaOwner(dma, false);
 	if (!inst) return; 
 
-	if (inst->isMasterWIRE())
-		inst->sercom->I2CM.CTRLB.reg |= SERCOM_I2CM_CTRLB_CMD(WIRE_MASTER_ACT_STOP);
-	else
-		inst->sercom->I2CS.CTRLB.reg |= SERCOM_I2CS_CTRLB_CMD(0x3);
+	// When using ADDR.LENEN mode, the hardware automatically generates NACK+STOP
+	// after ADDR.LEN bytes are transferred (datasheet §28.6.4.1.2).
+	// Do NOT issue a manual STOP command - it conflicts with the automatic sequence.
+	// The STOP is generated by hardware, not by software CMD write.
+	
 	inst->_wire.txnIndex = inst->_wire.txnLength;
-	inst->_wire.returnValue = SercomWireError::SUCCESS;
 	inst->_dmaRxActive = false;
-	SERCOM::setPending((uint8_t)inst->getSercomIndex());
+	inst->deferStopWIRE(SercomWireError::SUCCESS);
 }
 
 inline void SERCOM::dmaTxCallbackSPI(Adafruit_ZeroDMA* dma)
@@ -179,6 +212,7 @@ inline void SERCOM::dmaTxCallbackSPI(Adafruit_ZeroDMA* dma)
 	inst->_spi.dmaTxDone = true;
 	if (inst->_spi.dmaNeedRx && !inst->_spi.dmaRxDone)
 		return;
+	inst->_dmaTxActive = false;
 	inst->_spi.returnValue = SercomSpiError::SUCCESS;
 	SERCOM::setPending((uint8_t)inst->getSercomIndex());
 }
@@ -190,7 +224,32 @@ inline void SERCOM::dmaRxCallbackSPI(Adafruit_ZeroDMA* dma)
 	inst->_spi.dmaRxDone = true;
 	if (inst->_spi.dmaNeedTx && !inst->_spi.dmaTxDone)
 		return;
+	inst->_dmaRxActive = false;
 	inst->_spi.returnValue = SercomSpiError::SUCCESS;
+	SERCOM::setPending((uint8_t)inst->getSercomIndex());
+}
+
+inline void SERCOM::dmaTxCallbackUART(Adafruit_ZeroDMA* dma)
+{
+	SERCOM* inst = findDmaOwner(dma, true);
+	if (!inst) return;
+	inst->_uart.dmaTxDone = true;
+	if (inst->_uart.dmaNeedRx && !inst->_uart.dmaRxDone)
+		return;
+	inst->_dmaTxActive = false;
+	inst->_uart.returnValue = SercomUartError::SUCCESS;
+	SERCOM::setPending((uint8_t)inst->getSercomIndex());
+}
+
+inline void SERCOM::dmaRxCallbackUART(Adafruit_ZeroDMA* dma)
+{
+	SERCOM* inst = findDmaOwner(dma, false);
+	if (!inst) return;
+	inst->_uart.dmaRxDone = true;
+	if (inst->_uart.dmaNeedTx && !inst->_uart.dmaTxDone)
+		return;
+	inst->_dmaRxActive = false;
+	inst->_uart.returnValue = SercomUartError::SUCCESS;
 	SERCOM::setPending((uint8_t)inst->getSercomIndex());
 }
 #endif

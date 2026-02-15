@@ -251,49 +251,53 @@ class SERCOM
 		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false, uint8_t speed = 0x0) ;
 		void initSlaveWIRE(uint16_t address, bool enableGeneralCall = false, uint8_t speed = 0x0, bool enable10Bit = false) ;
 		void initMasterWIRE(uint32_t baudrate) ;
-		inline void setWireTxn(SercomTxn* txn, size_t length, bool useDma);
-		inline void setWireDma(bool useDma);
-		inline bool isWireDma(void) const;
-		void registerWireReceive(void (*cb)(void* user, int length), void* user);
-		void deferWireReceive(int length);
+		inline void setTxnWIRE(SercomTxn* txn, size_t length, bool useDma);
+		inline void setDmaWIRE(bool useDma) { _wire.useDma = useDma; }
+		inline bool isDmaWIRE(void) const { return _wire.useDma; }
+		void registerReceiveWIRE(void (*cb)(void* user, int length), void* user);
+		void deferReceiveWIRE(int length);
 		void setSlaveWIRE( void ) ;
 		void setMasterWIRE( void ) ;
 
 		void resetWIRE( void ) ;
+		void clearQueueWIRE( void ) ;
 		inline void enableWIRE( void ) ;
-		inline void disableWIRE( void ) ;
+		inline void disableWIRE( void ) { disableSERCOM(); }
 		void setBaudrateWIRE(uint32_t baudrate) ;
-        inline void prepareNackBitWIRE( void ) ;
-		inline void prepareAckBitWIRE( void ) ;
-        inline void prepareCommandBitsWire(uint8_t cmd) ;
-		bool startTransmissionWIRE( void ) ;
+        inline void prepareNackBitWIRE( void ) { sercom->I2CM.CTRLB.bit.ACKACT = 1; }
+		inline void prepareAckBitWIRE( void ) { sercom->I2CM.CTRLB.bit.ACKACT = 0; }
+        inline void prepareCommandBitsWIRE(uint8_t cmd) ;
+		SercomTxn* startTransmissionWIRE( void ) ;
 		bool startTransmissionWIRE( uint8_t address, SercomWireReadWriteFlag flag ) = delete ;
 		SercomTxn* stopTransmissionWIRE( void ) ;
 		SercomTxn* stopTransmissionWIRE( SercomWireError error ) ;
 		bool enqueueWIRE(SercomTxn* txn);
 		void deferStopWIRE(SercomWireError error);
-		inline uint8_t getINTFLAG( void ) const;
-		inline uint16_t getSTATUS( void ) const;
-		inline void clearINTFLAG( void );
-		inline bool sendDataWIRE( void ) ;
-		inline bool isMasterWIRE( void ) ;
-		inline bool isSlaveWIRE( void ) ;
-		inline bool isBusIdleWIRE( void ) ;
-		inline bool isBusOwnerWIRE( void ) ;
-		inline bool isBusUnknownWIRE( void ) ;
-		inline bool isArbLostWIRE( void ) ;
-		inline bool isBusBusyWIRE( void ) ;
-		inline bool isDataReadyWIRE( void ) ;
-		inline bool isStopDetectedWIRE( void ) ;
-		inline bool isRestartDetectedWIRE( void ) ;
-		inline bool isAddressMatch( void ) ;
-		inline bool isMasterReadOperationWIRE( void ) ;
-        inline bool isRXNackReceivedWIRE( void ) ;
-		inline int availableWIRE( void ) ;
-		inline bool readDataWIRE( void );
-		inline void writeDataWIRE(uint8_t data);
-		inline uint8_t readDataWIREByte(void);
 
+		inline bool sendDataWIRE( void ) ;
+		inline bool isMasterWIRE( void ) { return sercom->I2CM.CTRLA.bit.MODE == I2C_MASTER_OPERATION; }
+		inline bool isSlaveWIRE( void ) { return sercom->I2CS.CTRLA.bit.MODE == I2C_SLAVE_OPERATION; }
+		inline bool isBusIdleWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_IDLE_STATE; }
+		inline bool isBusOwnerWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_OWNER_STATE; }
+		inline bool isBusUnknownWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_UNKNOWN_STATE; }
+		inline bool isArbLostWIRE( void ) { return sercom->I2CM.STATUS.bit.ARBLOST == 1; }
+		inline bool isBusBusyWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_BUSY_STATE; }
+		inline bool isDataReadyWIRE( void ) { return sercom->I2CS.INTFLAG.bit.DRDY; }
+		inline bool isStopDetectedWIRE( void ) { return sercom->I2CS.INTFLAG.bit.PREC; }
+		inline bool isRestartDetectedWIRE( void ) { return sercom->I2CS.STATUS.bit.SR; }
+		inline bool isAddressMatch( void ) { return sercom->I2CS.INTFLAG.bit.AMATCH; }
+		inline bool isMasterReadOperationWIRE( void ) { return sercom->I2CS.STATUS.bit.DIR; }
+        inline bool isRXNackReceivedWIRE( void ) { return sercom->I2CM.STATUS.bit.RXNACK; }
+		inline int availableWIRE( void ) { return isMasterWIRE() ? sercom->I2CM.INTFLAG.bit.SB : sercom->I2CS.INTFLAG.bit.DRDY; }
+		inline bool readDataWIRE( void );
+		inline SercomTxn* getCurrentTxnWIRE(void) { return _wire.currentTxn; }
+		inline const SercomTxn* getCurrentTxnWIRE(void) const { return _wire.currentTxn; }
+		inline size_t getTxnIndexWIRE(void) const { return _wire.txnIndex; }
+		inline size_t getTxnLengthWIRE(void) const { return _wire.txnLength; }
+
+		inline bool isDBGSTOP( void ) const { return sercom->I2CM.DBGCTRL.bit.DBGSTOP; }
+		inline void setDBGSTOP( bool stop ) { sercom->I2CM.DBGCTRL.bit.DBGSTOP = stop; }
+		inline Sercom* getSercom() const { return sercom; }
 		int8_t getSercomIndex(void) ;
         uint32_t getSercomFreqRef(void) ;
 
@@ -415,15 +419,16 @@ class SERCOM
 		// as needed in the future. For now, it just provides default support
 		// for (hs) mode and DMA.
 		struct WireConfig {
-            uint32_t ctrla = 0x00000002; // default CTRLA value: auto ENABLE
-			uint32_t ctrlb = 0x00000500; // default CTRLB value: SMEN (both) | AACKEN (Slave only)
-			uint32_t baud  = 0x000000FF; // default to lowest supported speed
-			uint32_t addr  = 0x00000000; // default address no GCEN, no ADDRMASK, 7-bit address only
-			uint8_t masterSpeed = 0x0;   // default to lowest speed
-			uint8_t slaveSpeed = 0x0;    // default to lowest speed
-			bool inited = false;		 // whether initMaster/SlaveWIRE has been called
-			bool useDma = false;		 // per transaction DMA use flag for Host/Client modes
-			bool active = false;         // active transaction in progress
+            uint32_t ctrla = 0x00000000;             // default CTRLA value: auto ENABLE
+			uint32_t ctrlb = SERCOM_I2CM_CTRLB_SMEN; // default CTRLB value: SMEN
+			uint32_t baud  = 0x000000FF;             // default to lowest supported speed
+			uint32_t addr  = 0x00000000;             // default address no GCEN, no ADDRMASK, 7-bit address only
+			uint8_t masterSpeed = 0x0;               // default to lowest speed
+			uint8_t slaveSpeed = 0x0;                // default to lowest speed
+			bool inited = false;		             // whether initMaster/SlaveWIRE has been called
+			bool useDma = false;		             // per transaction DMA use flag for Host/Client modes
+			bool active = false;                     // active transaction in progress
+			uint8_t retryCount = 0;                  // retry count for recoverable bus errors
 			SercomWireError returnValue = SercomWireError::SUCCESS;
 			SercomTxn* currentTxn = nullptr;
 			size_t txnIndex = 0;

@@ -569,49 +569,53 @@ uint8_t SERCOM::calculateBaudrateSynchronous(uint32_t baudrate)
  */
 void SERCOM::resetWIRE()
 {
-  //I2CM OR I2CS, no matter SWRST is the same bit.
-
-  //Setting the Software bit to 1
-  sercom->I2CM.CTRLA.bit.SWRST = 1;
-
-  //Wait both bits Software Reset from CTRLA and SYNCBUSY are equal to 0
-  while(sercom->I2CM.CTRLA.bit.SWRST || sercom->I2CM.SYNCBUSY.bit.SWRST);
-
+  resetSERCOM();
   _wire = WireConfig{};
 }
+
+void SERCOM::clearQueueWIRE(void)
+{
+  // Drain all pending transactions from the queue without invoking callbacks
+  // This is needed for test teardown to ensure no stale transactions carry over
+  SercomTxn* txn = nullptr;
+  int drained = 0;
+  while (_txnQueue.read(txn)) {
+    drained++;
+    // Just discard - don't invoke callbacks during reset
+  }
+  
+  // Ensure wire state is completely clean
+  _wire.active = false;
+  _wire.currentTxn = nullptr;
+  _wire.txnIndex = 0;
+  _wire.txnLength = 0;
+  _wire.returnValue = SercomWireError::SUCCESS;
+  _wire.retryCount = 0;
+  
+  // Clear deferred callbacks (from slave/receive operations)
+  _wireDeferredCb = nullptr;
+  _wireDeferredUser = nullptr;
+  _wireDeferredLength = 0;
+  _wireDeferredPending = false;
+}
+
 void SERCOM::initWIRE(void)
 {
-  if (!_wire.inited) {
+  if (_wire.inited)  // If already initialized, return
+    return;
+
     uint8_t idx = getSercomIndex();
     initClockNVIC();
     registerService(idx, static_cast<ServiceFn>(&SERCOM::stopTransmissionWIRE));
-    _wire.inited = true;
-  }
-#ifdef USE_ZERODMA
-  initWireDma();
-#endif
-}
 
 #ifdef USE_ZERODMA
-void SERCOM::initWireDma(void)
-{
-#ifdef SERCOM0_DMAC_ID_TX
-  if (_dmaConfigured)
-    return;
-
-  int8_t id = getSercomIndex();
-  if (id < 0)
-    return;
-
-  _dmaTxTrigger = SERCOM0_DMAC_ID_TX + (id * 2);
-  _dmaRxTrigger = SERCOM0_DMAC_ID_RX + (id * 2);
   dmaSetCallbacks(SERCOM::dmaTxCallbackWIRE, SERCOM::dmaRxCallbackWIRE);
-  dmaInit(_dmaTxTrigger, _dmaRxTrigger);
-#else
-  (void)0;
-#endif
+  if (idx >= 0)
+    dmaInit(idx);
+#endif // USE_ZERODMA
+
+  _wire.inited = true;  // Mark as initialized last
 }
-#endif
 
 void SERCOM::initSlaveWIRE( uint8_t ucAddress, bool enableGeneralCall, uint8_t speed )
 {
@@ -639,13 +643,13 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
   setMasterWIRE();
 }
 
-void SERCOM::registerWireReceive(void (*cb)(void* user, int length), void* user)
+void SERCOM::registerReceiveWIRE(void (*cb)(void* user, int length), void* user)
 {
   _wireDeferredCb = cb;
   _wireDeferredUser = user;
 }
 
-void SERCOM::deferWireReceive(int length)
+void SERCOM::deferReceiveWIRE(int length)
 {
   _wireDeferredLength = length;
   _wireDeferredPending = true;
@@ -654,50 +658,36 @@ void SERCOM::deferWireReceive(int length)
 
 void SERCOM::setMasterWIRE(void)
 {
+  // Errata: do not enable QCEN when SCLSM=1 (bus error). Hs-mode requires SCLSM=1,
+  // so master Hs-mode must be DMA-only and STOP-only (no repeated starts).
   disableWIRE();
-
-  sercom->I2CM.CTRLB.reg = _wire.ctrlb |SERCOM_I2CM_CTRLB_QCEN;
-  sercom->I2CM.BAUD.reg = _wire.baud;
   bool sclsm = (_wire.masterSpeed == 0x2);
-
-  // Set master mode and clock settings
-  sercom->I2CM.CTRLA.reg = _wire.ctrla |
+  sercom->I2CM.CTRLA.reg = _wire.ctrla                                  |
                            SERCOM_I2CM_CTRLA_MODE(I2C_MASTER_OPERATION) |
-                           SERCOM_I2CM_CTRLA_SPEED(_wire.masterSpeed) |
+                           SERCOM_I2CM_CTRLA_SPEED(_wire.masterSpeed)   |
                            (sclsm ? SERCOM_I2CM_CTRLA_SCLSM : 0 );
-
-  while (sercom->I2CM.SYNCBUSY.bit.ENABLE != 0) ;
-
-  // Setting bus idle mode
-  sercom->I2CM.STATUS.bit.BUSSTATE = 1 ;
-  while (sercom->I2CM.SYNCBUSY.bit.SYSOP != 0) ;
-
-  // Disable slave interrupts: address match, data ready, stop/restart.
-  sercom->I2CS.INTENCLR.reg = SERCOM_I2CS_INTENSET_AMATCH |
-                              SERCOM_I2CS_INTENSET_DRDY |
+  sercom->I2CM.CTRLB.reg = _wire.ctrlb;
+  sercom->I2CM.BAUD.reg = _wire.baud;
+  enableWIRE();
+  // Disable slave interrupts.
+  // Master interrupts are set in startTransmissionWIRE() when the transaction is enqueued,
+  // so we don't want to enable them here.
+  sercom->I2CS.INTENCLR.reg = SERCOM_I2CS_INTENSET_ERROR  |
+                              SERCOM_I2CS_INTENSET_AMATCH |
+                              SERCOM_I2CS_INTENSET_DRDY   |
                               SERCOM_I2CS_INTENSET_PREC;
 }
 
 void SERCOM::setSlaveWIRE(void)
 {
   disableWIRE();
-
-  sercom->I2CS.ADDR.reg = _wire.addr;
-  sercom->I2CS.CTRLB.reg = _wire.ctrlb;
   bool sclsm = (_wire.slaveSpeed == 0x2);
-
-  // Set master mode and clock settings
-  sercom->I2CS.CTRLA.reg = _wire.ctrla |
-                           SERCOM_I2CS_CTRLA_MODE(I2C_SLAVE_OPERATION) |
-                           SERCOM_I2CS_CTRLA_SPEED(_wire.slaveSpeed) |
+  sercom->I2CS.CTRLA.reg = SERCOM_I2CS_CTRLA_MODE(I2C_SLAVE_OPERATION) |
+                           SERCOM_I2CS_CTRLA_SPEED(_wire.slaveSpeed)   |
                            (sclsm ? SERCOM_I2CS_CTRLA_SCLSM : 0 );
-
-  while (sercom->I2CS.SYNCBUSY.bit.ENABLE != 0) ;
-
-  // Setting bus idle mode
-  sercom->I2CS.STATUS.bit.BUSSTATE = 1 ;
-  while (sercom->I2CS.SYNCBUSY.bit.SYSOP != 0) ;
-
+  sercom->I2CS.CTRLB.reg = _wire.ctrlb | SERCOM_I2CS_CTRLB_AACKEN;
+  sercom->I2CS.ADDR.reg = _wire.addr;
+  enableWIRE();
   // Enable slave interrupts: address match, data ready, stop/restart.
   sercom->I2CS.INTENSET.reg = SERCOM_I2CS_INTENSET_ERROR  | // Error
                               SERCOM_I2CS_INTENSET_PREC   | // Stop
@@ -710,19 +700,13 @@ void SERCOM::setBaudrateWIRE(uint32_t baudrate)
 // Determine speed mode based on requested baudrate
   const uint32_t topSpeeds[3] = {400000, 1000000, 3400000}; // {(sm/fm), (fm+), (hs)}
   uint8_t speedBit;
-  uint8_t clockStretchMode; // See: 28.6.2.4.6 (SERCOM I2C Highspeed mode)
 
-  if (baudrate <= topSpeeds[0]) {
+  if (baudrate <= topSpeeds[0])
     speedBit = 0; // Standard/Fast mode up to 400 khz
-    clockStretchMode = 0;
-  } else if (baudrate <= topSpeeds[1]) {
+  else if (baudrate <= topSpeeds[1])
     speedBit = 1; // Fast mode+ up to 1 Mhz
-    clockStretchMode = 0;
-  } else {
-    // High speed up to 3.4 Mhz
-    speedBit = 2;
-    clockStretchMode = 1;
-  }
+  else 
+    speedBit = 2; // High speed up to 3.4 Mhz
 
   _wire.masterSpeed = speedBit;
 
@@ -742,48 +726,73 @@ void SERCOM::setBaudrateWIRE(uint32_t baudrate)
 }
 
 
-SercomTxn* SERCOM::startTransmissionWIRE(void)
+SercomTxn* SERCOM::startTransmissionWIRE( void )
 {
-  SercomTxn* txn = nullptr;
-  if (!_txnQueue.peek(txn) || txn == nullptr)
+  // Writing ADDR.ADDR drives different behavior based on BUSSTATE:
+  // UNKNOWN: MB and BUSERR assert and the transfer aborts.
+  // BUSY: The host waits until the bus is IDLE.
+  // IDLE: A START is generated, the address is sent, and on ACK the host holds SCL low with CLKHOLD
+  // set and MB asserted.
+  // OWNER: A repeated START is generated; if the prior transaction was a read, the ACK/NACK for the
+  // read is sent before the repeated START. The repeated START ADDR write must occur while MB or SB
+  // is set.
+  // Writing ADDR also clears BUSERR, ARBLOST, MB, and SB.
+
+  if (isBusUnknownWIRE()) {
+    stopTransmissionWIRE(SercomWireError::BUS_STATE_UNKNOWN);
     return nullptr;
+  }
+
+  SercomTxn* txn = nullptr;
+
+  if (!_txnQueue.peek(txn))
+    return nullptr;
+
+  if (txn != _wire.currentTxn)
+    _wire.retryCount = 0;
 
   _wire.currentTxn = txn;
   _wire.txnIndex = 0;
   _wire.txnLength = txn->length;
+  setDmaWIRE(false);  // Reset DMA mode - let code below decide if DMA is used
   
-  const bool read = (txn->config & I2C_CFG_READ) != 0;
+  const bool read = txn->config & I2C_CFG_READ;
   uint16_t addr = (txn->config & I2C_CFG_10BIT) ? I2C_ADDR(txn->address) : I2C_ADDR7(txn->address);
   addr = (uint16_t)((addr << 1) | (read ? 1u : 0u));
-
-  // If another master owns the bus or the last bus owner has not properly
-  // sent a stop, return failure early. This will prevent some misbehaved
-  // devices from deadlocking here at the cost of the caller being responsible
-  // for retrying the failed transmission. See SercomWireBusState for the
-  // possible bus states.
-  if(!isBusOwnerWIRE())
-  {
-    if (isArbLostWIRE() && !isBusIdleWIRE()) {
-      stopTransmissionWIRE(SercomWireError::ARBITRATION_LOST);
-      return nullptr;
-    }
-    if (isBusUnknownWIRE()) {
-      stopTransmissionWIRE(SercomWireError::BUS_STATE_UNKNOWN);
-      return nullptr;
-    }
-  }
-
+  bool hsMode = (_wire.masterSpeed == 0x2);
   uint32_t addrReg = SERCOM_I2CM_ADDR_ADDR(addr) |
                      ((txn->config & I2C_CFG_10BIT) ? SERCOM_I2CM_ADDR_TENBITEN : 0) |
-                     ((_wire.masterSpeed == 0x2) ? SERCOM_I2CM_ADDR_HS : 0);
+                     (hsMode ? SERCOM_I2CM_ADDR_HS : 0);
 
+  if (hsMode || sercom->I2CM.CTRLA.bit.SCLSM) {
+#ifndef USE_ZERODMA
+    stopTransmissionWIRE(SercomWireError::OTHER);
+    return nullptr;
+#endif
+    if (txn->length >255) {
+      stopTransmissionWIRE(SercomWireError::DATA_TOO_LONG);
+      return nullptr;
+    }
+
+    if (sercom->I2CM.CTRLB.bit.QCEN) {
+      stopTransmissionWIRE(SercomWireError::OTHER);
+      return nullptr;
+    }
+
+    txn->config |= I2C_CFG_STOP;
+    setDmaWIRE(true);
+  }
 #ifdef USE_ZERODMA
-  setWireDma(txn->length > 0 && txn->length < 256 && (txn->config & I2C_CFG_STOP));
+  else {
+    setDmaWIRE(txn->length > 0 && txn->length < 256 &&
+              (txn->config & I2C_CFG_STOP) &&
+              !(txn->config & I2C_CFG_NODMA));
+  }
 
-  if (isWireDma())
+  if (isDmaWIRE())
   {
     if (!_dmaConfigured)
-      dmaInit(_dmaTxTrigger, _dmaRxTrigger);
+      dmaInit(getSercomIndex());
 
     if (!_dmaConfigured || !_dmaTx || !_dmaRx) {
       stopTransmissionWIRE(SercomWireError::OTHER);
@@ -794,10 +803,10 @@ SercomTxn* SERCOM::startTransmissionWIRE(void)
   }
 #endif
   
-  // Send start and address (non-blocking; ISR handles MB/SB)
+  // Send address (non-blocking; ISR handles ERROR/MB/SB)
   _wire.active = true;
-  sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_ERROR | SERCOM_I2CM_INTENSET_MB | SERCOM_I2CM_INTENSET_SB;
-  sercom->I2CM.ADDR.reg = addrReg;
+  sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_ERROR | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_MB;
+  sercom->I2CM.ADDR.reg = addrReg; // ADDR is write synchronized so just wait for the MB/SB to know when synced
 
   return txn;
 }
@@ -813,12 +822,6 @@ bool SERCOM::enqueueWIRE(SercomTxn* txn)
   return true;
 }
 
-void SERCOM::deferStopWIRE(SercomWireError error)
-{
-  _wire.returnValue = error;
-  setPending((uint8_t)getSercomIndex());
-}
-
 SercomTxn* SERCOM::stopTransmissionWIRE( void )
 {
   return stopTransmissionWIRE( _wire.returnValue );
@@ -831,46 +834,76 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
   // Retry/backoff policy is intentionally deferred; a future change may add
   // a retry budget or tick-based delay if needed.
 
-  SercomTxn* txn = nullptr;
-  _txnQueue.peek(txn);
+  SercomTxn* txn = _wire.currentTxn;
+  SercomTxn* next = nullptr;
+
+  constexpr uint8_t kMaxWireRetries = 3;
 
   if (error == SercomWireError::BUS_STATE_UNKNOWN) {
+    if (_wire.retryCount < kMaxWireRetries) {
+      ++_wire.retryCount;
     sercom->I2CM.STATUS.bit.BUSSTATE = 1;
-
     while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ;
-
-    if (txn)
       startTransmissionWIRE();
-
     return txn;
+    }
   }
 
   if (error == SercomWireError::ARBITRATION_LOST || error == SercomWireError::BUS_ERROR) {
+    if (_wire.retryCount < kMaxWireRetries) {
+      ++_wire.retryCount;
     sercom->I2CM.STATUS.bit.ARBLOST = 1; // Clear arbitration lost flag
     sercom->I2CM.INTFLAG.reg = SERCOM_I2CM_INTFLAG_ERROR;
-
-    if (txn)
       startTransmissionWIRE();
-
     return txn;
+    }
+  }
+
+  if (error == SercomWireError::BUS_STATE_UNKNOWN ||
+      error == SercomWireError::ARBITRATION_LOST  ||
+      error == SercomWireError::BUS_ERROR) {
+    _wire.retryCount = 0;
   }
 
   // Callbacks are expected to run in non-ISR context (main loop/PendSV).
-  if (_txnQueue.read(txn) && txn != nullptr) {
-    _wire.active = false;
-    _wire.currentTxn = nullptr;
-    if (txn->onComplete)
+  if (txn &&txn->onComplete)
       txn->onComplete(txn->user, static_cast<int>(error));
-  }
 
-  SercomTxn* next = nullptr;
-
-  if (_txnQueue.peek(next) && next)
-    startTransmissionWIRE();
-
+  if(isMasterWIRE())
+    _txnQueue.read(txn); // remove the completed transaction from the queue
+  else {
+    // Deliver deferred WIRE callback outside the SERCOM ISR (from PendSV).
+    // This avoids running user code in the hardware interrupt context.
   if (_wireDeferredPending && _wireDeferredCb) {
     _wireDeferredPending = false;
     _wireDeferredCb(_wireDeferredUser, _wireDeferredLength);
+    }
+  }
+
+  _wire.retryCount = 0;
+  _wire.active = false;
+  _wire.currentTxn = nullptr;
+
+  bool isMaster = isMasterWIRE();
+
+  if (_txnQueue.peek(next) && isMaster) {
+    // Undocumented HW limitation: DMA transfers must terminate with STOP and bus release.
+    // After a DMA write, the host holds the bus ~7.33 us before the next transfer (Sr window).
+    // Writing ADDR during that window leaves the bus in an undefined state and breaks
+    // subsequent DMA/non-DMA transactions. To avoid this, we must wait for BUSSTATE
+    // to return to IDLE after a STOP returning the hardware to a known state.
+    // At the tested 48 MHz, this busy-wait is ~350 cycles corresponding to a 3.5 us delay
+    // at 100 MHz. Thus, we only wait when needed for the next transaction and not on every STOP.
+    if (txn) {
+      if (txn->config & I2C_CFG_STOP)
+        while (sercom->I2CM.STATUS.bit.BUSSTATE > 0x1) ;
+    }
+
+    startTransmissionWIRE();
+  } else if (isMaster) {
+    sercom->I2CM.INTENCLR.reg = SERCOM_I2CM_INTENCLR_ERROR |
+                                SERCOM_I2CM_INTENCLR_MB    |
+                                SERCOM_I2CM_INTENCLR_SB;
   }
 
   return txn;
