@@ -190,6 +190,124 @@ size_t Uart::write(const uint8_t data)
   return 1;
 }
 
+size_t Uart::write(const uint8_t* buffer, size_t size)
+{
+  if (buffer == nullptr || size == 0)
+    return 0;
+
+#ifdef USE_ZERODMA
+  _txn.txPtr = buffer;
+  _txn.rxPtr = nullptr;
+  _txn.length = size;
+  _txn.onComplete = &Uart::onTxnComplete;
+  _txn.user = this;
+  txnDone = false;
+  txnStatus = 0;
+
+  if (sercom->enqueueUART(&_txn)) {
+    while (!txnDone) ;
+    return size;
+  }
+#endif
+
+  for (size_t i = 0; i < size; ++i)
+    write(buffer[i]);
+  return size;
+}
+
+size_t Uart::writeAsync(const uint8_t* buffer, size_t size, void (*onComplete)(void* user, int status), void* user)
+{
+  if (buffer == nullptr || size == 0)
+    return 0;
+
+#ifdef USE_ZERODMA
+  _txn.txPtr = buffer;
+  _txn.rxPtr = nullptr;
+  _txn.length = size;
+  _txn.onComplete = onComplete ? onComplete : &Uart::onTxnComplete;
+  _txn.user = onComplete ? user : this;
+  txnDone = false;
+  txnStatus = 0;
+
+  if (!sercom->enqueueUART(&_txn))
+    return 0;
+
+  return size;
+#else
+  (void)onComplete;
+  (void)user;
+  for (size_t i = 0; i < size; ++i)
+    write(buffer[i]);
+  return size;
+#endif
+}
+
+size_t Uart::read(uint8_t* buffer, size_t size, void (*onComplete)(void* user, int status), void* user)
+{
+  if (buffer == nullptr || size == 0)
+    return 0;
+
+  if (onComplete == nullptr) {
+    size_t readCount = 0;
+    while (readCount < size) {
+      int c = read();
+      if (c >= 0)
+        buffer[readCount++] = static_cast<uint8_t>(c);
+    }
+    return readCount;
+  }
+
+#ifdef USE_ZERODMA
+  pendingRxCb = onComplete;
+  pendingRxUser = user;
+  rxExternalActive = true;
+
+  sercom->getSercom()->USART.INTENCLR.reg = SERCOM_USART_INTENCLR_RXC;
+
+  _txn.txPtr = nullptr;
+  _txn.rxPtr = buffer;
+  _txn.length = size;
+  _txn.onComplete = &Uart::onTxnComplete;
+  _txn.user = this;
+  txnDone = false;
+  txnStatus = 0;
+
+  if (!sercom->enqueueUART(&_txn)) {
+    sercom->getSercom()->USART.INTENSET.reg = SERCOM_USART_INTENSET_RXC;
+    rxExternalActive = false;
+    pendingRxCb = nullptr;
+    pendingRxUser = nullptr;
+    return 0;
+  }
+
+  return size;
+#else
+  (void)onComplete;
+  (void)user;
+  return 0;
+#endif
+}
+
+void Uart::onTxnComplete(void* user, int status)
+{
+  if (!user)
+    return;
+  Uart* self = static_cast<Uart*>(user);
+  self->txnStatus = status;
+  self->txnDone = true;
+  if (self->rxExternalActive) {
+    self->rxExternalActive = false;
+    self->sercom->getSercom()->USART.INTENSET.reg = SERCOM_USART_INTENSET_RXC;
+    if (self->pendingRxCb) {
+      void (*cb)(void*, int) = self->pendingRxCb;
+      void* cbUser = self->pendingRxUser;
+      self->pendingRxCb = nullptr;
+      self->pendingRxUser = nullptr;
+      cb(cbUser, status);
+    }
+  }
+}
+
 SercomNumberStopBit Uart::extractNbStopBit(uint16_t config)
 {
   switch(config & HARDSER_STOP_BIT_MASK)

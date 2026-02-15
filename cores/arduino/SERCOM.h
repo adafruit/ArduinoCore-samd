@@ -202,6 +202,11 @@ class SERCOM
 		void acknowledgeUARTError() ;
 		void enableDataRegisterEmptyInterruptUART();
 		void disableDataRegisterEmptyInterruptUART();
+		bool enqueueUART(SercomTxn* txn);
+		bool startTransmissionUART(void);
+		SercomTxn* stopTransmissionUART(void);
+		SercomTxn* stopTransmissionUART(SercomUartError error);
+		void deferStopUART(SercomUartError error);
 
 		/* ========== SPI ========== */
 		void initSPI(SercomSpiTXPad mosi, SercomRXPad miso, SercomSpiCharSize charSize, SercomDataOrder dataOrder) ;
@@ -336,7 +341,10 @@ class SERCOM
 		// --- SPI DMA callbacks (protocol-owned) ---
 		static inline void dmaTxCallbackSPI(Adafruit_ZeroDMA* dma);
 		static inline void dmaRxCallbackSPI(Adafruit_ZeroDMA* dma);
-#endif
+		// --- UART DMA callbacks (protocol-owned) ---
+		static inline void dmaTxCallbackUART(Adafruit_ZeroDMA* dma);
+		static inline void dmaRxCallbackUART(Adafruit_ZeroDMA* dma);
+#endif // USE_ZERODMA
 
 #ifdef SERCOM_STRICT_PADS
 		enum class PadFunc : uint8_t {
@@ -387,6 +395,7 @@ class SERCOM
 		void initClockNVIC( void ) ;
 #ifdef USE_ZERODMA
 		void initWireDma(void);
+		void initUartDma(void);
 #endif
 		void initWIRE(void);
 
@@ -422,6 +431,19 @@ class SERCOM
 			SercomTxn* currentTxn = nullptr;
 			SercomSpiError returnValue = SercomSpiError::SUCCESS;
 		} _spi;
+
+		struct UartConfig {
+			bool active = false;
+			bool useDma = false;
+			bool dmaNeedTx = false;
+			bool dmaNeedRx = false;
+			bool dmaTxDone = false;
+			bool dmaRxDone = false;
+			size_t index = 0;
+			size_t length = 0;
+			SercomTxn* currentTxn = nullptr;
+			SercomUartError returnValue = SercomUartError::SUCCESS;
+		} _uart;
 
 		RingBufferN<SERCOM_QUEUE_LENGTH, SercomTxn*> _txnQueue;
 		void (*_wireDeferredCb)(void* user, int length) = nullptr;
