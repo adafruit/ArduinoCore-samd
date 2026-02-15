@@ -180,6 +180,14 @@ class SERCOM
 {
 	public:
 		SERCOM(Sercom* s) ;
+		void resetSERCOM( void ) ;
+		inline void enableSERCOM( void ) ;
+		inline void disableSERCOM( void ) ;
+		inline void disableInterrupts(uint8_t mask) { sercom->I2CM.INTENCLR.reg = mask; }
+		inline void enableInterrupts(uint8_t mask) { sercom->I2CM.INTENSET.reg = mask; }
+		inline uint8_t getINTFLAG( void ) const { return sercom->I2CM.INTFLAG.reg; }
+		inline uint16_t getSTATUS( void ) const { return sercom->I2CM.STATUS.reg; }
+		inline void clearINTFLAG( void ) { sercom->I2CM.INTFLAG.reg = 0xFF; }
 
 		/* ========== UART ========== */
 		void initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint32_t baudrate=0) ;
@@ -187,7 +195,8 @@ class SERCOM
 		void initPads(SercomUartTXPad txPad, SercomRXPad rxPad) ;
 
 		void resetUART( void ) ;
-		void enableUART( void ) ;
+		void enableUART( void ) { enableSERCOM(); }
+		void disableUART( void ) { disableSERCOM(); }
 		void flushUART( void ) ;
 		void clearStatusUART( void ) ;
 		bool availableDataUART( void ) ;
@@ -212,8 +221,8 @@ class SERCOM
 		void initSPI(SercomSpiTXPad mosi, SercomRXPad miso, SercomSpiCharSize charSize, SercomDataOrder dataOrder) ;
 		void initSPIClock(SercomSpiClockMode clockMode, uint32_t baudrate) ;
 		void resetSPI( void ) ;
-		void enableSPI( void ) ;
-		void disableSPI( void ) ;
+		void enableSPI( void ) { enableSERCOM(); }
+		void disableSPI( void ) { disableSERCOM(); }
 		void setDataOrderSPI(SercomDataOrder dataOrder) ;
 		SercomDataOrder getDataOrderSPI( void ) ;
 		void setBaudrateSPI(uint8_t divider) ;
@@ -225,10 +234,18 @@ class SERCOM
 		bool isReceiveCompleteSPI( void ) ;
 		bool enqueueSPI(SercomTxn* txn);
 		bool startTransmissionSPI(void);
-		void serviceSPI(void);
 		void deferStopSPI(SercomSpiError error);
 		SercomTxn* stopTransmissionSPI(void);
 		SercomTxn* stopTransmissionSPI(SercomSpiError error);
+		inline SercomTxn* getCurrentTxnSPI(void) { return _spi.currentTxn; }
+		inline const SercomTxn* getCurrentTxnSPI(void) const { return _spi.currentTxn; }
+		inline size_t getTxnIndexSPI(void) const { return _spi.index; }
+		inline size_t getTxnLengthSPI(void) const { return _spi.length; }
+		inline bool isActiveSPI(void) const { return _spi.active; }
+		inline void setTxnIndexSPI(size_t index) { _spi.index = index; }
+		inline void setReturnValueSPI(SercomSpiError err) { _spi.returnValue = err; }
+		inline bool sendDataSPI(void);
+		inline bool readDataSPI(void);
 
 		/* ========== WIRE ========== */
 		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false, uint8_t speed = 0x0) ;
@@ -294,11 +311,10 @@ class SERCOM
 		void setClockSource(int8_t idx, SercomClockSource src, bool core) { (void)idx; (void)src; (void)core; };
 		SercomClockSource getClockSource(void) { return SERCOM_CLOCK_SOURCE_FCPU; };
 		uint32_t getFreqRef(void) { return F_CPU; };
-#endif
+#endif // SAMD51 vs 21
 
-		// --- Async SERCOM scaffolding (Phase 1) ---
 		enum class Role : uint8_t { None = 0, UART, SPI, I2C };
-		using ServiceFn = void (SERCOM::*)();
+		using ServiceFn = SercomTxn* (SERCOM::*)();
 
 		static bool claim(uint8_t sercomId, Role role);
 		static void release(uint8_t sercomId);
@@ -307,7 +323,6 @@ class SERCOM
 		static void dispatchPending(void);
 
 #ifdef USE_ZERODMA
-		// --- SERCOM ZeroDMA helpers (Phase 1) ---
 		using DmaCallback = void (*)(Adafruit_ZeroDMA*);
 		enum class DmaStatus : uint8_t {
 			Ok = 0,
@@ -319,11 +334,11 @@ class SERCOM
 			StartFailed
 		};
 
-		DmaStatus dmaInit(uint8_t txTrigger, uint8_t rxTrigger);
+		DmaStatus dmaInit(int8_t sercomId, uint8_t beatSize = 0); // beatSize: 0=byte (default), 1=halfword, 2=word
 		void dmaSetCallbacks(DmaCallback txCb, DmaCallback rxCb);
-		inline DmaStatus dmaStartTx(const void* src, void* dstReg, size_t len);
-		inline DmaStatus dmaStartRx(void* dst, void* srcReg, size_t len);
-		DmaStatus dmaStartDuplex(const void* txSrc, void* rxDst, void* txReg, void* rxReg, size_t len,
+		DmaStatus dmaStartTx(const void* src, volatile void* dstReg, size_t len);
+		DmaStatus dmaStartRx(void* dst, volatile void* srcReg, size_t len);
+		DmaStatus dmaStartDuplex(const void* txSrc, void* rxDst, volatile void* txReg, volatile void* rxReg, size_t len,
 		                    const uint8_t* dummyTx = nullptr);
 		void dmaRelease();
 		void dmaResetDescriptors();
@@ -390,14 +405,10 @@ class SERCOM
 		static std::array<SercomState, kSercomCount> s_states;
 		static std::array<SERCOM*, kSercomCount> s_instances;
 		static volatile uint32_t s_pendingMask;
-		uint8_t calculateBaudrateSynchronous(uint32_t baudrate);
+		uint8_t calculateBaudrateSynchronous(uint32_t baudrate) ;
 		uint32_t division(uint32_t dividend, uint32_t divisor) ;
 		void initClockNVIC( void ) ;
-#ifdef USE_ZERODMA
-		void initWireDma(void);
-		void initUartDma(void);
-#endif
-		void initWIRE(void);
+		void initWIRE(void) ;
 
 		// Cached I2C master/slave configuration for fast role switching.
 		// This can be expanded to support additional configuration options

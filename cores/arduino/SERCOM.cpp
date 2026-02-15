@@ -57,6 +57,19 @@ SERCOM::SERCOM(Sercom* s)
 #endif // end __SAMD51__
 }
 
+void SERCOM::resetSERCOM()
+{
+  // UART, SPI, I2CS, and I2CM use the same SWRST and DBGCTRL bits, so this works for all modes
+  sercom->USART.CTRLA.bit.SWRST = 1 ;
+
+  while ( sercom->USART.CTRLA.bit.SWRST || sercom->USART.SYNCBUSY.bit.SWRST )
+    ; // Wait for both bits Software Reset from CTRLA and SYNCBUSY coming back to 0
+
+  // DBGCTRL is not affected by SWRST, so explicitly clear it here to ensure debug behavior is
+  // consistent after reset
+  sercom->USART.DBGCTRL.bit.DBGSTOP = 0; 
+}
+
 /* =========================
  * ===== Sercom UART
  * =========================
@@ -67,22 +80,11 @@ void SERCOM::initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint
   resetUART();
 
 #ifdef USE_ZERODMA
-#ifdef SERCOM0_DMAC_ID_TX
   int8_t id = getSercomIndex();
-  if (id < 0)
-    return;
-
+  if (id >= 0) {
   dmaSetCallbacks(SERCOM::dmaTxCallbackUART, SERCOM::dmaRxCallbackUART);
-
-  if (_dmaConfigured)
-    return;
-
-  _dmaTxTrigger = SERCOM0_DMAC_ID_TX + (id * 2);
-  _dmaRxTrigger = SERCOM0_DMAC_ID_RX + (id * 2);
-  dmaInit(_dmaTxTrigger, _dmaRxTrigger);
-#else
-  (void)0;
-#endif // SERCOM0_DMAC_ID_TX
+    dmaInit(id);
+  }
 #endif // USE_ZERODMA
 
   registerService(getSercomIndex(), &SERCOM::stopTransmissionUART);
@@ -141,22 +143,7 @@ void SERCOM::initPads(SercomUartTXPad txPad, SercomRXPad rxPad)
 
 void SERCOM::resetUART()
 {
-  // Start the Software Reset
-  sercom->USART.CTRLA.bit.SWRST = 1 ;
-
-  while ( sercom->USART.CTRLA.bit.SWRST || sercom->USART.SYNCBUSY.bit.SWRST )
-  {
-    // Wait for both bits Software Reset from CTRLA and SYNCBUSY coming back to 0
-  }
-}
-
-void SERCOM::enableUART()
-{
-  //Setting  the enable bit to 1
-  sercom->USART.CTRLA.bit.ENABLE = 0x1u;
-
-  //Wait for then enable bit from SYNCBUSY is equal to 0;
-  while(sercom->USART.SYNCBUSY.bit.ENABLE);
+  resetSERCOM();
 }
 
 void SERCOM::flushUART()
@@ -353,8 +340,12 @@ void SERCOM::initSPI(SercomSpiTXPad mosi, SercomRXPad miso, SercomSpiCharSize ch
   resetSPI();
 
 #ifdef USE_ZERODMA
+  int8_t id = getSercomIndex();
+  if (id >= 0) {
   dmaSetCallbacks(SERCOM::dmaTxCallbackSPI, SERCOM::dmaRxCallbackSPI);
-#endif
+    dmaInit(id);
+  }
+#endif // USE_ZERODMA
 
   registerService(getSercomIndex(), &SERCOM::stopTransmissionSPI);
 
@@ -438,48 +429,6 @@ bool SERCOM::enqueueSPI(SercomTxn* txn)
   return true;
 }
 
-void SERCOM::serviceSPI(void)
-{
-  if (!_spi.active || _spi.currentTxn == nullptr)
-    return;
-
-  uint8_t flags = sercom->SPI.INTFLAG.reg;
-
-  if (flags & SERCOM_SPI_INTFLAG_ERROR)
-  {
-    _spi.returnValue = SercomSpiError::BUF_OVERFLOW;
-    sercom->SPI.INTFLAG.reg = SERCOM_SPI_INTFLAG_ERROR;
-    deferStopSPI(_spi.returnValue);
-    return;
-  }
-
-  SercomTxn* txn = _spi.currentTxn;
-
-  if (flags & SERCOM_SPI_INTFLAG_RXC) {
-    uint8_t rx = sercom->SPI.DATA.reg;
-    if (txn->rxPtr && _spi.index > 0 && (_spi.index - 1) < _spi.length)
-      txn->rxPtr[_spi.index - 1] = rx;
-    if (_spi.index >= _spi.length) {
-      sercom->SPI.INTENCLR.reg = SERCOM_SPI_INTENCLR_DRE | SERCOM_SPI_INTENCLR_RXC | SERCOM_SPI_INTENCLR_ERROR;
-      _spi.returnValue = SercomSpiError::SUCCESS;
-      deferStopSPI(_spi.returnValue);
-      return;
-    }
-  }
-
-  if (flags & SERCOM_SPI_INTFLAG_DRE) {
-    if (_spi.index < _spi.length) {
-      uint8_t out = 0xFF;
-      if (txn->txPtr)
-        out = txn->txPtr[_spi.index];
-      sercom->SPI.DATA.reg = out;
-      _spi.index++;
-      return;
-    }
-    sercom->SPI.INTENCLR.reg = SERCOM_SPI_INTENCLR_DRE;
-  }
-}
-
 void SERCOM::deferStopSPI(SercomSpiError error)
 {
   _spi.returnValue = error;
@@ -534,33 +483,7 @@ void SERCOM::initSPIClock(SercomSpiClockMode clockMode, uint32_t baudrate)
 
 void SERCOM::resetSPI()
 {
-  //Setting the Software Reset bit to 1
-  sercom->SPI.CTRLA.bit.SWRST = 1;
-
-  //Wait both bits Software Reset from CTRLA and SYNCBUSY are equal to 0
-  while(sercom->SPI.CTRLA.bit.SWRST || sercom->SPI.SYNCBUSY.bit.SWRST);
-}
-
-void SERCOM::enableSPI()
-{
-  //Setting the enable bit to 1
-  sercom->SPI.CTRLA.bit.ENABLE = 1;
-
-  while(sercom->SPI.SYNCBUSY.bit.ENABLE)
-  {
-    //Waiting then enable bit from SYNCBUSY is equal to 0;
-  }
-}
-
-void SERCOM::disableSPI()
-{
-  while(sercom->SPI.SYNCBUSY.bit.ENABLE)
-  {
-    //Waiting then enable bit from SYNCBUSY is equal to 0;
-  }
-
-  //Setting the enable bit to 0
-  sercom->SPI.CTRLA.bit.ENABLE = 0;
+  resetSERCOM();
 }
 
 void SERCOM::setDataOrderSPI(SercomDataOrder dataOrder)
@@ -953,52 +876,71 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
   return txn;
 }
 
+// Hardware metadata structure for SERCOM peripherals - private to this file
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
-
-static const struct {
+// SAMD51 has separate core and slow clocks, and extended interrupt array
+struct SercomData {
   Sercom   *sercomPtr;
   uint8_t   id_core;
   uint8_t   id_slow;
   IRQn_Type irq[4];
-} sercomData[] = {
+  uint8_t   dmaTxTrigger;
+  uint8_t   dmaRxTrigger;
+  void     *dataReg;  // Pointer to DATA register
+};
+
+static const SercomData sercomData[] = {
   { SERCOM0, SERCOM0_GCLK_ID_CORE, SERCOM0_GCLK_ID_SLOW,
-    SERCOM0_0_IRQn, SERCOM0_1_IRQn, SERCOM0_2_IRQn, SERCOM0_3_IRQn },
+    SERCOM0_0_IRQn, SERCOM0_1_IRQn, SERCOM0_2_IRQn, SERCOM0_3_IRQn,
+    SERCOM0_DMAC_ID_TX, SERCOM0_DMAC_ID_RX, (void*)&SERCOM0->I2CM.DATA.reg },
   { SERCOM1, SERCOM1_GCLK_ID_CORE, SERCOM1_GCLK_ID_SLOW,
-    SERCOM1_0_IRQn, SERCOM1_1_IRQn, SERCOM1_2_IRQn, SERCOM1_3_IRQn },
+    SERCOM1_0_IRQn, SERCOM1_1_IRQn, SERCOM1_2_IRQn, SERCOM1_3_IRQn,
+    SERCOM1_DMAC_ID_TX, SERCOM1_DMAC_ID_RX, (void*)&SERCOM1->I2CM.DATA.reg },
   { SERCOM2, SERCOM2_GCLK_ID_CORE, SERCOM2_GCLK_ID_SLOW,
-    SERCOM2_0_IRQn, SERCOM2_1_IRQn, SERCOM2_2_IRQn, SERCOM2_3_IRQn },
+    SERCOM2_0_IRQn, SERCOM2_1_IRQn, SERCOM2_2_IRQn, SERCOM2_3_IRQn,
+    SERCOM2_DMAC_ID_TX, SERCOM2_DMAC_ID_RX, (void*)&SERCOM2->I2CM.DATA.reg },
   { SERCOM3, SERCOM3_GCLK_ID_CORE, SERCOM3_GCLK_ID_SLOW,
-    SERCOM3_0_IRQn, SERCOM3_1_IRQn, SERCOM3_2_IRQn, SERCOM3_3_IRQn },
+    SERCOM3_0_IRQn, SERCOM3_1_IRQn, SERCOM3_2_IRQn, SERCOM3_3_IRQn,
+    SERCOM3_DMAC_ID_TX, SERCOM3_DMAC_ID_RX, (void*)&SERCOM3->I2CM.DATA.reg },
   { SERCOM4, SERCOM4_GCLK_ID_CORE, SERCOM4_GCLK_ID_SLOW,
-    SERCOM4_0_IRQn, SERCOM4_1_IRQn, SERCOM4_2_IRQn, SERCOM4_3_IRQn },
+    SERCOM4_0_IRQn, SERCOM4_1_IRQn, SERCOM4_2_IRQn, SERCOM4_3_IRQn,
+    SERCOM4_DMAC_ID_TX, SERCOM4_DMAC_ID_RX, (void*)&SERCOM4->I2CM.DATA.reg },
   { SERCOM5, SERCOM5_GCLK_ID_CORE, SERCOM5_GCLK_ID_SLOW,
-    SERCOM5_0_IRQn, SERCOM5_1_IRQn, SERCOM5_2_IRQn, SERCOM5_3_IRQn },
+    SERCOM5_0_IRQn, SERCOM5_1_IRQn, SERCOM5_2_IRQn, SERCOM5_3_IRQn,
+    SERCOM5_DMAC_ID_TX, SERCOM5_DMAC_ID_RX, (void*)&SERCOM5->I2CM.DATA.reg },
 #if defined(SERCOM6)
   { SERCOM6, SERCOM6_GCLK_ID_CORE, SERCOM6_GCLK_ID_SLOW,
-    SERCOM6_0_IRQn, SERCOM6_1_IRQn, SERCOM6_2_IRQn, SERCOM6_3_IRQn },
+    SERCOM6_0_IRQn, SERCOM6_1_IRQn, SERCOM6_2_IRQn, SERCOM6_3_IRQn,
+    SERCOM6_DMAC_ID_TX, SERCOM6_DMAC_ID_RX, (void*)&SERCOM6->I2CM.DATA.reg },
 #endif
 #if defined(SERCOM7)
   { SERCOM7, SERCOM7_GCLK_ID_CORE, SERCOM7_GCLK_ID_SLOW,
-    SERCOM7_0_IRQn, SERCOM7_1_IRQn, SERCOM7_2_IRQn, SERCOM7_3_IRQn },
+    SERCOM7_0_IRQn, SERCOM7_1_IRQn, SERCOM7_2_IRQn, SERCOM7_3_IRQn,
+    SERCOM7_DMAC_ID_TX, SERCOM7_DMAC_ID_RX, (void*)&SERCOM7->I2CM.DATA.reg },
 #endif
 };
 
 #else // end if SAMD51 (prob SAMD21)
-
-static const struct {
+// SAMD21 has unified clock and single interrupt
+struct SercomData {
   Sercom   *sercomPtr;
   uint8_t   clock;
   IRQn_Type irqn;
-} sercomData[] = {
-  SERCOM0, GCM_SERCOM0_CORE, SERCOM0_IRQn,
-  SERCOM1, GCM_SERCOM1_CORE, SERCOM1_IRQn,
-  SERCOM2, GCM_SERCOM2_CORE, SERCOM2_IRQn,
-  SERCOM3, GCM_SERCOM3_CORE, SERCOM3_IRQn,
+  uint8_t   dmaTxTrigger;
+  uint8_t   dmaRxTrigger;
+  void     *dataReg;  // Pointer to DATA register
+};
+
+static const SercomData sercomData[] = {
+  { SERCOM0, GCM_SERCOM0_CORE, SERCOM0_IRQn, SERCOM0_DMAC_ID_TX, SERCOM0_DMAC_ID_RX, (void*)&SERCOM0->I2CM.DATA.reg },
+  { SERCOM1, GCM_SERCOM1_CORE, SERCOM1_IRQn, SERCOM1_DMAC_ID_TX, SERCOM1_DMAC_ID_RX, (void*)&SERCOM1->I2CM.DATA.reg },
+  { SERCOM2, GCM_SERCOM2_CORE, SERCOM2_IRQn, SERCOM2_DMAC_ID_TX, SERCOM2_DMAC_ID_RX, (void*)&SERCOM2->I2CM.DATA.reg },
+  { SERCOM3, GCM_SERCOM3_CORE, SERCOM3_IRQn, SERCOM3_DMAC_ID_TX, SERCOM3_DMAC_ID_RX, (void*)&SERCOM3->I2CM.DATA.reg },
 #if defined(SERCOM4)
-  SERCOM4, GCM_SERCOM4_CORE, SERCOM4_IRQn,
+  { SERCOM4, GCM_SERCOM4_CORE, SERCOM4_IRQn, SERCOM4_DMAC_ID_TX, SERCOM4_DMAC_ID_RX, (void*)&SERCOM4->I2CM.DATA.reg },
 #endif
 #if defined(SERCOM5)
-  SERCOM5, GCM_SERCOM5_CORE, SERCOM5_IRQn,
+  { SERCOM5, GCM_SERCOM5_CORE, SERCOM5_IRQn, SERCOM5_DMAC_ID_TX, SERCOM5_DMAC_ID_RX, (void*)&SERCOM5->I2CM.DATA.reg },
 #endif
 };
 
@@ -1045,13 +987,33 @@ bool SERCOM::registerService(uint8_t sercomId, ServiceFn fn)
 }
 
 #ifdef USE_ZERODMA
-SERCOM::DmaStatus SERCOM::dmaInit(uint8_t txTrigger, uint8_t rxTrigger)
+SERCOM::DmaStatus SERCOM::dmaInit(int8_t sercomId, uint8_t beatSize)
 {
   if (_dmaConfigured)
     return DmaStatus::Ok;
 
-  _dmaTxTrigger = txTrigger;
-  _dmaRxTrigger = rxTrigger;
+  // Validate beat size: 0=byte, 1=halfword, 2=word
+  if (beatSize > DMA_BEAT_SIZE_WORD)
+    beatSize = DMA_BEAT_SIZE_BYTE;
+
+  // Look up DMA triggers from sercomData table
+#ifdef SERCOM0_DMAC_ID_TX
+  if (sercomId >= 0 && sercomId < (int8_t)kSercomCount && sercomData[sercomId].dmaTxTrigger != 0)
+  {
+    _dmaTxTrigger = sercomData[sercomId].dmaTxTrigger;
+    _dmaRxTrigger = sercomData[sercomId].dmaRxTrigger;
+  }
+  else
+#endif
+  {
+    // Fallback: calculate triggers if table lookup unavailable
+    _dmaTxTrigger = SERCOM0_DMAC_ID_TX + (sercomId * 2);
+    _dmaRxTrigger = SERCOM0_DMAC_ID_RX + (sercomId * 2);
+  }
+
+  // DATA register is at the same offset (0x28) for all protocols (I2C, SPI, UART).
+  // Access via any union member is transparent—just use I2CM as the canonical reference.
+  void* dataReg = (void*)&sercom->I2CM.DATA.reg;
 
   if (!_dmaTx)
     _dmaTx = new Adafruit_ZeroDMA();
@@ -1088,9 +1050,9 @@ SERCOM::DmaStatus SERCOM::dmaInit(uint8_t txTrigger, uint8_t rxTrigger)
     _dmaRx->setCallback(_dmaRxCb);
 
   if (_dmaTxDesc == nullptr)
-    _dmaTxDesc = _dmaTx->addDescriptor(&_dmaDummy, (void*)&sercom->I2CM.DATA.reg, 1, DMA_BEAT_SIZE_BYTE, true, false);
+    _dmaTxDesc = _dmaTx->addDescriptor(&_dmaDummy, dataReg, 0, (dma_beat_size)beatSize, true, false);
   if (_dmaRxDesc == nullptr)
-    _dmaRxDesc = _dmaRx->addDescriptor((void*)&sercom->I2CM.DATA.reg, &_dmaDummy, 1, DMA_BEAT_SIZE_BYTE, false, true);
+    _dmaRxDesc = _dmaRx->addDescriptor(dataReg, &_dmaDummy, 0, (dma_beat_size)beatSize, false, true);
   if (_dmaTxDesc == nullptr || _dmaRxDesc == nullptr)
   {
     _dmaLastError = DmaStatus::DescriptorFailed;
@@ -1117,7 +1079,74 @@ void SERCOM::dmaSetCallbacks(DmaCallback txCb, DmaCallback rxCb)
   }
 }
 
-SERCOM::DmaStatus SERCOM::dmaStartDuplex(const void* txSrc, void* rxDst, void* txReg, void* rxReg, size_t len,
+SERCOM::DmaStatus SERCOM::dmaStartTx(const void* src, volatile void* dstReg, size_t len)
+{
+  if (!_dmaConfigured || !_dmaTx) {
+    _dmaLastError = DmaStatus::NotConfigured;
+    return _dmaLastError;
+  }
+  if (src == nullptr || dstReg == nullptr) {
+    _dmaLastError = DmaStatus::NullPtr;
+    return _dmaLastError;
+  }
+  if (len == 0) {
+    _dmaLastError = DmaStatus::ZeroLen;
+    return _dmaLastError;
+  }
+  if (_dmaTxDesc == nullptr) {
+    _dmaLastError = DmaStatus::DescriptorFailed;
+    return _dmaLastError;
+  }
+
+  _dmaTx->changeDescriptor(_dmaTxDesc, const_cast<void*>(src),
+                           const_cast<void*>(dstReg), len);
+
+  if (_dmaTx->startJob() != DMA_STATUS_OK) {
+    _dmaTx->abort();
+    _dmaLastError = DmaStatus::StartFailed;
+    return _dmaLastError;
+  }
+
+  _dmaTxActive = true;
+  _dmaLastError = DmaStatus::Ok;
+  return _dmaLastError;
+}
+
+SERCOM::DmaStatus SERCOM::dmaStartRx(void* dst, volatile void* srcReg, size_t len)
+{
+  if (!_dmaConfigured || !_dmaRx) {
+    _dmaLastError = DmaStatus::NotConfigured;
+    return _dmaLastError;
+  }
+  if (dst == nullptr || srcReg == nullptr) {
+    _dmaLastError = DmaStatus::NullPtr;
+    return _dmaLastError;
+  }
+  if (len == 0) {
+    _dmaLastError = DmaStatus::ZeroLen;
+    return _dmaLastError;
+  }
+  if (_dmaRxDesc == nullptr) {
+    _dmaLastError = DmaStatus::DescriptorFailed;
+    return _dmaLastError;
+  }
+
+  _dmaRx->changeDescriptor(_dmaRxDesc,
+                           const_cast<void*>(srcReg),
+                           dst, len);
+
+  if (_dmaRx->startJob() != DMA_STATUS_OK) {
+    _dmaRx->abort();
+    _dmaLastError = DmaStatus::StartFailed;
+    return _dmaLastError;
+  }
+
+  _dmaRxActive = true;
+  _dmaLastError = DmaStatus::Ok;
+  return _dmaLastError;
+}
+
+SERCOM::DmaStatus SERCOM::dmaStartDuplex(const void* txSrc, void* rxDst, volatile void* txReg, volatile void* rxReg, size_t len,
                                          const uint8_t* dummyTx)
 {
   if (len == 0)

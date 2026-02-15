@@ -62,7 +62,7 @@ typedef RingBufferN<SERIAL_BUFFER_SIZE> RingBuffer;
 
 
 template <int N, typename T>
-RingBufferN<N>::RingBufferN( void )
+RingBufferN<N, T>::RingBufferN( void )
 {
     for (int i = 0; i < N; ++i)
       _aucBuffer[i] = T{};

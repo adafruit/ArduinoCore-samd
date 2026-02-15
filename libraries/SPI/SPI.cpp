@@ -59,7 +59,7 @@ void SPIClass::begin()
   }
 
 #ifdef USE_ZERODMA
-  _p_sercom->dmaInit(getDMAC_ID_TX(), getDMAC_ID_RX());
+  _p_sercom->dmaInit(_p_sercom->getSercomIndex());
 #endif
 
   // PIO init
@@ -270,7 +270,39 @@ void SPIClass::transfer(const void *txbuf, void *rxbuf, size_t count,
 
 void SPIClass::onService(void)
 {
-  _p_sercom->serviceSPI();
+  // SPI interrupt service handler - moved from SERCOM::serviceSPI()
+  if (!_p_sercom->isActiveSPI() || _p_sercom->getCurrentTxnSPI() == nullptr)
+    return;
+
+  uint8_t flags = _p_sercom->getINTFLAG();
+
+  if (flags & SERCOM_SPI_INTFLAG_ERROR)
+  {
+    _p_sercom->setReturnValueSPI(SercomSpiError::BUF_OVERFLOW);
+    _p_sercom->clearINTFLAG();
+    _p_sercom->deferStopSPI(SercomSpiError::BUF_OVERFLOW);
+    return;
+  }
+
+  SercomTxn* txn = _p_sercom->getCurrentTxnSPI();
+
+  if (flags & SERCOM_SPI_INTFLAG_RXC) {
+    // Read completes after write, so read previous byte
+    bool hasMore = _p_sercom->readDataSPI();
+    
+    if (!hasMore) {
+      _p_sercom->disableInterrupts(SERCOM_SPI_INTENCLR_DRE | SERCOM_SPI_INTENCLR_RXC | SERCOM_SPI_INTENCLR_ERROR);
+      _p_sercom->setReturnValueSPI(SercomSpiError::SUCCESS);
+      _p_sercom->deferStopSPI(SercomSpiError::SUCCESS);
+      return;
+    }
+  }
+
+  if (flags & SERCOM_SPI_INTFLAG_DRE) {
+    bool hasMore = _p_sercom->sendDataSPI();
+    if (!hasMore)
+      _p_sercom->disableInterrupts(SERCOM_SPI_INTENCLR_DRE);
+  }
 }
 
 void SPIClass::onTxnComplete(void* user, int status)
@@ -302,61 +334,6 @@ void SPIClass::attachInterrupt() {
 void SPIClass::detachInterrupt() {
   // Should be disableInterrupt()
 }
-
-// SPI DMA lookup works on both SAMD21 and SAMD51
-
-static const struct {
-  volatile uint32_t *data_reg;
-  int                dmac_id_tx;
-  int                dmac_id_rx;
-} sercomData[] = {
-  { &SERCOM0->SPI.DATA.reg, SERCOM0_DMAC_ID_TX, SERCOM0_DMAC_ID_RX },
-  { &SERCOM1->SPI.DATA.reg, SERCOM1_DMAC_ID_TX, SERCOM1_DMAC_ID_RX },
-  { &SERCOM2->SPI.DATA.reg, SERCOM2_DMAC_ID_TX, SERCOM2_DMAC_ID_RX },
-  { &SERCOM3->SPI.DATA.reg, SERCOM3_DMAC_ID_TX, SERCOM3_DMAC_ID_RX },
-#if defined(SERCOM4)
-  { &SERCOM4->SPI.DATA.reg, SERCOM4_DMAC_ID_TX, SERCOM4_DMAC_ID_RX },
-#endif
-#if defined(SERCOM5)
-  { &SERCOM5->SPI.DATA.reg, SERCOM5_DMAC_ID_TX, SERCOM5_DMAC_ID_RX },
-#endif
-#if defined(SERCOM6)
-  { &SERCOM6->SPI.DATA.reg, SERCOM6_DMAC_ID_TX, SERCOM6_DMAC_ID_RX },
-#endif
-#if defined(SERCOM7)
-  { &SERCOM7->SPI.DATA.reg, SERCOM7_DMAC_ID_TX, SERCOM7_DMAC_ID_RX },
-#endif
-};
-
-volatile uint32_t *SPIClass::getDataRegister(void) {
-  int8_t idx = _p_sercom->getSercomIndex();
-  return (idx >= 0) ? sercomData[idx].data_reg: NULL;
-}
-
-int SPIClass::getDMAC_ID_TX(void) {
-  int8_t idx = _p_sercom->getSercomIndex();
-  return (idx >= 0) ? sercomData[idx].dmac_id_tx : -1;
-}
-
-int SPIClass::getDMAC_ID_RX(void) {
-  int8_t idx = _p_sercom->getSercomIndex();
-  return (idx >= 0) ? sercomData[idx].dmac_id_rx : -1;
-}
-
-#if defined(__SAMD51__)
-
-// Set the SPI device's SERCOM clock CORE and SLOW clock sources.
-// SercomClockSource values are an enumeration in SERCOM.h.
-// This works on SAMD51 only.  On SAMD21, a dummy function is declared
-// in SPI.h which compiles to nothing, so user code doesn't need to check
-// and conditionally compile lines for different architectures.
-void SPIClass::setClockSource(SercomClockSource clk) {
-  int8_t idx = _p_sercom->getSercomIndex();
-  _p_sercom->setClockSource(idx, clk, true);  // true  = set core clock
-  _p_sercom->setClockSource(idx, clk, false); // false = set slow clock
-}
-
-#endif // end __SAMD51__
 
 #if SPI_INTERFACES_COUNT > 0
   /* In case new variant doesn't define these macros,

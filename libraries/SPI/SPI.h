@@ -42,8 +42,8 @@
   // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
   // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
   // this affects ALL SPI peripherals including some that should NOT be
-  // changed (e.g. anything using SD card). Use the setClockSource()
-  // function instead. This is left here for compatibility with interim code.
+  // changed (e.g. anything using SD card). Configure SERCOM clock source
+  // directly via the SERCOM API instead. This is left here for compatibility.
   #if !defined(MAX_SPI)
     #define MAX_SPI 24000000
   #endif
