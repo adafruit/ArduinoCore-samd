@@ -844,11 +844,11 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
     if (_wire.retryCount < kMaxWireRetries) {
       ++_wire.retryCount;
 
-    sercom->I2CM.STATUS.bit.BUSSTATE = 1;
-    while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ;
+      sercom->I2CM.STATUS.bit.BUSSTATE = 1;
+      while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ;
       startTransmissionWIRE();
 
-    return txn;
+      return txn;
     }
   }
 
@@ -856,11 +856,11 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
     if (_wire.retryCount < kMaxWireRetries) {
       ++_wire.retryCount;
 
-    sercom->I2CM.STATUS.bit.ARBLOST = 1; // Clear arbitration lost flag
-    sercom->I2CM.INTFLAG.reg = SERCOM_I2CM_INTFLAG_ERROR;
+      sercom->I2CM.STATUS.bit.ARBLOST = 1; // Clear arbitration lost flag
+      sercom->I2CM.INTFLAG.reg = SERCOM_I2CM_INTFLAG_ERROR;
       startTransmissionWIRE();
 
-    return txn;
+      return txn;
     }
   }
 
@@ -1338,7 +1338,7 @@ void SERCOM::clearPads(uint8_t sercomId)
 
 void SERCOM::setPending(uint8_t sercomId)
 {
-  if (sercomId >= kSercomCount || sercomId < 0)
+  if (sercomId >= kSercomCount)
     return;
 
   __disable_irq();

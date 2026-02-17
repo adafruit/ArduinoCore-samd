@@ -288,8 +288,6 @@ void SPIClass::onService(void)
     return;
   }
 
-  SercomTxn* txn = _p_sercom->getCurrentTxnSPI();
-
   if (flags & SERCOM_SPI_INTFLAG_RXC) {
     // Read completes after write, so read previous byte
     bool hasMore = _p_sercom->readDataSPI();
