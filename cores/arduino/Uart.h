@@ -41,8 +41,11 @@ class Uart : public HardwareSerial
                 void* user = nullptr);
     void flush();
     size_t write(const uint8_t data);
-    size_t write(const uint8_t* buffer, size_t size);
-    size_t writeAsync(const uint8_t* buffer, size_t size, void (*onComplete)(void* user, int status), void* user);
+    // If onComplete is nullptr, blocks (sync); otherwise enqueues and returns (async)
+    // Transparently uses DMA when available, falls back to byte-by-byte otherwise
+    size_t write(const uint8_t* buffer, size_t size,
+                 void (*onComplete)(void* user, int status) = nullptr,
+                 void* user = nullptr);
     using Print::write; // pull in write(str) and write(buf, size) from Print
 
     void IrqHandler();
@@ -66,7 +69,13 @@ class Uart : public HardwareSerial
 
     volatile bool txnDone = false;
     volatile int txnStatus = 0;
-    SercomTxn _txn;
+    
+    // Transaction pool for async operations (matches SERCOM queue depth)
+    static constexpr size_t TXN_POOL_SIZE = 8;
+    SercomTxn txnPool[TXN_POOL_SIZE];
+    uint8_t txnPoolHead = 0;
+    
+    SercomTxn* allocateTxn();
     static void onTxnComplete(void* user, int status);
     bool rxExternalActive = false;
     void (*pendingRxCb)(void* user, int status) = nullptr;
