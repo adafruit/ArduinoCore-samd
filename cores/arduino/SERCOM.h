@@ -294,6 +294,7 @@ class SERCOM
 		inline const SercomTxn* getCurrentTxnWIRE(void) const { return _wire.currentTxn; }
 		inline size_t getTxnIndexWIRE(void) const { return _wire.txnIndex; }
 		inline size_t getTxnLengthWIRE(void) const { return _wire.txnLength; }
+		inline bool isActiveWIRE(void) const { return _wire.active; }
 
 		inline bool isDBGSTOP( void ) const { return sercom->I2CM.DBGCTRL.bit.DBGSTOP; }
 		inline void setDBGSTOP( bool stop ) { sercom->I2CM.DBGCTRL.bit.DBGSTOP = stop; }
@@ -343,7 +344,7 @@ class SERCOM
 		DmaStatus dmaStartTx(const void* src, volatile void* dstReg, size_t len);
 		DmaStatus dmaStartRx(void* dst, volatile void* srcReg, size_t len);
 		DmaStatus dmaStartDuplex(const void* txSrc, void* rxDst, volatile void* txReg, volatile void* rxReg, size_t len,
-		                    const uint8_t* dummyTx = nullptr);
+		                 const uint8_t* dummyTx = nullptr);
 		void dmaRelease();
 		void dmaResetDescriptors();
 		void dmaAbortTx();

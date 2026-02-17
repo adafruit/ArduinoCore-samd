@@ -52,19 +52,21 @@ class TwoWire : public Stream
     uint8_t endTransmission(bool stopBit = true,
                             void (*onComplete)(void* user, int status) = nullptr,
                             void* user = nullptr);
-    uint8_t endTransmission(void);
 
     // If onComplete is nullptr, this blocks for legacy sync behavior.
     // If onComplete is non-null, this enqueues and returns immediately (async).
     // If rxBuffer is nullptr, the internal buffer is used; otherwise rxBuffer is used.
-    uint8_t requestFrom(uint8_t address, size_t quantity, uint8_t* rxBuffer = nullptr,
-                        bool stopBit = true,
+    uint8_t requestFrom(uint8_t address, size_t quantity, bool stopBit = true,
+                        uint8_t* rxBuffer = nullptr,
                         void (*onComplete)(void* user, int status) = nullptr,
                         void* user = nullptr);
-    uint8_t requestFrom(uint8_t address, size_t quantity);
 
     size_t write(uint8_t data);
-    size_t write(const uint8_t * data, size_t quantity);
+    // 3-arg write: when setExternal=true, data is used directly (zero-copy) and
+    // quantity is treated as both length and capacity; subsequent write() calls return 0.
+    // For streaming > WIRE_BUFFER_LENGTH or async usage, call setTxBuffer() before write()
+    // on every transaction.
+    size_t write(const uint8_t * data, size_t quantity, bool setExternal = false);
 
     virtual int available(void);
     virtual int read(void);
@@ -73,6 +75,7 @@ class TwoWire : public Stream
     void onReceive(void(*)(int));
     void onRequest(void(*)(void));
     void setRxBuffer(uint8_t* buffer, size_t length);
+    void setTxBuffer(uint8_t* buffer, size_t length);
     void clearRxBuffer(void);
     void resetRxBuffer(void);
     uint8_t* getRxBuffer(void);
@@ -94,27 +97,30 @@ class TwoWire : public Stream
     bool transmissionBegun;
 
     // RX/TX buffers (sync compatibility, async staging)
-    static constexpr size_t WIRE_TX_BUFFER_LENGTH = 255;
-    static constexpr size_t WIRE_RX_BUFFER_LENGTH = SERIAL_BUFFER_SIZE;
-    uint8_t rxBuffer[WIRE_RX_BUFFER_LENGTH];
-    uint8_t txBuffer[WIRE_TX_BUFFER_LENGTH];
+    static constexpr size_t WIRE_BUFFER_LENGTH = 255;
+    uint8_t rxBuffer[WIRE_BUFFER_LENGTH];
+    uint8_t txBuffer[WIRE_BUFFER_LENGTH];
     uint8_t* rxBufferPtr;
     size_t rxBufferCapacity;
     size_t rxLength;
     size_t rxIndex;
-    size_t txLength;
-    size_t txIndex;
-    const uint8_t* txExternalPtr;
-    size_t txExternalLength;
-    bool txExternalActive;
+    size_t txBufferCapacity;
     size_t masterIndex;
     bool awaitingAddressAck;
-    uint8_t txAddress;
     volatile bool txnDone;
     volatile int txnStatus;
     bool pendingReceive;
     int pendingReceiveLength;
-    SercomTxn txn;
+    SercomTxn slaveTxn;
+    SercomTxn loader;  // Staging area for building transactions
+    
+    // Transaction pool for async operations (matches SERCOM queue depth)
+    static constexpr size_t TXN_POOL_SIZE = 8;
+    SercomTxn txnPool[TXN_POOL_SIZE];
+    uint8_t txnPoolHead;
+    
+    SercomTxn* allocateTxn();
+    void freeTxn(SercomTxn* txn);
 
     // Callback user functions
     void (*onRequestCallback)(void);
@@ -254,29 +260,29 @@ inline void TwoWire::onService(void)
       {
         // onRequestCallback runs in ISR context here. Deferring to PendSV
         // would require stalling DRDY or returning 0xFF until the buffer is filled.
-        // onRequestCallback is what will set TwoWire::txn for the transaction.
+        // onRequestCallback is what will set TwoWire::slaveTxn for the transaction.
         if(onRequestCallback)
           onRequestCallback();
         
-        // Ensure callback actually set txn.length; if not, stall with 0-length txn
-        if (txn.length == 0) 
+        // Ensure callback actually set slaveTxn.length; if not, stall with 0-length txn
+        if (slaveTxn.length == 0) 
           return;
 
-        if (!(txn.config & I2C_CFG_READ)) 
-          txn.config |= I2C_CFG_READ;
+        if (!(slaveTxn.config & I2C_CFG_READ)) 
+          slaveTxn.config |= I2C_CFG_READ;
       }
       else // Master Write / Slave RX
       {
         // rxLength needs to be set in the rxCallback so the user has runtime control
         // setting rxLength to 0 will default to the internal buffer
         rxIndex = 0;
-        txn.txPtr = nullptr;
-        txn.rxPtr = rxLength ? rxBufferPtr : rxBuffer;
-        txn.length = rxLength ? rxLength : WIRE_RX_BUFFER_LENGTH;
-        txn.config = 0;
+        slaveTxn.txPtr = nullptr;
+        slaveTxn.rxPtr = rxLength ? rxBufferPtr : rxBuffer;
+        slaveTxn.length = rxLength ? rxLength : WIRE_BUFFER_LENGTH;
+        slaveTxn.config = 0;
       }
 
-      sercom->setTxnWIRE(&txn);
+      sercom->setTxnWIRE(&slaveTxn);
 
       // SCLSM=0 (Smart Mode disabled): AMATCH and DRDY never fire together
       //   → return now, DRDY will fire in next interrupt
