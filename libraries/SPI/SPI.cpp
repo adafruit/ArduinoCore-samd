@@ -47,6 +47,9 @@ SPIClass::SPIClass(SERCOM *p_sercom, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint
   // SERCOM pads
   _padTx=PadTx;
   _padRx=PadRx;
+  
+  // Transaction pool initialization
+  txnPoolHead = 0;
 }
 
 void SPIClass::begin()
@@ -249,15 +252,16 @@ void SPIClass::transfer(const void *txbuf, void *rxbuf, size_t count,
   // OK to assume now that txbuf and/or rxbuf are non-NULL, an if/else is
   // often sufficient, don't need else-ifs for everything buffer related.
 
-  _txn.txPtr = static_cast<const uint8_t*>(txbuf);
-  _txn.rxPtr = static_cast<uint8_t*>(rxbuf);
-  _txn.length = count;
-  _txn.onComplete = onComplete ? onComplete : &SPIClass::onTxnComplete;
-  _txn.user = onComplete ? user : this;
+  SercomTxn* txn = allocateTxn();
+  txn->txPtr = static_cast<const uint8_t*>(txbuf);
+  txn->rxPtr = static_cast<uint8_t*>(rxbuf);
+  txn->length = count;
+  txn->onComplete = onComplete ? onComplete : &SPIClass::onTxnComplete;
+  txn->user = onComplete ? user : this;
   txnDone = false;
   txnStatus = 0;
 
-  if (!_p_sercom->enqueueSPI(&_txn)) {
+  if (!_p_sercom->enqueueSPI(txn)) {
     if (onComplete)
       onComplete(user, static_cast<int>(SercomSpiError::UNKNOWN_ERROR));
     return;
@@ -303,6 +307,13 @@ void SPIClass::onService(void)
     if (!hasMore)
       _p_sercom->disableInterrupts(SERCOM_SPI_INTENCLR_DRE);
   }
+}
+
+SercomTxn* SPIClass::allocateTxn() {
+  // Simple round-robin allocation from pool
+  SercomTxn* txn = &txnPool[txnPoolHead];
+  txnPoolHead = (txnPoolHead + 1) % TXN_POOL_SIZE;
+  return txn;
 }
 
 void SPIClass::onTxnComplete(void* user, int status)

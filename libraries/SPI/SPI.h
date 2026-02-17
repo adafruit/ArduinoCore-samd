@@ -160,7 +160,13 @@ class SPIClass {
 
   volatile bool    txnDone               = false;
   volatile int     txnStatus             = 0;
-  SercomTxn        _txn;
+  
+  // Transaction pool for async operations (matches SERCOM queue depth)
+  static constexpr size_t TXN_POOL_SIZE = 8;
+  SercomTxn txnPool[TXN_POOL_SIZE];
+  uint8_t txnPoolHead;
+  
+  SercomTxn* allocateTxn();
   static void      onTxnComplete(void* user, int status);
 };
 
