@@ -364,6 +364,7 @@ void SPIClass::detachInterrupt() {
   #ifndef SPI_IT_HANDLER
     #define SPI_IT_HANDLER      SERCOM4_Handler
   #endif
+  void SPI_IT_HANDLER(void) __attribute__ ((weak));
   void SPI_IT_HANDLER(void) { SPI.onService(); }
 
   #if defined(__SAMD51__)
@@ -373,6 +374,10 @@ void SPIClass::detachInterrupt() {
       #define SPI_IT_HANDLER_2 SERCOM4_2_Handler
       #define SPI_IT_HANDLER_3 SERCOM4_3_Handler
     #endif
+    void SPI_IT_HANDLER_0(void) __attribute__ ((weak));
+    void SPI_IT_HANDLER_1(void) __attribute__ ((weak));
+    void SPI_IT_HANDLER_2(void) __attribute__ ((weak));
+    void SPI_IT_HANDLER_3(void) __attribute__ ((weak));
     void SPI_IT_HANDLER_0(void) { SPI.onService(); }
     void SPI_IT_HANDLER_1(void) { SPI.onService(); }
     void SPI_IT_HANDLER_2(void) { SPI.onService(); }
@@ -383,10 +388,15 @@ void SPIClass::detachInterrupt() {
   SPIClass SPI1(&PERIPH_SPI1, PIN_SPI1_MISO, PIN_SPI1_SCK, PIN_SPI1_MOSI, PAD_SPI1_TX, PAD_SPI1_RX);
 
   #if defined(SPI1_IT_HANDLER)
+    void SPI1_IT_HANDLER(void) __attribute__ ((weak));
     void SPI1_IT_HANDLER(void) { SPI1.onService(); }
   #endif
 
   #if defined(__SAMD51__) && defined(SPI1_IT_HANDLER_0)
+    void SPI1_IT_HANDLER_0(void) __attribute__ ((weak));
+    void SPI1_IT_HANDLER_1(void) __attribute__ ((weak));
+    void SPI1_IT_HANDLER_2(void) __attribute__ ((weak));
+    void SPI1_IT_HANDLER_3(void) __attribute__ ((weak));
     void SPI1_IT_HANDLER_0(void) { SPI1.onService(); }
     void SPI1_IT_HANDLER_1(void) { SPI1.onService(); }
     void SPI1_IT_HANDLER_2(void) { SPI1.onService(); }
