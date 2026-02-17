@@ -39,19 +39,16 @@ TwoWire::TwoWire(SERCOM * s, uint8_t pinSDA, uint8_t pinSCL)
   transmissionBegun = false;
   rxLength = 0;
   rxIndex = 0;
-  txLength = 0;
-  txIndex = 0;
-  txExternalPtr = nullptr;
-  txExternalLength = 0;
-  txExternalActive = false;
   masterIndex = 0;
   awaitingAddressAck = false;
   txnDone = false;
   txnStatus = 0;
   rxBufferPtr = rxBuffer;
-  rxBufferCapacity = WIRE_RX_BUFFER_LENGTH;
+  rxBufferCapacity = WIRE_BUFFER_LENGTH;
+  txBufferCapacity = WIRE_BUFFER_LENGTH;
   pendingReceive = false;
   pendingReceiveLength = 0;
+  txnPoolHead = 0;
 }
 
 void TwoWire::begin(void) {
@@ -82,74 +79,92 @@ void TwoWire::setClock(uint32_t baudrate) {
 }
 
 void TwoWire::end() {
-  sercom->disableWIRE();
+  sercom->resetWIRE();   // SWRST: resets hardware + clears state + drains queue
 }
 
-uint8_t TwoWire::requestFrom(uint8_t address, size_t quantity, uint8_t* rxBuffer, bool stopBit,
+uint8_t TwoWire::requestFrom(uint8_t address, size_t quantity, bool stopBit, uint8_t* rxBuffer,
                              void (*onComplete)(void* user, int status), void* user)
 {
   if(quantity == 0)
-  {
     return 0;
-  }
+
+  loader = SercomTxn{}; 
 
   if (rxBuffer != nullptr) {
-    rxBufferPtr = rxBuffer;
-    rxBufferCapacity = quantity;
+    loader.rxPtr = rxBuffer;
+    loader.length = quantity;
   } else {
-    rxBufferPtr = this->rxBuffer;
-    rxBufferCapacity = WIRE_RX_BUFFER_LENGTH;
-    if (quantity > rxBufferCapacity)
-      quantity = rxBufferCapacity;
+    loader.rxPtr = this->rxBuffer;
+    loader.length = ( quantity > WIRE_BUFFER_LENGTH) ? WIRE_BUFFER_LENGTH : quantity;
   }
 
-  rxLength = 0;
-  rxIndex = 0;
-
-  txn.config = I2C_CFG_READ | (stopBit ? I2C_CFG_STOP : 0);
-  txn.address = address;
-  txn.length = quantity;
-  txn.txPtr = nullptr;
-  txn.rxPtr = rxBufferPtr;
-  txn.onComplete = onComplete ? onComplete : &TwoWire::onTxnComplete;
-  txn.user = onComplete ? user : this;
-  txnDone = false;
-  txnStatus = static_cast<int>(SercomWireError::SUCCESS);
-  masterIndex = 0;
+  loader.config = I2C_CFG_READ | (stopBit ? I2C_CFG_STOP : 0);
+  loader.address = address;
+  loader.onComplete = onComplete ? onComplete : &TwoWire::onTxnComplete;
+  
+  // Allocate fresh transaction from pool and copy loader data
+  SercomTxn* txn = allocateTxn();
+  *txn = loader;
+  
+  // For async callbacks, pass txn as user so callback can access txn->rxPtr/length directly
+  // For sync calls, pass 'this' so onTxnComplete can update txnStatus/txnDone
+  if (onComplete)
+    txn->user = (user == nullptr) ? txn : user;
+  else
+    txn->user = this;
+  
   awaitingAddressAck = true;
+  txnDone = false;
 
-  if (!sercom->enqueueWIRE(&txn))
+  // Enqueue the pool transaction, not the loader
+  if (!sercom->enqueueWIRE(txn))
     return 0;
 
   if (!onComplete) {
+    // Wait for transaction to complete (onTxnComplete sets txnDone) with timeout
+    uint32_t startMillis = millis();
+    const uint32_t timeout = 1000; // 1 second timeout
     while (!txnDone) {
+      if (millis() - startMillis > timeout)
+        return 0;
+
       yield();
     }
 
     if (txnStatus != static_cast<int>(SercomWireError::SUCCESS))
       return 0;
 
+    // Set up pointers for Wire.available()/read() to access the data
+    // txn->rxPtr already points to this->rxBuffer (from loader copy)
+    rxBufferPtr = loader.rxPtr;
     rxLength = quantity;
+    rxIndex = 0;
     return rxLength;
   }
 
   return quantity;
 }
 
-uint8_t TwoWire::requestFrom(uint8_t address, size_t quantity)
-{
-  return requestFrom(address, quantity, nullptr, true);
+SercomTxn* TwoWire::allocateTxn() {
+  // Simple round-robin allocation from pool
+  SercomTxn* txn = &txnPool[txnPoolHead];
+  txnPoolHead = (txnPoolHead + 1) % TXN_POOL_SIZE;
+  *txn = SercomTxn{};  // Clear the transaction
+  return txn;
+}
+
+void TwoWire::freeTxn(SercomTxn* txn) {
+  // Transactions are freed when removed from SERCOM queue
+  // Pool allocation is round-robin, so no explicit free needed
+  (void)txn;
 }
 
 void TwoWire::beginTransmission(uint8_t address) {
-  // save address of target and clear buffer
-  txAddress = address;
-  txLength = 0;
-  txIndex = 0;
-  txExternalPtr = nullptr;
-  txExternalLength = 0;
-  txExternalActive = false;
-
+  // Initialize loader as staging area for building transaction
+  loader = SercomTxn{};
+  loader.txPtr = nullptr;
+  loader.address = address;
+  txBufferCapacity = WIRE_BUFFER_LENGTH;
   transmissionBegun = true;
 }
 
@@ -163,27 +178,30 @@ uint8_t TwoWire::endTransmission(bool stopBit, void (*onComplete)(void* user, in
 {
   transmissionBegun = false ;
 
-  txn.config = stopBit ? I2C_CFG_STOP : 0;
-  txn.address = txAddress;
-  txn.length = txExternalActive ? txExternalLength : txLength;
-  txn.txPtr = txExternalActive ? txExternalPtr : txBuffer;
-  txn.rxPtr = nullptr;
-  txn.onComplete = onComplete ? onComplete : &TwoWire::onTxnComplete;
-  txn.user = onComplete ? user : this;
-  txnDone = false;
-  txnStatus = static_cast<int>(SercomWireError::SUCCESS);
-  masterIndex = 0;
+  // Allocate a fresh transaction from the pool and copy staged data from loader
+  SercomTxn* txn = allocateTxn();
+  *txn = loader;  // Copy staged transaction data
+  
+  // Set parameters that weren't known during beginTransmission/write
+  txn->config = stopBit ? I2C_CFG_STOP : 0;
+  txn->onComplete = onComplete ? onComplete : &TwoWire::onTxnComplete;
+  txn->user  = (user == nullptr) ? this : user;
+  
   awaitingAddressAck = true;
+  txnDone = false;
 
-  if (!sercom->enqueueWIRE(&txn))
+  // Enqueue the pool transaction, not the loader
+  if (!sercom->enqueueWIRE(txn))
     return static_cast<uint8_t>(SercomWireError::QUEUE_FULL);
 
-  txExternalPtr = nullptr;
-  txExternalLength = 0;
-  txExternalActive = false;
-
   if (!onComplete) {
+    // Wait for transaction to complete (onTxnComplete sets txnDone) with timeout
+    uint32_t startMillis = millis();
+    const uint32_t timeout = 1000; // 1 second timeout
     while (!txnDone) {
+      if (millis() - startMillis > timeout)
+        return 4; // OTHER error
+  
       yield();
     }
 
@@ -197,7 +215,7 @@ uint8_t TwoWire::endTransmission(bool stopBit, void (*onComplete)(void* user, in
         return 2;
       case SercomWireError::NACK_ON_DATA:
         return 3;
-      default:
+      default: // OTHER
         return 4;
     }
   }
@@ -205,49 +223,81 @@ uint8_t TwoWire::endTransmission(bool stopBit, void (*onComplete)(void* user, in
   return 0;
 }
 
-uint8_t TwoWire::endTransmission()
-{
-  return endTransmission(true);
-}
-
 size_t TwoWire::write(uint8_t ucData)
-{
-  // No writing, without begun transmission or a full buffer
-  if ( !transmissionBegun || txExternalActive || txLength >= WIRE_TX_BUFFER_LENGTH )
-  {
-    return 0 ;
-  }
-
-  txBuffer[txLength++] = ucData;
-
-  return 1 ;
-}
-
-size_t TwoWire::write(const uint8_t *data, size_t quantity)
 {
   if (!transmissionBegun)
     return 0;
 
-  if (txExternalActive)
+  // Check buffer full
+  if (loader.length >= txBufferCapacity)
     return 0;
 
-  if (txLength == 0 && quantity > 0) {
-    txExternalPtr = data;
-    txExternalLength = quantity;
-    txExternalActive = true;
-    txLength = quantity;
+  // Initialize to internal buffer if first write
+  if (loader.txPtr == nullptr)
+    loader.txPtr = txBuffer;
+
+  // Append to current buffer (internal or external)
+  if (loader.txPtr == txBuffer)
+    txBuffer[loader.length++] = ucData;
+  else
+    const_cast<uint8_t*>(loader.txPtr)[loader.length++] = ucData;
+
+  return 1;
+}
+
+size_t TwoWire::write(const uint8_t *data, size_t quantity, bool setExternal)
+{
+  if (!transmissionBegun)
+    return 0;
+
+  if (quantity == 0)
+    return 0;
+
+  // External path: require external buffer (zero-copy)
+  if (setExternal) {
+    if (loader.txPtr == nullptr) {
+      loader.txPtr = data;
+      txBufferCapacity = quantity;  // Treat quantity as both length and capacity
+      loader.length = quantity;
+      return quantity;
+    }
+
+    // Prevent switching from internal buffer to external mid-transaction
+    if (loader.txPtr == txBuffer)
+      return 0;
+  }
+
+  // Sync path: prefer internal buffer unless it overflows
+  if (loader.txPtr == nullptr) {
+    if (quantity <= WIRE_BUFFER_LENGTH) {
+      loader.txPtr = txBuffer;
+      txBufferCapacity = WIRE_BUFFER_LENGTH;
+      memcpy(txBuffer, data, quantity);
+      loader.length = quantity;
+      return quantity;
+    }
+
+    // Large write: require external buffer
+    loader.txPtr = data;
+    txBufferCapacity = quantity;
+    loader.length = quantity;
     return quantity;
   }
 
-  //Try to store all data
-  for(size_t i = 0; i < quantity; ++i)
-  {
-    //Return the number of data stored, when the buffer is full (if write return 0)
-    if(!write(data[i]))
-      return i;
-  }
+  // Appending to existing buffer
+  size_t available = txBufferCapacity - loader.length;
+  if (quantity > available)
+    quantity = available;
 
-  //All data stored
+  if (quantity == 0)
+    return 0;
+
+  if (loader.txPtr == txBuffer)
+    memcpy(txBuffer + loader.length, data, quantity);
+  else
+    memcpy(const_cast<uint8_t*>(loader.txPtr) + loader.length, data, quantity);
+
+  loader.length += quantity;
   return quantity;
 }
 
@@ -297,6 +347,20 @@ void TwoWire::setRxBuffer(uint8_t* buffer, size_t length)
   rxBufferCapacity = length;
 }
 
+void TwoWire::setTxBuffer(uint8_t* buffer, size_t length)
+{
+  if (buffer == nullptr || length == 0) {
+    loader.txPtr = nullptr;
+    txBufferCapacity = WIRE_BUFFER_LENGTH;
+    loader.length = 0;
+    return;
+  }
+
+  loader.txPtr = buffer;
+  txBufferCapacity = length;
+  loader.length = 0;
+}
+
 void TwoWire::clearRxBuffer(void)
 {
   if (rxBufferPtr && rxBufferCapacity > 0)
@@ -308,7 +372,7 @@ void TwoWire::clearRxBuffer(void)
 void TwoWire::resetRxBuffer(void)
 {
   rxBufferPtr = rxBuffer;
-  rxBufferCapacity = WIRE_RX_BUFFER_LENGTH;
+  rxBufferCapacity = WIRE_BUFFER_LENGTH;
   clearRxBuffer();
 }
 
