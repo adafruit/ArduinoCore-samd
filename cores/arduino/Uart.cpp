@@ -38,6 +38,7 @@ Uart::Uart(SERCOM *_s, uint8_t _pinRX, uint8_t _pinTX, SercomRXPad _padRX, Serco
   uc_padTX = _padTX;
   uc_pinRTS = _pinRTS;
   uc_pinCTS = _pinCTS;
+  txnPoolHead = 0;
 }
 
 void Uart::begin(unsigned long baudrate)
@@ -190,56 +191,58 @@ size_t Uart::write(const uint8_t data)
   return 1;
 }
 
-size_t Uart::write(const uint8_t* buffer, size_t size)
+size_t Uart::write(const uint8_t* buffer, size_t size,
+                    void (*onComplete)(void* user, int status),
+                    void* user)
 {
   if (buffer == nullptr || size == 0)
     return 0;
 
+  if (onComplete == nullptr) {
+    // Synchronous path: block until complete
 #ifdef USE_ZERODMA
-  _txn.txPtr = buffer;
-  _txn.rxPtr = nullptr;
-  _txn.length = size;
-  _txn.onComplete = &Uart::onTxnComplete;
-  _txn.user = this;
-  txnDone = false;
-  txnStatus = 0;
+    SercomTxn* txn = allocateTxn();
+    txn->txPtr = buffer;
+    txn->rxPtr = nullptr;
+    txn->length = size;
+    txn->onComplete = &Uart::onTxnComplete;
+    txn->user = this;
+    txnDone = false;
+    txnStatus = 0;
 
-  if (sercom->enqueueUART(&_txn)) {
-    while (!txnDone) ;
+    if (sercom->enqueueUART(txn)) {
+      while (!txnDone) ;
+      return size;
+    }
+#endif
+    // Fallback: byte-by-byte
+    for (size_t i = 0; i < size; ++i)
+      write(buffer[i]);
     return size;
-  }
-#endif
-
-  for (size_t i = 0; i < size; ++i)
-    write(buffer[i]);
-  return size;
-}
-
-size_t Uart::writeAsync(const uint8_t* buffer, size_t size, void (*onComplete)(void* user, int status), void* user)
-{
-  if (buffer == nullptr || size == 0)
-    return 0;
-
+  } else {
+    // Asynchronous path: enqueue and return immediately
 #ifdef USE_ZERODMA
-  _txn.txPtr = buffer;
-  _txn.rxPtr = nullptr;
-  _txn.length = size;
-  _txn.onComplete = onComplete ? onComplete : &Uart::onTxnComplete;
-  _txn.user = onComplete ? user : this;
-  txnDone = false;
-  txnStatus = 0;
+    SercomTxn* txn = allocateTxn();
+    txn->txPtr = buffer;
+    txn->rxPtr = nullptr;
+    txn->length = size;
+    txn->onComplete = onComplete;
+    txn->user = user;
+    txnDone = false;
+    txnStatus = 0;
 
-  if (!sercom->enqueueUART(&_txn))
-    return 0;
+    if (!sercom->enqueueUART(txn))
+      return 0;
 
-  return size;
+    return size;
 #else
-  (void)onComplete;
-  (void)user;
-  for (size_t i = 0; i < size; ++i)
-    write(buffer[i]);
-  return size;
+    (void)onComplete;
+    (void)user;
+    for (size_t i = 0; i < size; ++i)
+      write(buffer[i]);
+    return size;
 #endif
+  }
 }
 
 size_t Uart::read(uint8_t* buffer, size_t size, void (*onComplete)(void* user, int status), void* user)
@@ -248,6 +251,7 @@ size_t Uart::read(uint8_t* buffer, size_t size, void (*onComplete)(void* user, i
     return 0;
 
   if (onComplete == nullptr) {
+    // Synchronous path: read from ring buffer
     size_t readCount = 0;
     while (readCount < size) {
       int c = read();
@@ -258,21 +262,25 @@ size_t Uart::read(uint8_t* buffer, size_t size, void (*onComplete)(void* user, i
   }
 
 #ifdef USE_ZERODMA
+  // Asynchronous path: use DMA
   pendingRxCb = onComplete;
   pendingRxUser = user;
   rxExternalActive = true;
 
+  // Disable RXC interrupt; DMA takes over
   sercom->getSercom()->USART.INTENCLR.reg = SERCOM_USART_INTENCLR_RXC;
 
-  _txn.txPtr = nullptr;
-  _txn.rxPtr = buffer;
-  _txn.length = size;
-  _txn.onComplete = &Uart::onTxnComplete;
-  _txn.user = this;
+  SercomTxn* txn = allocateTxn();
+  txn->txPtr = nullptr;
+  txn->rxPtr = buffer;
+  txn->length = size;
+  txn->onComplete = &Uart::onTxnComplete;
+  txn->user = this;
   txnDone = false;
   txnStatus = 0;
 
-  if (!sercom->enqueueUART(&_txn)) {
+  if (!sercom->enqueueUART(txn)) {
+    // Enqueue failed; restore RXC interrupt and clear pending state
     sercom->getSercom()->USART.INTENSET.reg = SERCOM_USART_INTENSET_RXC;
     rxExternalActive = false;
     pendingRxCb = nullptr;
@@ -286,6 +294,13 @@ size_t Uart::read(uint8_t* buffer, size_t size, void (*onComplete)(void* user, i
   (void)user;
   return 0;
 #endif
+}
+
+SercomTxn* Uart::allocateTxn() {
+  // Simple round-robin allocation from pool
+  SercomTxn* txn = &txnPool[txnPoolHead];
+  txnPoolHead = (txnPoolHead + 1) % TXN_POOL_SIZE;
+  return txn;
 }
 
 void Uart::onTxnComplete(void* user, int status)
