@@ -80,6 +80,8 @@ class TwoWire : public Stream
     void resetRxBuffer(void);
     uint8_t* getRxBuffer(void);
     size_t getRxLength(void) const;
+    inline SERCOM *getSercom(void) { return sercom; }
+    inline const SERCOM *getSercom(void) const { return sercom; }
 
     inline size_t write(unsigned long n) { return write((uint8_t)n); }
     inline size_t write(long n) { return write((uint8_t)n); }
