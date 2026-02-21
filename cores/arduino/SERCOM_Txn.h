@@ -12,6 +12,7 @@ struct SercomTxn {
   uint8_t* rxPtr;
   void (*onComplete)(void* user, int status);
   void* user;
+  bool chainNext;      // callback sets true to continue transaction with updated context
 };
 
 // Mirrors WireDMA I2CError values for SERCOM-level reporting.

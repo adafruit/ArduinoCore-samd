@@ -284,9 +284,9 @@ bool SERCOM::enqueueUART(SercomTxn* txn)
 #ifdef USE_ZERODMA
   if (!_dmaConfigured)
     return false;
-#else
-  return false;
 #endif
+  if (_txnQueue.isFull())
+    return false;  // Queue full; caller must retry at runtime
   if (!_txnQueue.store(txn))
     return false;
   if (!_uart.active) {
@@ -315,13 +315,30 @@ SercomTxn* SERCOM::stopTransmissionUART(void)
 SercomTxn* SERCOM::stopTransmissionUART(SercomUartError error)
 {
   SercomTxn* txn = nullptr;
-  if (_txnQueue.read(txn) && txn != nullptr)
-  {
-    _uart.active = false;
-    _uart.currentTxn = nullptr;
+  if (!_txnQueue.peek(txn) || txn == nullptr)
+    return nullptr;
+
+  // Call completion callback before deciding to dequeue
     if (txn->onComplete)
       txn->onComplete(txn->user, static_cast<int>(error));
+
+  // Check if callback wants to chain another phase
+  if (txn->chainNext) {
+    txn->chainNext = false; // reset for next iteration
+    if (!startTransmissionUART()) {
+      // Hardware start failed, force dequeue
+      _txnQueue.read(txn);
+      _uart.active = false;
+      _uart.currentTxn = nullptr;
+      return txn;
+    }
+    return txn;
   }
+
+  // Normal completion: dequeue and start next transaction
+  _txnQueue.read(txn);
+  _uart.active = false;
+  _uart.currentTxn = nullptr;
 
   SercomTxn* next = nullptr;
   if (_txnQueue.peek(next) && next)
@@ -421,6 +438,8 @@ bool SERCOM::enqueueSPI(SercomTxn* txn)
 {
   if (txn == nullptr)
     return false;
+  if (_txnQueue.isFull())
+    return false;  // Queue full; caller must retry at runtime
   if (!_txnQueue.store(txn))
     return false;
   if (!_spi.active) {
@@ -443,13 +462,24 @@ SercomTxn* SERCOM::stopTransmissionSPI(void)
 SercomTxn* SERCOM::stopTransmissionSPI(SercomSpiError error)
 {
   SercomTxn* txn = nullptr;
-  if (_txnQueue.read(txn) && txn != nullptr)
-  {
-    _spi.active = false;
-    _spi.currentTxn = nullptr;
+  if (!_txnQueue.peek(txn) || txn == nullptr)
+    return nullptr;
+
+  // Call completion callback before deciding to dequeue
     if (txn->onComplete)
       txn->onComplete(txn->user, static_cast<int>(error));
+
+  // Check if callback wants to chain another phase
+  if (txn->chainNext) {
+    txn->chainNext = false; // reset for next iteration
+    startTransmissionSPI(); // restart with updated context, same queue slot
+    return txn;
   }
+
+  // Normal completion: dequeue and start next transaction
+  _txnQueue.read(txn);
+  _spi.active = false;
+  _spi.currentTxn = nullptr;
 
   SercomTxn* next = nullptr;
   if (_txnQueue.peek(next) && next)
@@ -816,6 +846,8 @@ bool SERCOM::enqueueWIRE(SercomTxn* txn)
 {
   if (txn == nullptr)
     return false;
+  if (_txnQueue.isFull())
+    return false;  // Queue full; caller must retry at runtime
   if (!_txnQueue.store(txn))
     return false;
   if (!_wire.active)
@@ -888,6 +920,13 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
   // Callbacks are expected to run in non-ISR context (main loop/PendSV).
   if (txn && txn->onComplete)
     txn->onComplete(txn->user, static_cast<int>(error));
+
+  // Allow multi-phase I2C transactions to chain without dequeuing.
+  if (isMasterWIRE() && txn && txn->chainNext) {
+    txn->chainNext = false; // reset for next iteration
+    startTransmissionWIRE();
+    return txn;
+  }
 
   if(isMasterWIRE())
     _txnQueue.read(txn); // remove the completed transaction from the queue
