@@ -124,6 +124,7 @@ class SPIClass {
   void onService(void);
   void waitForTransfer(void);
   bool isBusy(void);
+  SERCOM* getSercom(void) const { return _p_sercom; }
 
   // Transaction Functions
   void usingInterrupt(int interruptNumber);

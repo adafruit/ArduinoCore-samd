@@ -105,6 +105,7 @@ uint8_t TwoWire::requestFrom(uint8_t address, size_t quantity, bool stopBit, uin
   // Allocate fresh transaction from pool and copy loader data
   SercomTxn* txn = allocateTxn();
   *txn = loader;
+  txn->chainNext = false;
   
   // For async callbacks, pass txn as user so callback can access txn->rxPtr/length directly
   // For sync calls, pass 'this' so onTxnComplete can update txnStatus/txnDone
@@ -181,11 +182,15 @@ uint8_t TwoWire::endTransmission(bool stopBit, void (*onComplete)(void* user, in
   // Allocate a fresh transaction from the pool and copy staged data from loader
   SercomTxn* txn = allocateTxn();
   *txn = loader;  // Copy staged transaction data
+  txn->chainNext = false;
   
   // Set parameters that weren't known during beginTransmission/write
   txn->config = stopBit ? I2C_CFG_STOP : 0;
   txn->onComplete = onComplete ? onComplete : &TwoWire::onTxnComplete;
-  txn->user  = (user == nullptr) ? this : user;
+  if (onComplete)
+    txn->user = (user == nullptr) ? txn : user;
+  else
+    txn->user = this;
   
   awaitingAddressAck = true;
   txnDone = false;

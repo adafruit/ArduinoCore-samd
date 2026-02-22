@@ -319,8 +319,8 @@ SercomTxn* SERCOM::stopTransmissionUART(SercomUartError error)
     return nullptr;
 
   // Call completion callback before deciding to dequeue
-    if (txn->onComplete)
-      txn->onComplete(txn->user, static_cast<int>(error));
+  if (txn->onComplete)
+    txn->onComplete(txn->user, static_cast<int>(error));
 
   // Check if callback wants to chain another phase
   if (txn->chainNext) {
@@ -466,8 +466,8 @@ SercomTxn* SERCOM::stopTransmissionSPI(SercomSpiError error)
     return nullptr;
 
   // Call completion callback before deciding to dequeue
-    if (txn->onComplete)
-      txn->onComplete(txn->user, static_cast<int>(error));
+  if (txn->onComplete)
+    txn->onComplete(txn->user, static_cast<int>(error));
 
   // Check if callback wants to chain another phase
   if (txn->chainNext) {
