@@ -52,6 +52,9 @@ class Uart : public HardwareSerial
 
     operator bool() { return true; }
 
+    // Accessor for SERCOM peripheral (for direct async transaction enqueuing)
+    SERCOM* getSercom(void) const { return sercom; }
+
   private:
     SERCOM *sercom;
     RingBuffer rxBuffer;

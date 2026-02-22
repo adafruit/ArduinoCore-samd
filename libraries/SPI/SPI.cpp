@@ -258,6 +258,7 @@ void SPIClass::transfer(const void *txbuf, void *rxbuf, size_t count,
   txn->length = count;
   txn->onComplete = onComplete ? onComplete : &SPIClass::onTxnComplete;
   txn->user = onComplete ? user : this;
+  txn->chainNext = false;
   txnDone = false;
   txnStatus = 0;
 

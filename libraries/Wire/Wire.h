@@ -50,35 +50,35 @@ class TwoWire : public Stream
     // If onComplete is nullptr, this blocks for legacy sync behavior.
     // If onComplete is non-null, this enqueues and returns immediately (async).
     uint8_t endTransmission(bool stopBit = true,
-                            void (*onComplete)(void* user, int status) = nullptr,
-                            void* user = nullptr);
+                            void (*onComplete)(void *user, int status) = nullptr,
+                            void *user = nullptr);
 
     // If onComplete is nullptr, this blocks for legacy sync behavior.
     // If onComplete is non-null, this enqueues and returns immediately (async).
     // If rxBuffer is nullptr, the internal buffer is used; otherwise rxBuffer is used.
     uint8_t requestFrom(uint8_t address, size_t quantity, bool stopBit = true,
-                        uint8_t* rxBuffer = nullptr,
-                        void (*onComplete)(void* user, int status) = nullptr,
-                        void* user = nullptr);
+                        uint8_t *rxBuffer = nullptr,
+                        void (*onComplete)(void *user, int status) = nullptr,
+                        void *user = nullptr);
 
     size_t write(uint8_t data);
     // 3-arg write: when setExternal=true, data is used directly (zero-copy) and
     // quantity is treated as both length and capacity; subsequent write() calls return 0.
     // For streaming > WIRE_BUFFER_LENGTH or async usage, call setTxBuffer() before write()
     // on every transaction.
-    size_t write(const uint8_t * data, size_t quantity, bool setExternal = false);
+    size_t write(const uint8_t *data, size_t quantity, bool setExternal = false);
 
     virtual int available(void);
     virtual int read(void);
     virtual int peek(void);
     virtual void flush(void);
-    void onReceive(void(*)(int));
-    void onRequest(void(*)(void));
-    void setRxBuffer(uint8_t* buffer, size_t length);
-    void setTxBuffer(uint8_t* buffer, size_t length);
+    void onReceive(void (*)(int));
+    void onRequest(void (*)(void));
+    void setRxBuffer(uint8_t *buffer, size_t length);
+    void setTxBuffer(uint8_t *buffer, size_t length);
     void clearRxBuffer(void);
     void resetRxBuffer(void);
-    uint8_t* getRxBuffer(void);
+    uint8_t *getRxBuffer(void);
     size_t getRxLength(void) const;
     inline SERCOM *getSercom(void) { return sercom; }
     inline const SERCOM *getSercom(void) const { return sercom; }
@@ -92,7 +92,7 @@ class TwoWire : public Stream
     inline void onService(void);
 
   private:
-    SERCOM * sercom;
+    SERCOM *sercom;
     uint8_t _uc_pinSDA;
     uint8_t _uc_pinSCL;
 
@@ -102,7 +102,7 @@ class TwoWire : public Stream
     static constexpr size_t WIRE_BUFFER_LENGTH = 255;
     uint8_t rxBuffer[WIRE_BUFFER_LENGTH];
     uint8_t txBuffer[WIRE_BUFFER_LENGTH];
-    uint8_t* rxBufferPtr;
+    uint8_t *rxBufferPtr;
     size_t rxBufferCapacity;
     size_t rxLength;
     size_t rxIndex;
@@ -114,22 +114,22 @@ class TwoWire : public Stream
     bool pendingReceive;
     int pendingReceiveLength;
     SercomTxn slaveTxn;
-    SercomTxn loader;  // Staging area for building transactions
+    SercomTxn loader; // Staging area for building transactions
     
     // Transaction pool for async operations (matches SERCOM queue depth)
     static constexpr size_t TXN_POOL_SIZE = 8;
     SercomTxn txnPool[TXN_POOL_SIZE];
     uint8_t txnPoolHead;
     
-    SercomTxn* allocateTxn();
-    void freeTxn(SercomTxn* txn);
+    SercomTxn *allocateTxn();
+    void freeTxn(SercomTxn *txn);
 
     // Callback user functions
     void (*onRequestCallback)(void);
     void (*onReceiveCallback)(int);
 
-    static void onTxnComplete(void* user, int status);
-    static void onDeferredReceive(void* user, int length);
+    static void onTxnComplete(void *user, int status);
+    static void onDeferredReceive(void *user, int length);
 
     // TWI clock frequency
     static const uint32_t TWI_CLOCK = 100000;
@@ -174,7 +174,7 @@ inline void TwoWire::onService(void)
   }
 
   if (isMaster) {
-    SercomTxn* txn = sercom->getCurrentTxnWIRE();
+    SercomTxn *txn = sercom->getCurrentTxnWIRE();
     if (!txn) {
       sercom->clearINTFLAG();
       return;
@@ -222,7 +222,7 @@ inline void TwoWire::onService(void)
   }
   else {
     if (flags & SERCOM_I2CS_INTFLAG_ERROR) {
-      SercomWireError err = SercomWireError::UNKNOWN_ERROR;;
+      SercomWireError err = SercomWireError::UNKNOWN_ERROR;
 
       if (status & SERCOM_I2CS_STATUS_BUSERR)
         err = SercomWireError::BUS_ERROR;
@@ -239,14 +239,14 @@ inline void TwoWire::onService(void)
     }
 
     // To avoid unnecessary clock cycles for register reads, avoid using inline getters
-    bool isMasterRead = (status & SERCOM_I2CS_STATUS_DIR);  // Master Read / Slave Transmit
-    bool sr = (status & SERCOM_I2CS_STATUS_SR);             // Repeated Start detected
-    bool prec = (flags & SERCOM_I2CS_INTFLAG_PREC);         // Stop detected
-    bool amatch = (flags & SERCOM_I2CS_INTFLAG_AMATCH);     // Address Match detected
-    bool drdy = (flags & SERCOM_I2CS_INTFLAG_DRDY);         // Data Ready detected
+    bool isMasterRead = (status & SERCOM_I2CS_STATUS_DIR); // Master Read / Slave Transmit
+    bool sr = (status & SERCOM_I2CS_STATUS_SR);            // Repeated Start detected
+    bool prec = (flags & SERCOM_I2CS_INTFLAG_PREC);        // Stop detected
+    bool amatch = (flags & SERCOM_I2CS_INTFLAG_AMATCH);    // Address Match detected
+    bool drdy = (flags & SERCOM_I2CS_INTFLAG_DRDY);        // Data Ready detected
         
     // Stop or Restart detected - defer receive callback
-    if(prec || (amatch && sr && !isMasterRead))
+    if (prec || (amatch && sr && !isMasterRead))
     {
       pendingReceive = true;
       pendingReceiveLength = available();
@@ -256,14 +256,14 @@ inline void TwoWire::onService(void)
     
     // Address Match - setup transaction
     // AACKEN enabled: address ACK is automatic, no manual ACK/clear needed
-    else if(amatch)
+    else if (amatch)
     {
-      if(isMasterRead) // Master Read / Slave TX
+      if (isMasterRead) // Master Read / Slave TX
       {
         // onRequestCallback runs in ISR context here. Deferring to PendSV
         // would require stalling DRDY or returning 0xFF until the buffer is filled.
         // onRequestCallback is what will set TwoWire::slaveTxn for the transaction.
-        if(onRequestCallback)
+        if (onRequestCallback)
           onRequestCallback();
         
         // Ensure callback actually set slaveTxn.length; if not, stall with 0-length txn
@@ -298,7 +298,7 @@ inline void TwoWire::onService(void)
     }
 
     // Data Ready - handle byte transfer
-    if(drdy)
+    if (drdy)
     {
       isMasterRead ? sercom->sendDataWIRE() : sercom->readDataWIRE();
 
