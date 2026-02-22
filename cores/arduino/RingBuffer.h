@@ -22,6 +22,7 @@
 #define _RING_BUFFER_
 
 #include <stdint.h>
+#include <type_traits>
 
 // Define constants and variables for buffering incoming serial data.  We're
 // using a ring buffer (I think), in which head is the index of the location
@@ -32,16 +33,19 @@
 #define SERIAL_BUFFER_SIZE 350
 #endif
 
-template <int N>
+template <int N, typename T = uint8_t>
 class RingBufferN
 {
   public:
-    uint8_t _aucBuffer[N] ;
+    T _aucBuffer[N] ;
     volatile int _iHead ;
     volatile int _iTail ;
 
   public:
     RingBufferN( void ) ;
+    bool store( const T& c ) ;
+    bool read( T& out ) ;
+    bool peek( T& out ) const ;
     void store_char( uint8_t c ) ;
     void clear();
     int read_char();
@@ -57,15 +61,16 @@ class RingBufferN
 typedef RingBufferN<SERIAL_BUFFER_SIZE> RingBuffer;
 
 
-template <int N>
-RingBufferN<N>::RingBufferN( void )
+template <int N, typename T>
+RingBufferN<N, T>::RingBufferN( void )
 {
-    memset( _aucBuffer, 0, N ) ;
+    for (int i = 0; i < N; ++i)
+      _aucBuffer[i] = T{};
     clear();
 }
 
-template <int N>
-void RingBufferN<N>::store_char( uint8_t c )
+template <int N, typename T>
+bool RingBufferN<N, T>::store( const T& c )
 {
   int i = nextIndex(_iHead);
 
@@ -77,30 +82,58 @@ void RingBufferN<N>::store_char( uint8_t c )
   {
     _aucBuffer[_iHead] = c ;
     _iHead = i ;
+    return true;
   }
+  return false;
 }
 
-template <int N>
-void RingBufferN<N>::clear()
+template <int N, typename T>
+bool RingBufferN<N, T>::read( T& out )
+{
+  if(_iTail == _iHead)
+    return false;
+
+  out = _aucBuffer[_iTail];
+  _iTail = nextIndex(_iTail);
+  return true;
+}
+
+template <int N, typename T>
+bool RingBufferN<N, T>::peek( T& out ) const
+{
+  if(_iTail == _iHead)
+    return false;
+
+  out = _aucBuffer[_iTail];
+  return true;
+}
+
+template <int N, typename T>
+void RingBufferN<N, T>::store_char( uint8_t c )
+{
+  static_assert(std::is_same<T, uint8_t>::value, "store_char only valid for uint8_t buffers");
+  (void)store(static_cast<T>(c));
+}
+
+template <int N, typename T>
+void RingBufferN<N, T>::clear()
 {
   _iHead = 0;
   _iTail = 0;
 }
 
-template <int N>
-int RingBufferN<N>::read_char()
+template <int N, typename T>
+int RingBufferN<N, T>::read_char()
 {
-  if(_iTail == _iHead)
+  static_assert(std::is_same<T, uint8_t>::value, "read_char only valid for uint8_t buffers");
+  uint8_t value;
+  if (!read(value))
     return -1;
-
-  uint8_t value = _aucBuffer[_iTail];
-  _iTail = nextIndex(_iTail);
-
   return value;
 }
 
-template <int N>
-int RingBufferN<N>::available()
+template <int N, typename T>
+int RingBufferN<N, T>::available()
 {
   int delta = _iHead - _iTail;
 
@@ -110,8 +143,8 @@ int RingBufferN<N>::available()
     return delta;
 }
 
-template <int N>
-int RingBufferN<N>::availableForStore()
+template <int N, typename T>
+int RingBufferN<N, T>::availableForStore()
 {
   if (_iHead >= _iTail)
     return N - 1 - _iHead + _iTail;
@@ -119,23 +152,25 @@ int RingBufferN<N>::availableForStore()
     return _iTail - _iHead - 1;
 }
 
-template <int N>
-int RingBufferN<N>::peek()
+template <int N, typename T>
+int RingBufferN<N, T>::peek()
 {
-  if(_iTail == _iHead)
+  static_assert(std::is_same<T, uint8_t>::value, "peek() only valid for uint8_t buffers");
+  uint8_t value;
+  if (!peek(value))
     return -1;
 
-  return _aucBuffer[_iTail];
+  return value;
 }
 
-template <int N>
-int RingBufferN<N>::nextIndex(int index)
+template <int N, typename T>
+int RingBufferN<N, T>::nextIndex(int index)
 {
   return (uint32_t)(index + 1) % N;
 }
 
-template <int N>
-bool RingBufferN<N>::isFull()
+template <int N, typename T>
+bool RingBufferN<N, T>::isFull()
 {
   return (nextIndex(_iHead) == _iTail);
 }
