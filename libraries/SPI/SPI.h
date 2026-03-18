@@ -21,7 +21,7 @@
 #define _SPI_H_INCLUDED
 
 #include <Arduino.h>
-#include <Adafruit_ZeroDMA.h>
+#include "SERCOM.h"
 
 // SPI_HAS_TRANSACTION means SPI has
 //   - beginTransaction()
@@ -42,8 +42,8 @@
   // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
   // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
   // this affects ALL SPI peripherals including some that should NOT be
-  // changed (e.g. anything using SD card). Use the setClockSource()
-  // function instead. This is left here for compatibility with interim code.
+  // changed (e.g. anything using SD card). Configure SERCOM clock source
+  // directly via the SERCOM API instead. This is left here for compatibility.
   #if !defined(MAX_SPI)
     #define MAX_SPI 24000000
   #endif
@@ -118,9 +118,13 @@ class SPIClass {
   uint16_t transfer16(uint16_t data);
   void transfer(void *buf, size_t count);
   void transfer(const void* txbuf, void* rxbuf, size_t count,
-         bool block = true);
+         bool block = true,
+         void (*onComplete)(void* user, int status) = nullptr,
+         void* user = nullptr);
+  void onService(void);
   void waitForTransfer(void);
   bool isBusy(void);
+  SERCOM* getSercom(void) const { return _p_sercom; }
 
   // Transaction Functions
   void usingInterrupt(int interruptNumber);
@@ -139,20 +143,6 @@ class SPIClass {
   void setDataMode(uint8_t uc_mode);
   void setClockDivider(uint8_t uc_div);
 
-  // SERCOM lookup functions are available on both SAMD51 and 21.
-  volatile uint32_t *getDataRegister(void);
-  int getDMAC_ID_TX(void);
-  int getDMAC_ID_RX(void);
-  uint8_t getSercomIndex(void) { return _p_sercom->getSercomIndex(); };
-#if defined(__SAMD51__)
-  // SERCOM clock source override is available only on SAMD51.
-  void setClockSource(SercomClockSource clk);
-#else
-  // On SAMD21, this compiles to nothing, so user code doesn't need to
-  // check and conditionally compile lines for different architectures.
-  void setClockSource(SercomClockSource clk) { (void)clk; };
-#endif // end __SAMD51__
-
   private:
   void config(SPISettings settings);
 
@@ -169,17 +159,16 @@ class SPIClass {
   char interruptSave;
   uint32_t interruptMask;
 
-  // transfer(txbuf, rxbuf, count, block) uses DMA when possible
-  Adafruit_ZeroDMA readChannel;
-  Adafruit_ZeroDMA writeChannel;
-  DmacDescriptor  *firstReadDescriptor   = NULL;  // List entry point
-  DmacDescriptor  *firstWriteDescriptor  = NULL;
-  DmacDescriptor  *extraReadDescriptors  = NULL;  // Add'l descriptors
-  DmacDescriptor  *extraWriteDescriptors = NULL;
-  bool             use_dma               = false; // true on successful alloc
-  volatile bool    dma_busy              = false;
-  void             dmaAllocate(void);
-  static void      dmaCallback(Adafruit_ZeroDMA *dma);
+  volatile bool    txnDone               = false;
+  volatile int     txnStatus             = 0;
+  
+  // Transaction pool for async operations (matches SERCOM queue depth)
+  static constexpr size_t TXN_POOL_SIZE = 8;
+  SercomTxn txnPool[TXN_POOL_SIZE];
+  uint8_t txnPoolHead;
+  
+  SercomTxn* allocateTxn();
+  static void      onTxnComplete(void* user, int status);
 };
 
 #if SPI_INTERFACES_COUNT > 0

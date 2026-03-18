@@ -174,6 +174,7 @@ SERCOM sercom5(SERCOM5);
 #if defined(USE_BQ24195L_PMIC)
 
 #include "wiring_private.h"
+#include "SERCOM_Txn.h"
 
 #define PMIC_ADDRESS  0x6B
 #define PMIC_REG01    0x01
@@ -185,12 +186,17 @@ static inline void enable_battery_charging() {
   pinPeripheral(PIN_WIRE_SDA, g_APinDescription[PIN_WIRE_SDA].ulPinType);
   pinPeripheral(PIN_WIRE_SCL, g_APinDescription[PIN_WIRE_SCL].ulPinType);
 
-  PERIPH_WIRE.startTransmissionWIRE( PMIC_ADDRESS, WIRE_WRITE_FLAG );
-  PERIPH_WIRE.sendDataMasterWIRE(PMIC_REG01);
-  PERIPH_WIRE.sendDataMasterWIRE(0x1B); // Charge Battery + Minimum System Voltage 3.5V
-  PERIPH_WIRE.prepareCommandBitsWire(WIRE_MASTER_ACT_STOP);
+  static SercomTxn txn;
+  static uint8_t txData[2] = {PMIC_REG01, 0x1B}; // Charge Battery + Minimum System Voltage 3.5V
 
-  PERIPH_WIRE.disableWIRE();
+  txn = SercomTxn{};
+  txn.config = I2C_CFG_STOP;
+  txn.address = PMIC_ADDRESS;
+  txn.length = 2;
+  txn.txPtr = txData;
+  
+  PERIPH_WIRE.enqueueWIRE(&txn);
+  PERIPH_WIRE.startTransmissionWIRE();
 }
 
 static inline void disable_battery_fet(bool disabled) {
@@ -199,14 +205,21 @@ static inline void disable_battery_fet(bool disabled) {
   pinPeripheral(PIN_WIRE_SDA, g_APinDescription[PIN_WIRE_SDA].ulPinType);
   pinPeripheral(PIN_WIRE_SCL, g_APinDescription[PIN_WIRE_SCL].ulPinType);
 
-  PERIPH_WIRE.startTransmissionWIRE( PMIC_ADDRESS, WIRE_WRITE_FLAG );
-  PERIPH_WIRE.sendDataMasterWIRE(PMIC_REG07);
+  static SercomTxn txn;
+  static uint8_t txData[2];
+  txData[0] = PMIC_REG07;
   // No D+/D– detection + Safety timer not slowed by 2X during input DPM or thermal regulation +
   // BAT fet disabled/enabled + charge and bat fault INT
-  PERIPH_WIRE.sendDataMasterWIRE(0x0B | (disabled ? 0x20 : 0x00));
-  PERIPH_WIRE.prepareCommandBitsWire(WIRE_MASTER_ACT_STOP);
+  txData[1] = 0x0B | (disabled ? 0x20 : 0x00);
 
-  PERIPH_WIRE.disableWIRE();
+  txn = SercomTxn{};
+  txn.config = I2C_CFG_STOP;
+  txn.address = PMIC_ADDRESS;
+  txn.length = 2;
+  txn.txPtr = txData;
+  
+  PERIPH_WIRE.enqueueWIRE(&txn);
+  PERIPH_WIRE.startTransmissionWIRE();
 }
 
 #endif

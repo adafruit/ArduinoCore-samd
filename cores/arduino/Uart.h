@@ -36,13 +36,24 @@ class Uart : public HardwareSerial
     int availableForWrite();
     int peek();
     int read();
+    size_t read(uint8_t* buffer, size_t size,
+                void (*onComplete)(void* user, int status) = nullptr,
+                void* user = nullptr);
     void flush();
     size_t write(const uint8_t data);
+    // If onComplete is nullptr, blocks (sync); otherwise enqueues and returns (async)
+    // Transparently uses DMA when available, falls back to byte-by-byte otherwise
+    size_t write(const uint8_t* buffer, size_t size,
+                 void (*onComplete)(void* user, int status) = nullptr,
+                 void* user = nullptr);
     using Print::write; // pull in write(str) and write(buf, size) from Print
 
     void IrqHandler();
 
     operator bool() { return true; }
+
+    // Accessor for SERCOM peripheral (for direct async transaction enqueuing)
+    SERCOM* getSercom(void) const { return sercom; }
 
   private:
     SERCOM *sercom;
@@ -58,6 +69,20 @@ class Uart : public HardwareSerial
     volatile uint32_t* pul_outclrRTS;
     uint32_t ul_pinMaskRTS;
     uint8_t uc_pinCTS;
+
+    volatile bool txnDone = false;
+    volatile int txnStatus = 0;
+    
+    // Transaction pool for async operations (matches SERCOM queue depth)
+    static constexpr size_t TXN_POOL_SIZE = 8;
+    SercomTxn txnPool[TXN_POOL_SIZE];
+    uint8_t txnPoolHead = 0;
+    
+    SercomTxn* allocateTxn();
+    static void onTxnComplete(void* user, int status);
+    bool rxExternalActive = false;
+    void (*pendingRxCb)(void* user, int status) = nullptr;
+    void* pendingRxUser = nullptr;
 
     SercomNumberStopBit extractNbStopBit(uint16_t config);
     SercomUartCharSize extractCharSize(uint16_t config);
