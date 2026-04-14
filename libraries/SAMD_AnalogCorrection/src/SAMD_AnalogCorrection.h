@@ -18,7 +18,4 @@
 
 #pragma once
 
-#include <Arduino.h>
-
-void analogReadCorrection (int offset, uint16_t gain);
-
+#include <ADC.h>
