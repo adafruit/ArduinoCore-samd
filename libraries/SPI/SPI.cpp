@@ -33,6 +33,47 @@
 
 const SPISettings DEFAULT_SPI_SETTINGS = SPISettings();
 
+namespace sercomPinMux {
+bool spiMosiPinValidForRoute(uint8_t arduinoPin, uint8_t sercomIndex,
+                             uint8_t mosiPad) {
+  if (arduinoPin >= PINS_COUNT || mosiPad > 3)
+    return false;
+
+  const char portLetter =
+      static_cast<char>('A' + g_APinDescription[arduinoPin].ulPort);
+  const uint8_t portPin =
+      static_cast<uint8_t>(g_APinDescription[arduinoPin].ulPin);
+
+#define SERCOM_PINMUX_EMIT_SPI 1
+#define SERCOM_SPI_PIN(PORT_LETTER, PORT_PIN, S0, P0, S1, P1)                   \
+  if ((portLetter == (PORT_LETTER)) && (portPin == (PORT_PIN)) &&               \
+      (((S0) == sercomIndex && (P0) == mosiPad) ||                              \
+       ((S1) == sercomIndex && (P1) == mosiPad)))                               \
+    return true;
+#include <SercomPinMux.inc>
+#undef SERCOM_SPI_PIN
+#undef SERCOM_PINMUX_EMIT_SPI
+
+  return false;
+}
+} // namespace sercomPinMux
+
+namespace {
+static uint8_t spiMosiPadFromTxPad(SercomSpiTXPad txPad) {
+  switch (txPad) {
+    case SPI_PAD_0_SCK_1:
+    case SPI_PAD_0_SCK_3:
+      return 0;
+    case SPI_PAD_2_SCK_3:
+      return 2;
+    case SPI_PAD_3_SCK_1:
+      return 3;
+    default:
+      return 255;
+  }
+}
+} // namespace
+
 SPIClass::SPIClass(SERCOM *p_sercom, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint8_t uc_pinMOSI, SercomSpiTXPad PadTx, SercomRXPad PadRx)
 {
   initialized = false;
@@ -52,7 +93,7 @@ SPIClass::SPIClass(SERCOM *p_sercom, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint
   txnPoolHead = 0;
 }
 
-void SPIClass::begin()
+bool SPIClass::begin()
 {
   if(!initialized) {
     interruptMode = SPI_IMODE_NONE;
@@ -66,11 +107,17 @@ void SPIClass::begin()
 #endif
 
   // PIO init
+  const uint8_t sercomIndex = static_cast<uint8_t>(_p_sercom->getSercomIndex());
+  const uint8_t mosiPad = spiMosiPadFromTxPad(_padTx);
+  if (!sercomPinMux::spiMosiPinValidForRoute(_uc_pinMosi, sercomIndex, mosiPad))
+    return false;
+
   pinPeripheral(_uc_pinMiso, g_APinDescription[_uc_pinMiso].ulPinType);
   pinPeripheral(_uc_pinSCK, g_APinDescription[_uc_pinSCK].ulPinType);
   pinPeripheral(_uc_pinMosi, g_APinDescription[_uc_pinMosi].ulPinType);
 
   config(DEFAULT_SPI_SETTINGS);
+  return true;
 }
 
 void SPIClass::config(SPISettings settings)
@@ -368,7 +415,7 @@ void SPIClass::detachInterrupt() {
   void SPI_IT_HANDLER(void) __attribute__ ((weak));
   void SPI_IT_HANDLER(void) { SPI.onService(); }
 
-  #if defined(__SAMD51__)
+  #ifdef FAMILY_SAMD5X
     #ifndef SPI_IT_HANDLER_0
       #define SPI_IT_HANDLER_0 SERCOM4_0_Handler
       #define SPI_IT_HANDLER_1 SERCOM4_1_Handler
@@ -388,12 +435,7 @@ void SPIClass::detachInterrupt() {
 #if SPI_INTERFACES_COUNT > 1
   SPIClass SPI1(&PERIPH_SPI1, PIN_SPI1_MISO, PIN_SPI1_SCK, PIN_SPI1_MOSI, PAD_SPI1_TX, PAD_SPI1_RX);
 
-  #if defined(SPI1_IT_HANDLER)
-    void SPI1_IT_HANDLER(void) __attribute__ ((weak));
-    void SPI1_IT_HANDLER(void) { SPI1.onService(); }
-  #endif
-
-  #if defined(__SAMD51__) && defined(SPI1_IT_HANDLER_0)
+  #ifdef FAMILY_SAMD5X
     void SPI1_IT_HANDLER_0(void) __attribute__ ((weak));
     void SPI1_IT_HANDLER_1(void) __attribute__ ((weak));
     void SPI1_IT_HANDLER_2(void) __attribute__ ((weak));
@@ -402,61 +444,76 @@ void SPIClass::detachInterrupt() {
     void SPI1_IT_HANDLER_1(void) { SPI1.onService(); }
     void SPI1_IT_HANDLER_2(void) { SPI1.onService(); }
     void SPI1_IT_HANDLER_3(void) { SPI1.onService(); }
+  #else
+    void SPI1_IT_HANDLER(void) __attribute__ ((weak));
+    void SPI1_IT_HANDLER(void) { SPI1.onService(); }
   #endif
 #endif
 #if SPI_INTERFACES_COUNT > 2
   SPIClass SPI2(&PERIPH_SPI2, PIN_SPI2_MISO, PIN_SPI2_SCK, PIN_SPI2_MOSI, PAD_SPI2_TX, PAD_SPI2_RX);
 
-  #if defined(SPI2_IT_HANDLER)
-    void SPI2_IT_HANDLER(void) { SPI2.onService(); }
-  #endif
-
-  #if defined(__SAMD51__) && defined(SPI2_IT_HANDLER_0)
+  #ifdef FAMILY_SAMD5X
+    void SPI2_IT_HANDLER_0(void) __attribute__ ((weak));
+    void SPI2_IT_HANDLER_1(void) __attribute__ ((weak));
+    void SPI2_IT_HANDLER_2(void) __attribute__ ((weak));
+    void SPI2_IT_HANDLER_3(void) __attribute__ ((weak));
     void SPI2_IT_HANDLER_0(void) { SPI2.onService(); }
     void SPI2_IT_HANDLER_1(void) { SPI2.onService(); }
     void SPI2_IT_HANDLER_2(void) { SPI2.onService(); }
     void SPI2_IT_HANDLER_3(void) { SPI2.onService(); }
+  #else
+    void SPI2_IT_HANDLER(void) __attribute__ ((weak));
+    void SPI2_IT_HANDLER(void) { SPI2.onService(); }
   #endif
 #endif
 #if SPI_INTERFACES_COUNT > 3
   SPIClass SPI3(&PERIPH_SPI3, PIN_SPI3_MISO, PIN_SPI3_SCK, PIN_SPI3_MOSI, PAD_SPI3_TX, PAD_SPI3_RX);
 
-  #if defined(SPI3_IT_HANDLER)
-    void SPI3_IT_HANDLER(void) { SPI3.onService(); }
-  #endif
-
-  #if defined(__SAMD51__) && defined(SPI3_IT_HANDLER_0)
+  #ifdef FAMILY_SAMD5X
+    void SPI3_IT_HANDLER_0(void) __attribute__ ((weak));
+    void SPI3_IT_HANDLER_1(void) __attribute__ ((weak));
+    void SPI3_IT_HANDLER_2(void) __attribute__ ((weak));
+    void SPI3_IT_HANDLER_3(void) __attribute__ ((weak));
     void SPI3_IT_HANDLER_0(void) { SPI3.onService(); }
     void SPI3_IT_HANDLER_1(void) { SPI3.onService(); }
     void SPI3_IT_HANDLER_2(void) { SPI3.onService(); }
     void SPI3_IT_HANDLER_3(void) { SPI3.onService(); }
+  #else
+    void SPI3_IT_HANDLER(void) __attribute__ ((weak));
+    void SPI3_IT_HANDLER(void) { SPI3.onService(); }
   #endif
 #endif
 #if SPI_INTERFACES_COUNT > 4
   SPIClass SPI4(&PERIPH_SPI4, PIN_SPI4_MISO, PIN_SPI4_SCK, PIN_SPI4_MOSI, PAD_SPI4_TX, PAD_SPI4_RX);
 
-  #if defined(SPI4_IT_HANDLER)
-    void SPI4_IT_HANDLER(void) { SPI4.onService(); }
-  #endif
-
-  #if defined(__SAMD51__) && defined(SPI4_IT_HANDLER_0)
+  #ifdef FAMILY_SAMD5X
+    void SPI4_IT_HANDLER_0(void) __attribute__ ((weak));
+    void SPI4_IT_HANDLER_1(void) __attribute__ ((weak));
+    void SPI4_IT_HANDLER_2(void) __attribute__ ((weak));
+    void SPI4_IT_HANDLER_3(void) __attribute__ ((weak));
     void SPI4_IT_HANDLER_0(void) { SPI4.onService(); }
     void SPI4_IT_HANDLER_1(void) { SPI4.onService(); }
     void SPI4_IT_HANDLER_2(void) { SPI4.onService(); }
     void SPI4_IT_HANDLER_3(void) { SPI4.onService(); }
+  #else
+    void SPI4_IT_HANDLER(void) __attribute__ ((weak));
+    void SPI4_IT_HANDLER(void) { SPI4.onService(); }
   #endif
 #endif
 #if SPI_INTERFACES_COUNT > 5
   SPIClass SPI5(&PERIPH_SPI5, PIN_SPI5_MISO, PIN_SPI5_SCK, PIN_SPI5_MOSI, PAD_SPI5_TX, PAD_SPI5_RX);
 
-  #if defined(SPI5_IT_HANDLER)
-    void SPI5_IT_HANDLER(void) { SPI5.onService(); }
-  #endif
-
-  #if defined(__SAMD51__) && defined(SPI5_IT_HANDLER_0)
+  #ifdef FAMILY_SAMD5X
+    void SPI5_IT_HANDLER_0(void) __attribute__ ((weak));
+    void SPI5_IT_HANDLER_1(void) __attribute__ ((weak));
+    void SPI5_IT_HANDLER_2(void) __attribute__ ((weak));
+    void SPI5_IT_HANDLER_3(void) __attribute__ ((weak));
     void SPI5_IT_HANDLER_0(void) { SPI5.onService(); }
     void SPI5_IT_HANDLER_1(void) { SPI5.onService(); }
     void SPI5_IT_HANDLER_2(void) { SPI5.onService(); }
     void SPI5_IT_HANDLER_3(void) { SPI5.onService(); }
+  #else
+    void SPI5_IT_HANDLER(void) __attribute__ ((weak));
+    void SPI5_IT_HANDLER(void) { SPI5.onService(); }
   #endif
 #endif

@@ -38,16 +38,16 @@
 #define SPI_MODE2 0x03
 #define SPI_MODE3 0x01
 
-#if defined(__SAMD51__)
-  // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
-  // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
-  // this affects ALL SPI peripherals including some that should NOT be
-  // changed (e.g. anything using SD card). Configure SERCOM clock source
-  // directly via the SERCOM API instead. This is left here for compatibility.
-  #if !defined(MAX_SPI)
-    #define MAX_SPI 24000000
-  #endif
-  #define SPI_MIN_CLOCK_DIVIDER 1
+#ifdef FAMILY_SAMD5X
+// SAMD51 has configurable MAX_SPI, else use peripheral clock default.
+// Update: changing MAX_SPI via compiler flags is DEPRECATED, because
+// this affects ALL SPI peripherals including some that should NOT be
+// changed (e.g. anything using SD card). Configure SERCOM clock source
+// directly via the SERCOM API instead. This is left here for compatibility.
+#if !defined(MAX_SPI)
+#define MAX_SPI 24000000
+#endif
+#define SPI_MIN_CLOCK_DIVIDER 1
 #else
   // The datasheet specifies a typical SPI SCK period (tSCK) of 42 ns,
   // see "Table 36-48. SPI Timing Characteristics and Requirements",
@@ -80,7 +80,7 @@ class SPISettings {
   }
 
   void init_AlwaysInline(uint32_t clock, BitOrder bitOrder, uint8_t dataMode) __attribute__((__always_inline__)) {
-#if defined(__SAMD51__)
+#ifdef FAMILY_SAMD5X
     this->clockFreq = clock; // Clipping handled in SERCOM.cpp
 #else
     this->clockFreq = clock >= MAX_SPI ? MAX_SPI : clock;
@@ -136,7 +136,7 @@ class SPIClass {
   void attachInterrupt();
   void detachInterrupt();
 
-  void begin();
+  bool begin();
   void end();
 
   void setBitOrder(BitOrder order);
@@ -159,8 +159,8 @@ class SPIClass {
   char interruptSave;
   uint32_t interruptMask;
 
-  volatile bool    txnDone               = false;
-  volatile int     txnStatus             = 0;
+  volatile bool txnDone = false;
+  volatile int txnStatus = 0;
   
   // Transaction pool for async operations (matches SERCOM queue depth)
   static constexpr size_t TXN_POOL_SIZE = 8;
@@ -168,7 +168,7 @@ class SPIClass {
   uint8_t txnPoolHead;
   
   SercomTxn* allocateTxn();
-  static void      onTxnComplete(void* user, int status);
+  static void onTxnComplete(void* user, int status);
 };
 
 #if SPI_INTERFACES_COUNT > 0

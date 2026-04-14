@@ -40,9 +40,9 @@ class TwoWire : public Stream
 {
 public:
   TwoWire(SERCOM *s, uint8_t pinSDA, uint8_t pinSCL);
-  void begin();
-  void begin(uint8_t, bool enableGeneralCall = false);
-  void begin(uint16_t, bool enableGeneralCall, uint8_t speed = 0x0,
+  bool begin();
+  bool begin(uint8_t, bool enableGeneralCall = false);
+  bool begin(uint16_t, bool enableGeneralCall, uint8_t speed = 0x0,
              bool enable10Bit = false);
   void end();
   void setClock(uint32_t);

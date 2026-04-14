@@ -20,6 +20,7 @@
 #define _SERCOM_CLASS_
 
 #include "sam.h"
+#include "SERCOM_PinMux.h"
 #include "SERCOM_Txn.h"
 #include "RingBuffer.h"
 #include <array>

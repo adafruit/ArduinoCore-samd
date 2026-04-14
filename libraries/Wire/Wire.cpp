@@ -31,6 +31,29 @@ extern "C" {
 
 #include "Wire.h"
 
+namespace sercomPinMux {
+bool wirePinValidForSercom(uint8_t arduinoPin, uint8_t sercomIndex) {
+  if (arduinoPin >= PINS_COUNT)
+    return false;
+
+  const char portLetter =
+      static_cast<char>('A' + g_APinDescription[arduinoPin].ulPort);
+  const uint8_t portPin =
+      static_cast<uint8_t>(g_APinDescription[arduinoPin].ulPin);
+
+#define SERCOM_PINMUX_EMIT_I2C 1
+#define SERCOM_I2C_PIN(PORT_LETTER, PORT_PIN, S0, P0, S1, P1)                  \
+  if ((portLetter == (PORT_LETTER)) && (portPin == (PORT_PIN)) &&              \
+      (((S0) == sercomIndex) || ((S1) == sercomIndex)))                        \
+    return true;
+#include <SercomPinMux.inc>
+#undef SERCOM_I2C_PIN
+#undef SERCOM_PINMUX_EMIT_I2C
+
+  return false;
+}
+} // namespace sercomPinMux
+
 TwoWire::TwoWire(SERCOM * s, uint8_t pinSDA, uint8_t pinSCL)
 {
   this->sercom = s;
@@ -51,27 +74,40 @@ TwoWire::TwoWire(SERCOM * s, uint8_t pinSDA, uint8_t pinSCL)
   txnPoolHead = 0;
 }
 
-void TwoWire::begin(void) {
+bool TwoWire::begin(void) {
   //Master Mode
+  const uint8_t sercomIndex = static_cast<uint8_t>(sercom->getSercomIndex());
+  if (!sercomPinMux::wirePinValidForSercom(_uc_pinSDA, sercomIndex) ||
+      !sercomPinMux::wirePinValidForSercom(_uc_pinSCL, sercomIndex))
+    return false;
+
   pinPeripheral(_uc_pinSDA, g_APinDescription[_uc_pinSDA].ulPinType);
   pinPeripheral(_uc_pinSCL, g_APinDescription[_uc_pinSCL].ulPinType);
 
   sercom->initMasterWIRE(TWI_CLOCK);
   sercom->enableWIRE();
+  return true;
 }
 
-void TwoWire::begin(uint16_t address, bool enableGeneralCall, uint8_t speed, bool enable10Bit) {
+bool TwoWire::begin(uint16_t address, bool enableGeneralCall, uint8_t speed,
+                    bool enable10Bit) {
   //Slave mode
+  const uint8_t sercomIndex = static_cast<uint8_t>(sercom->getSercomIndex());
+  if (!sercomPinMux::wirePinValidForSercom(_uc_pinSDA, sercomIndex) ||
+      !sercomPinMux::wirePinValidForSercom(_uc_pinSCL, sercomIndex))
+    return false;
+
   pinPeripheral(_uc_pinSDA, g_APinDescription[_uc_pinSDA].ulPinType);
   pinPeripheral(_uc_pinSCL, g_APinDescription[_uc_pinSCL].ulPinType);
 
   sercom->initSlaveWIRE(address, enableGeneralCall, speed, enable10Bit);
   sercom->enableWIRE();
   sercom->registerReceiveWIRE(&TwoWire::onDeferredReceive, this);
+  return true;
 }
 
-void TwoWire::begin(uint8_t address, bool enableGeneralCall) {
-  begin(static_cast<uint16_t>(address), enableGeneralCall);
+bool TwoWire::begin(uint8_t address, bool enableGeneralCall) {
+  return begin(static_cast<uint16_t>(address), enableGeneralCall);
 }
 
 void TwoWire::setClock(uint32_t baudrate) {
@@ -431,85 +467,75 @@ void TwoWire::onDeferredReceive(void* user, int length)
     Wire.onService();
   }
 
-  #if defined(__SAMD51__)
-    void WIRE_IT_HANDLER_0(void) { Wire.onService(); }
-    void WIRE_IT_HANDLER_1(void) { Wire.onService(); }
-    void WIRE_IT_HANDLER_2(void) { Wire.onService(); }
-    void WIRE_IT_HANDLER_3(void) { Wire.onService(); }
-  #endif // __SAMD51__
+#ifdef FAMILY_SAMD5X
+  void WIRE_IT_HANDLER_0(void) { Wire.onService(); }
+  void WIRE_IT_HANDLER_1(void) { Wire.onService(); }
+  void WIRE_IT_HANDLER_2(void) { Wire.onService(); }
+  void WIRE_IT_HANDLER_3(void) { Wire.onService(); }
+#endif // FAMILY_SAMD5X
 #endif
 
 #if WIRE_INTERFACES_COUNT > 1
-  TwoWire Wire1(&PERIPH_WIRE1, PIN_WIRE1_SDA, PIN_WIRE1_SCL);
+    TwoWire Wire1(&PERIPH_WIRE1, PIN_WIRE1_SDA, PIN_WIRE1_SCL);
 
-  void WIRE1_IT_HANDLER(void) {
-    Wire1.onService();
-  }
+    void WIRE1_IT_HANDLER(void) { Wire1.onService(); }
 
-  #if defined(__SAMD51__)
+#ifdef FAMILY_SAMD5X
     void WIRE1_IT_HANDLER_0(void) { Wire1.onService(); }
     void WIRE1_IT_HANDLER_1(void) { Wire1.onService(); }
     void WIRE1_IT_HANDLER_2(void) { Wire1.onService(); }
     void WIRE1_IT_HANDLER_3(void) { Wire1.onService(); }
-  #endif // __SAMD51__
+#endif // FAMILY_SAMD5X
 #endif
 
 #if WIRE_INTERFACES_COUNT > 2
-  TwoWire Wire2(&PERIPH_WIRE2, PIN_WIRE2_SDA, PIN_WIRE2_SCL);
+    TwoWire Wire2(&PERIPH_WIRE2, PIN_WIRE2_SDA, PIN_WIRE2_SCL);
 
-  void WIRE2_IT_HANDLER(void) {
-    Wire2.onService();
-  }
+    void WIRE2_IT_HANDLER(void) { Wire2.onService(); }
 
-  #if defined(__SAMD51__)
+#ifdef FAMILY_SAMD5X
     void WIRE2_IT_HANDLER_0(void) { Wire2.onService(); }
     void WIRE2_IT_HANDLER_1(void) { Wire2.onService(); }
     void WIRE2_IT_HANDLER_2(void) { Wire2.onService(); }
     void WIRE2_IT_HANDLER_3(void) { Wire2.onService(); }
-  #endif // __SAMD51__
+#endif // FAMILY_SAMD5X
 #endif
 
 #if WIRE_INTERFACES_COUNT > 3
-  TwoWire Wire3(&PERIPH_WIRE3, PIN_WIRE3_SDA, PIN_WIRE3_SCL);
+    TwoWire Wire3(&PERIPH_WIRE3, PIN_WIRE3_SDA, PIN_WIRE3_SCL);
 
-  void WIRE3_IT_HANDLER(void) {
-    Wire3.onService();
-  }
+    void WIRE3_IT_HANDLER(void) { Wire3.onService(); }
 
-  #if defined(__SAMD51__)
+#ifdef FAMILY_SAMD5X
     void WIRE3_IT_HANDLER_0(void) { Wire3.onService(); }
     void WIRE3_IT_HANDLER_1(void) { Wire3.onService(); }
     void WIRE3_IT_HANDLER_2(void) { Wire3.onService(); }
     void WIRE3_IT_HANDLER_3(void) { Wire3.onService(); }
-  #endif // __SAMD51__
+#endif // FAMILY_SAMD5X
 #endif
 
 #if WIRE_INTERFACES_COUNT > 4
-  TwoWire Wire4(&PERIPH_WIRE4, PIN_WIRE4_SDA, PIN_WIRE4_SCL);
+    TwoWire Wire4(&PERIPH_WIRE4, PIN_WIRE4_SDA, PIN_WIRE4_SCL);
 
-  void WIRE4_IT_HANDLER(void) {
-    Wire4.onService();
-  }
+    void WIRE4_IT_HANDLER(void) { Wire4.onService(); }
 
-  #if defined(__SAMD51__)
+#ifdef FAMILY_SAMD5X
     void WIRE4_IT_HANDLER_0(void) { Wire4.onService(); }
     void WIRE4_IT_HANDLER_1(void) { Wire4.onService(); }
     void WIRE4_IT_HANDLER_2(void) { Wire4.onService(); }
     void WIRE4_IT_HANDLER_3(void) { Wire4.onService(); }
-  #endif // __SAMD51__
+#endif // FAMILY_SAMD5X
 #endif
 
 #if WIRE_INTERFACES_COUNT > 5
-  TwoWire Wire5(&PERIPH_WIRE5, PIN_WIRE5_SDA, PIN_WIRE5_SCL);
+    TwoWire Wire5(&PERIPH_WIRE5, PIN_WIRE5_SDA, PIN_WIRE5_SCL);
 
-  void WIRE5_IT_HANDLER(void) {
-    Wire5.onService();
-  }
+    void WIRE5_IT_HANDLER(void) { Wire5.onService(); }
 
-  #if defined(__SAMD51__)
+#ifdef FAMILY_SAMD5X
     void WIRE5_IT_HANDLER_0(void) { Wire5.onService(); }
     void WIRE5_IT_HANDLER_1(void) { Wire5.onService(); }
     void WIRE5_IT_HANDLER_2(void) { Wire5.onService(); }
     void WIRE5_IT_HANDLER_3(void) { Wire5.onService(); }
-  #endif // __SAMD51__
+#endif // FAMILY_SAMD5X
 #endif
