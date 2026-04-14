@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate WirePinMux.inc from SAMD21/DA1 and SAMD51/E5x device tables.
+Generate SercomPinMux.inc from SAMD21/DA1 and SAMD51/E5x device tables.
 
 Workflow:
 1. Load device-to-package mappings from Tables 2-1, 2-2 (SAMD21/DA1) and 1-1, 1-2 (SAMD51/E5x)
@@ -9,10 +9,10 @@ Workflow:
 4. Group devices by series and emit guard blocks with I2C_PIN macros
 
 Emits:
-    libraries/Wire/WirePinMux.inc
+    cores/arduino/SercomPinMux.inc
 
 Each pin entry:
-    I2C_PIN(PA08, 0, 0, 2, 1)
+    SERCOM_I2C_PIN(PA08, 0, 0, 2, 1)
 where arguments are (pin, primary_sercom, primary_pad, alt_sercom, alt_pad).
 If an alternate SERCOM is missing, alt_sercom/pad are set to 255.
 """
@@ -25,7 +25,7 @@ from typing import Dict, List, Set, Tuple
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "extras" / "wirepinmux"
-OUTPUT = ROOT / "libraries" / "Wire" / "WirePinMux.inc"
+SERCOM_OUTPUT = ROOT / "cores" / "arduino" / "SercomPinMux.inc"
 
 # Device-to-package mapping CSVs
 SAMD21_TABLE_2_1 = DATA_DIR / "SAMD21_Table_2-1.csv"
@@ -36,6 +36,10 @@ SAMD51_TABLE_1_2 = DATA_DIR / "SAMD51_Table_1-2.csv"
 # I2C pin configuration CSVs
 SAMD21_TABLE_7_5 = DATA_DIR / "SAMD21_Table_7-5.csv"
 SAMD51_TABLE_6_8 = DATA_DIR / "SAMD51_Table_6-8.csv"
+
+# Full pin mux tables (SERCOM column C/D)
+SAMD21_TABLE_7_1 = DATA_DIR / "SAMD21_Table_7-1.csv"
+SAMD51_TABLE_6_1 = DATA_DIR / "SAMD51_Table_6-1.csv"
 
 # Regex patterns
 SERCOM_PAD_RE = re.compile(r"SERCOM(\d+)/PAD\[(\d+)\]")
@@ -231,6 +235,14 @@ def load_pin_mux_configs(
     return pin_configs
 
 
+def pin_name_to_port_pin(pin_name: str) -> Tuple[str, int]:
+    """Convert pin label like PA08 -> ('A', 8)."""
+    pin_name = pin_name.strip().upper()
+    if len(pin_name) < 4 or pin_name[0] != "P":
+        raise ValueError(f"Unsupported pin format: {pin_name}")
+    return pin_name[1], int(pin_name[2:])
+
+
 def macro_candidates(dev: str) -> List[str]:
     """
     Return the canonical sam.h device macro for a device name.
@@ -329,12 +341,8 @@ def build_series_map() -> (
     i2c_pins_samd51 = load_i2c_pins_samd51(SAMD51_TABLE_6_8)
 
     # Load pin mux configurations (SERCOM mappings from columns C/D)
-    pin_mux_samd21 = load_pin_mux_configs(
-        ROOT / "docs" / "SAMD21_Table_7-1.csv", is_samd51=False
-    )
-    pin_mux_samd51 = load_pin_mux_configs(
-        ROOT / "docs" / "SAMD51_Table_6-1.csv", is_samd51=True
-    )
+    pin_mux_samd21 = load_pin_mux_configs(SAMD21_TABLE_7_1, is_samd51=False)
+    pin_mux_samd51 = load_pin_mux_configs(SAMD51_TABLE_6_1, is_samd51=True)
 
     # Process SAMD21/DA1 devices
     for device, pin_counts in device_pins_samd21.items():
@@ -462,94 +470,131 @@ def format_series_macro(series_name: str, device_macros: List[str]) -> List[str]
     return lines
 
 
-def emit_inc(
-    series_map: Dict[
-        str, Tuple[List[str], List[Tuple[str, Tuple[int, int, int, int]]]]
-    ],
-) -> str:
-    """Generate the WirePinMux.inc file content."""
+SERIES_ORDER = {
+    "SAMD21E_SERIES": 0,
+    "SAMD21G_SERIES": 1,
+    "SAMD21J_SERIES": 2,
+    "SAMDA1_SERIES": 3,
+    "SAMD51_120_SERIES": 4,
+    "SAMD51_SERIES": 5,
+    "SAME51_SERIES": 5,
+    "SAME53_SERIES": 5,
+    "SAME54_SERIES": 5,
+    "SAME54_120_SERIES": 6,
+}
+
+
+def emit_series_macros(
+    series_map: Dict[str, Tuple[List[str], List[Tuple[str, Tuple[int, int, int, int]]]]],
+) -> List[str]:
     lines: List[str] = []
-    lines.append(
-        "// Auto-generated from SAMD21/SAMD51 device tables. Do not edit manually.\n"
-    )
-
-    # Define custom ordering for series (moved here to use in sorting)
-    series_order = {
-        "SAMD21E_SERIES": 0,
-        "SAMD21G_SERIES": 1,
-        "SAMD21J_SERIES": 2,
-        "SAMDA1_SERIES": 3,
-        "SAMD51_120_SERIES": 4,
-        "SAMD51_SERIES": 5,
-        "SAME51_SERIES": 5,
-        "SAME53_SERIES": 5,
-        "SAME54_SERIES": 5,
-        "SAME54_120_SERIES": 6,
-    }
-
-    # Emit series macro definitions in custom order
-    for series_name in sorted(
-        series_map.keys(), key=lambda s: (series_order.get(s, 999), s)
-    ):
+    for series_name in sorted(series_map.keys(), key=lambda s: (SERIES_ORDER.get(s, 999), s)):
         devices, _ = series_map[series_name]
-
-        # Build the macro definition
-        device_checks = []
+        device_checks: List[str] = []
         for dev in sorted(set(devices)):
             device_checks.extend(macro_candidates(dev))
 
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_checks = []
+        seen: Set[str] = set()
+        unique_checks: List[str] = []
         for check in device_checks:
             if check not in seen:
                 seen.add(check)
                 unique_checks.append(check)
 
-        # Use the intelligent grouping formatter
         lines.extend(format_series_macro(series_name, unique_checks))
-        lines.append("")  # Add blank line between series
+        lines.append("")
 
-    lines.append("")
-
-    # Fallback: if a TARGET_* flag is set but no series macro matches, default to the base series
-    lines.append(
-        "#if defined(TARGET_SAMD21) && !(SAMD21E_SERIES || SAMD21G_SERIES || SAMD21J_SERIES || SAMDA1_SERIES)"
-    )
+    lines.append("#ifdef FAMILY_SAMD2X")
+    lines.append("#if !(SAMD21E_SERIES || SAMD21G_SERIES || SAMD21J_SERIES || SAMDA1_SERIES)")
     lines.append("#define SAMD21E_SERIES 1")
     lines.append("#endif")
-    lines.append(
-        "#if defined(TARGET_SAMD51) && !(SAMD51_SERIES || SAMD51_120_SERIES || SAME51_SERIES || SAME53_SERIES || SAME54_SERIES || SAME54_120_SERIES)"
-    )
+    lines.append("#endif")
+    lines.append("#ifdef FAMILY_SAMD5X")
+    lines.append("#if !(SAMD51_SERIES || SAMD51_120_SERIES || SAME51_SERIES || SAME53_SERIES || SAME54_SERIES || SAME54_120_SERIES)")
     lines.append("#define SAMD51_SERIES 1")
     lines.append("#endif")
+    lines.append("#endif")
     lines.append("")
+    return lines
 
-    # Group series by their pin configuration
+
+def emit_i2c_entries(
+    series_map: Dict[str, Tuple[List[str], List[Tuple[str, Tuple[int, int, int, int]]]]],
+) -> List[str]:
+    lines: List[str] = []
     pin_config_groups: Dict[Tuple, List[str]] = {}
     for series_name, (_, pins) in series_map.items():
         pin_tuple = tuple((p, s0, p0, s1, p1) for p, (s0, p0, s1, p1) in pins)
-        if pin_tuple not in pin_config_groups:
-            pin_config_groups[pin_tuple] = []
-        pin_config_groups[pin_tuple].append(series_name)
+        pin_config_groups.setdefault(pin_tuple, []).append(series_name)
 
-    # Sort by series order
     sorted_groups = sorted(
         pin_config_groups.items(),
-        key=lambda x: (series_order.get(sorted(x[1])[0], 999), sorted(x[1])[0]),
+        key=lambda x: (SERIES_ORDER.get(sorted(x[1])[0], 999), sorted(x[1])[0]),
     )
 
-    # Emit pin configurations with guards
     for pin_config, series_list in sorted_groups:
-        # Build guard expression
         guard_expr = " || ".join(sorted(series_list))
         lines.append(f"#if {guard_expr}")
-
-        # Emit I2C_PIN macros
         for pin_name, s0, p0, s1, p1 in pin_config:
-            lines.append(f"I2C_PIN({pin_name}, {s0}, {p0}, {s1}, {p1})")
-
+            port, pin = pin_name_to_port_pin(pin_name)
+            lines.append(f"SERCOM_I2C_PIN('{port}', {pin}, {s0}, {p0}, {s1}, {p1})")
         lines.append("#endif\n")
+    return lines
+
+
+def build_spi_series_map(
+    series_map: Dict[str, Tuple[List[str], List[Tuple[str, Tuple[int, int, int, int]]]]],
+) -> Dict[str, List[Tuple[str, Tuple[int, int, int, int]]]]:
+    """Build SPI MOSI-capable pin configs per series."""
+    pin_mux_samd21 = load_pin_mux_configs(SAMD21_TABLE_7_1, is_samd51=False)
+    pin_mux_samd51 = load_pin_mux_configs(SAMD51_TABLE_6_1, is_samd51=True)
+
+    result: Dict[str, List[Tuple[str, Tuple[int, int, int, int]]]] = {}
+    for series_name in series_map.keys():
+        family_mux = pin_mux_samd51 if ("SAMD51" in series_name or "SAME" in series_name) else pin_mux_samd21
+        pins: List[Tuple[str, Tuple[int, int, int, int]]] = []
+        for pin_name, cfg in sorted(family_mux.items()):
+            s0, p0, s1, p1 = cfg
+            # MOSI can be PAD 0, 2, or 3. Keep entries where at least one route is MOSI-capable.
+            if ((s0 != 255 and p0 in (0, 2, 3)) or (s1 != 255 and p1 in (0, 2, 3))):
+                pins.append((pin_name, cfg))
+        result[series_name] = pins
+    return result
+
+
+def emit_spi_entries(
+    series_map: Dict[str, Tuple[List[str], List[Tuple[str, Tuple[int, int, int, int]]]]],
+    spi_series_map: Dict[str, List[Tuple[str, Tuple[int, int, int, int]]]],
+) -> List[str]:
+    lines: List[str] = []
+    for series_name in sorted(spi_series_map.keys(), key=lambda s: (SERIES_ORDER.get(s, 999), s)):
+        lines.append(f"#if {series_name}")
+        for pin_name, (s0, p0, s1, p1) in spi_series_map[series_name]:
+            port, pin = pin_name_to_port_pin(pin_name)
+            lines.append(f"SERCOM_SPI_PIN('{port}', {pin}, {s0}, {p0}, {s1}, {p1})")
+        lines.append("#endif\n")
+    return lines
+
+
+def emit_sercom_inc(
+    series_map: Dict[str, Tuple[List[str], List[Tuple[str, Tuple[int, int, int, int]]]]],
+    spi_series_map: Dict[str, List[Tuple[str, Tuple[int, int, int, int]]]],
+) -> str:
+    lines: List[str] = []
+    lines.append("// Auto-generated from SAMD21/SAMD51 device tables. Do not edit manually.")
+    lines.append("// Define SERCOM_PINMUX_EMIT_I2C and/or SERCOM_PINMUX_EMIT_SPI before including.")
+    lines.append("")
+    lines.extend(emit_series_macros(series_map))
+
+    lines.append("#if defined(SERCOM_PINMUX_EMIT_I2C)")
+    lines.extend(emit_i2c_entries(series_map))
+    lines.append("#endif")
+    lines.append("")
+
+    lines.append("#if defined(SERCOM_PINMUX_EMIT_SPI)")
+    lines.extend(emit_spi_entries(series_map, spi_series_map))
+    lines.append("#endif")
+    lines.append("")
 
     return "\n".join(lines)
 
@@ -557,12 +602,14 @@ def emit_inc(
 def main() -> None:
     """Main entry point."""
     series_map = build_series_map()
-    inc_text = emit_inc(series_map)
-    OUTPUT.write_text(inc_text)
+    spi_series_map = build_spi_series_map(series_map)
+    sercom_inc_text = emit_sercom_inc(series_map, spi_series_map)
+
+    SERCOM_OUTPUT.write_text(sercom_inc_text)
 
     total_devices = sum(len(devices) for devices, _ in series_map.values())
     print(
-        f"Wrote {len(series_map)} series macros covering {total_devices} devices to {OUTPUT}"
+        f"Wrote SERCOM pinmux for {len(series_map)} series covering {total_devices} devices to {SERCOM_OUTPUT}"
     )
 
 
