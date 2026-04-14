@@ -143,6 +143,22 @@ void SERCOM::initPads(SercomUartTXPad txPad, SercomRXPad rxPad)
 
 void SERCOM::resetUART()
 {
+  _txnQueue.clear();
+  _uart.currentTxn = nullptr;
+  _uart.index = 0;
+  _uart.length = 0;
+  _uart.active = false;
+  _uart.returnValue = SercomUartError::SUCCESS;
+
+#ifdef USE_ZERODMA
+  _uart.dmaNeedTx = false;
+  _uart.dmaNeedRx = false;
+  _uart.dmaTxDone = false;
+  _uart.dmaRxDone = false;
+  dmaAbortTx();
+  dmaAbortRx();
+#endif
+
   resetSERCOM();
 }
 
@@ -243,6 +259,7 @@ bool SERCOM::startTransmissionUART(void)
   _uart.index = 0;
   _uart.length = txn->length;
   _uart.active = true;
+  _uart.returnValue = SercomUartError::SUCCESS;
 
 #ifdef USE_ZERODMA
   _uart.useDma = _dmaConfigured;
@@ -251,7 +268,12 @@ bool SERCOM::startTransmissionUART(void)
 #endif
 
   if (!_uart.useDma)
+  {
+    _uart.active = false;
+    _uart.currentTxn = nullptr;
+    _uart.returnValue = SercomUartError::UNKNOWN_ERROR;
     return false;
+  }
 
 #ifdef USE_ZERODMA
   void* dataReg = (void*)&sercom->USART.DATA.reg;
@@ -267,8 +289,9 @@ bool SERCOM::startTransmissionUART(void)
     st = dmaStartRx(txn->rxPtr, dataReg, txn->length);
 
   if (st != DmaStatus::Ok) {
+    _uart.active = false;
+    _uart.currentTxn = nullptr;
     _uart.returnValue = SercomUartError::UNKNOWN_ERROR;
-    deferStopUART(_uart.returnValue);
     return false;
   }
   return true;
