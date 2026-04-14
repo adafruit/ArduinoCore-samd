@@ -3,6 +3,14 @@
 #include <PendSV.h>
 #include <wiring_private.h>
 
+#ifdef FAMILY_SAMD5X
+#ifndef NVMCTRL_TEMP_LOG
+#ifdef NVMCTRL_TEMP_LOG_W0
+#define NVMCTRL_TEMP_LOG NVMCTRL_TEMP_LOG_W0
+#endif
+#endif
+#endif
+
 static inline float decToFrac(uint8_t val) {
     // Temperature fuse decimal part is 4 bits only (0-15):
     // 0-9 represent tenths (0.0-0.9), 10-15 represent hundredths (0.10-0.15)
@@ -112,6 +120,34 @@ constexpr uint8_t kInvalidMux = 0xFF;
 constexpr uint8_t kMaxAdjres = 4;
 constexpr uint8_t kAdcPendSvServiceId = PendSV::kMaxServices - 1;
 constexpr uint32_t kAdcNvicPriority = (1u << __NVIC_PRIO_BITS) - 1u;
+
+#ifdef FAMILY_SAMD5X
+#ifdef ADC_EVCTRL_SYNCEI
+constexpr uint8_t kAdcEvctrlSynceiBit = ADC_EVCTRL_SYNCEI;
+#elif defined(ADC_EVCTRL_FLUSHEI)
+constexpr uint8_t kAdcEvctrlSynceiBit = ADC_EVCTRL_FLUSHEI;
+#else
+constexpr uint8_t kAdcEvctrlSynceiBit = 0u;
+#endif
+#else
+constexpr uint8_t kAdcEvctrlSynceiBit = ADC_EVCTRL_SYNCEI;
+#endif
+
+uint8_t adcDmacResrdyTrigger() {
+#ifdef FAMILY_SAMD5X
+  return ADC0_DMAC_ID_RESRDY;
+#else
+  return ADC_DMAC_ID_RESRDY;
+#endif
+}
+
+inline Adc *adcInstance() {
+#ifdef FAMILY_SAMD5X
+  return ADC0;
+#else
+  return ADC;
+#endif
+}
 
 // ADC IRQ routing mirrors SERCOM family handling:
 // - SAMD2x exposes a single ADC_IRQn vector.
@@ -230,11 +266,14 @@ bool AdcEngine::begin() {
         return false;
     }
 
-    dma_.setTrigger(ADC_DMAC_ID_RESRDY);
+    dma_.setTrigger(adcDmacResrdyTrigger());
     dma_.setAction(DMA_TRIGGER_ACTON_BEAT);
     dma_.setCallback(AdcEngine::dmaDoneCallback, DMA_CALLBACK_TRANSFER_DONE);
-    dmaDescriptor_ = dma_.addDescriptor((void *)&ADC->RESULT.reg, (void *)&dmaLatestResult_, 1,
-                                        DMA_BEAT_SIZE_HWORD, false, false);
+    Adc *const adc = adcInstance();
+
+    dmaDescriptor_ =
+        dma_.addDescriptor((void *)&adc->RESULT.reg, (void *)&dmaLatestResult_,
+                           1, DMA_BEAT_SIZE_HWORD, false, false);
     if (dmaDescriptor_ == nullptr) {
         dma_.free();
         PendSV::instance().clearService(kAdcPendSvServiceId);
@@ -249,8 +288,8 @@ bool AdcEngine::begin() {
         NVIC_EnableIRQ(irq);
     }
 
-    ADC->INTFLAG.reg = ADC_INTFLAG_RESRDY | ADC_INTFLAG_WINMON;
-    ADC->INTENSET.bit.RESRDY = 1;
+    adc->INTFLAG.reg = ADC_INTFLAG_RESRDY | ADC_INTFLAG_WINMON;
+    adc->INTENSET.bit.RESRDY = 1;
     initialized_ = true;
     return true;
 }
@@ -264,7 +303,9 @@ void AdcEngine::end() {
         NVIC_DisableIRQ(irq);
         NVIC_ClearPendingIRQ(irq);
     }
-    ADC->INTENCLR.bit.RESRDY = 1;
+    Adc *const adc = adcInstance();
+
+    adc->INTENCLR.bit.RESRDY = 1;
 
     if (dmaActive_)
         dma_.abort();
@@ -272,8 +313,9 @@ void AdcEngine::end() {
     dma_.free();
     dmaDescriptor_ = nullptr;
 
-    ADC->CTRLA.bit.SWRST = 1;
-    while (ADC->CTRLA.bit.SWRST);
+    adc->CTRLA.bit.SWRST = 1;
+    while (adc->CTRLA.bit.SWRST)
+      ;
     waitAdcSync();
 
     PendSV::instance().clearService(kAdcPendSvServiceId);
@@ -389,20 +431,22 @@ uint32_t AdcEngine::enabledMask() const {
 }
 
 void AdcEngine::onResrdyIsr() {
-    const uint8_t flags = static_cast<uint8_t>(ADC->INTFLAG.reg & 0x0F);
+  Adc *const adc = adcInstance();
+  const uint8_t flags = static_cast<uint8_t>(adc->INTFLAG.reg & 0x0F);
 
-    if ((flags & ADC_INTFLAG_WINMON) != 0u) {
-        ChannelADC *channel = activeChannel_;
-        if (channel != nullptr && channel->windowEnabled_ && channel->onWindowMonitor_ != nullptr) {
-            const uint16_t result = ADC->RESULT.reg;
-            channel->onWindowMonitor_(channel, result, channel->windowUserData_);
-        }
+  if ((flags & ADC_INTFLAG_WINMON) != 0u) {
+    ChannelADC *channel = activeChannel_;
+    if (channel != nullptr && channel->windowEnabled_ &&
+        channel->onWindowMonitor_ != nullptr) {
+      const uint16_t result = adc->RESULT.reg;
+      channel->onWindowMonitor_(channel, result, channel->windowUserData_);
     }
+  }
 
     if ((flags & ADC_INTFLAG_RESRDY) != 0u)
-        ADC->INTFLAG.reg = ADC_INTFLAG_RESRDY;
+      adc->INTFLAG.reg = ADC_INTFLAG_RESRDY;
 
-    ADC->INTFLAG.reg = 0x0F;
+    adc->INTFLAG.reg = 0x0F;
 }
 
 void AdcEngine::onPendSv() {
@@ -458,28 +502,30 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     if (channel == nullptr)
         return false;
 
-    ADC->CTRLA.bit.ENABLE = 0;
+    Adc *const adc = adcInstance();
+
+    adc->CTRLA.bit.ENABLE = 0;
     waitAdcSync();
 
     const uint8_t refctrlReg = static_cast<uint8_t>(ADC_REFCTRL_REFSEL(channel->refSel_));
-    ADC->REFCTRL.reg = refctrlReg;
+    adc->REFCTRL.reg = refctrlReg;
 
 #ifdef FAMILY_SAMD5X
     const uint16_t inputCtrlReg = static_cast<uint16_t>(
         ADC_INPUTCTRL_MUXPOS(channel->muxPos_) | ADC_INPUTCTRL_MUXNEG(channel->muxNeg_) |
         (channel->differentialMode_ ? ADC_INPUTCTRL_DIFFMODE : 0u));
-    ADC->INPUTCTRL.reg = inputCtrlReg;
+    adc->INPUTCTRL.reg = inputCtrlReg;
 
     const uint8_t avgCtrlReg =
         static_cast<uint8_t>(ADC_AVGCTRL_SAMPLENUM(sampleNumToCode(channel->sampleNum_)) |
                              ADC_AVGCTRL_ADJRES(channel->adjres_));
-    ADC->AVGCTRL.reg = avgCtrlReg;
+    adc->AVGCTRL.reg = avgCtrlReg;
 
-    uint16_t ctrlaReg = ADC->CTRLA.reg;
+    uint16_t ctrlaReg = adc->CTRLA.reg;
     ctrlaReg =
         static_cast<uint16_t>((ctrlaReg & ~ADC_CTRLA_PRESCALER_Msk) |
                               ADC_CTRLA_PRESCALER(static_cast<uint8_t>(channel->prescaler_)));
-    ADC->CTRLA.reg = ctrlaReg;
+    adc->CTRLA.reg = ctrlaReg;
 
     const uint16_t ctrlbReg = static_cast<uint16_t>(
         (channel->leftAdjust_ ? ADC_CTRLB_LEFTADJ : 0u) |
@@ -489,30 +535,30 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
         ADC_CTRLB_WINMODE(channel->windowEnabled_
                               ? static_cast<uint8_t>(channel->winMode_)
                               : static_cast<uint8_t>(AdcWinMode::ADC_WINMODE_DISABLE)));
-    ADC->CTRLB.reg = ctrlbReg;
+    adc->CTRLB.reg = ctrlbReg;
 
     const uint8_t evctrlReg =
         static_cast<uint8_t>((channel->evWinmonEo_ ? ADC_EVCTRL_WINMONEO : 0u) |
                              (channel->evResrdyEo_ ? ADC_EVCTRL_RESRDYEO : 0u) |
-                             (channel->evSyncei_ ? ADC_EVCTRL_SYNCEI : 0u) |
+                             (channel->evSyncei_ ? kAdcEvctrlSynceiBit : 0u) |
                              (channel->evStartei_ ? ADC_EVCTRL_STARTEI : 0u));
-    ADC->EVCTRL.reg = evctrlReg;
+    adc->EVCTRL.reg = evctrlReg;
 
-    ADC->WINLT.reg = channel->windowLower_;
-    ADC->WINUT.reg = channel->windowUpper_;
+    adc->WINLT.reg = channel->windowLower_;
+    adc->WINUT.reg = channel->windowUpper_;
 
-    ADC->OFFSETCORR.reg = static_cast<uint16_t>(channel->offsetCorr_);
-    ADC->GAINCORR.reg = channel->gainCorr_;
+    adc->OFFSETCORR.reg = static_cast<uint16_t>(channel->offsetCorr_);
+    adc->GAINCORR.reg = channel->gainCorr_;
 #else
     const uint16_t inputCtrlReg = static_cast<uint16_t>(
         ADC_INPUTCTRL_MUXPOS(channel->muxPos_) | ADC_INPUTCTRL_MUXNEG(channel->muxNeg_) |
         ADC_INPUTCTRL_GAIN(static_cast<uint8_t>(channel->gain_)));
-    ADC->INPUTCTRL.reg = inputCtrlReg;
+    adc->INPUTCTRL.reg = inputCtrlReg;
 
     const uint8_t avgCtrlReg =
         static_cast<uint8_t>(ADC_AVGCTRL_SAMPLENUM(sampleNumToCode(channel->sampleNum_)) |
                              ADC_AVGCTRL_ADJRES(channel->adjres_));
-    ADC->AVGCTRL.reg = avgCtrlReg;
+    adc->AVGCTRL.reg = avgCtrlReg;
 
     const uint16_t ctrlbReg =
         static_cast<uint16_t>((channel->differentialMode_ ? ADC_CTRLB_DIFFMODE : 0u) |
@@ -521,40 +567,41 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
                               (channel->corrEnabled_ ? ADC_CTRLB_CORREN : 0u) |
                               ADC_CTRLB_RESSEL(static_cast<uint8_t>(channel->ressel_)) |
                               ADC_CTRLB_PRESCALER(static_cast<uint8_t>(channel->prescaler_)));
-    ADC->CTRLB.reg = ctrlbReg;
+    adc->CTRLB.reg = ctrlbReg;
 
     const uint8_t evctrlReg =
         static_cast<uint8_t>((channel->evWinmonEo_ ? ADC_EVCTRL_WINMONEO : 0u) |
                              (channel->evResrdyEo_ ? ADC_EVCTRL_RESRDYEO : 0u) |
-                             (channel->evSyncei_ ? ADC_EVCTRL_SYNCEI : 0u) |
+                             (channel->evSyncei_ ? kAdcEvctrlSynceiBit : 0u) |
                              (channel->evStartei_ ? ADC_EVCTRL_STARTEI : 0u));
-    ADC->EVCTRL.reg = evctrlReg;
+    adc->EVCTRL.reg = evctrlReg;
 
-    ADC->WINLT.reg = channel->windowLower_;
-    ADC->WINUT.reg = channel->windowUpper_;
+    adc->WINLT.reg = channel->windowLower_;
+    adc->WINUT.reg = channel->windowUpper_;
 
     const uint8_t winctrlReg = static_cast<uint8_t>(
         ADC_WINCTRL_WINMODE(channel->windowEnabled_ ? static_cast<uint8_t>(channel->winMode_) : 0));
-    ADC->WINCTRL.reg = winctrlReg;
+    adc->WINCTRL.reg = winctrlReg;
 
-    ADC->OFFSETCORR.reg = static_cast<uint16_t>(channel->offsetCorr_);
-    ADC->GAINCORR.reg = channel->gainCorr_;
+    adc->OFFSETCORR.reg = static_cast<uint16_t>(channel->offsetCorr_);
+    adc->GAINCORR.reg = channel->gainCorr_;
 #endif
 
     waitAdcSync();
 
-    ADC->INTENCLR.reg = 0x0F;
+    adc->INTENCLR.reg = 0x0F;
     const uint8_t intensetReg =
         static_cast<uint8_t>(ADC_INTENSET_RESRDY |
                              ((monitorMode && channel->windowEnabled_) ? ADC_INTENSET_WINMON : 0u));
-    ADC->INTENSET.reg = intensetReg;
+    adc->INTENSET.reg = intensetReg;
 
-    ADC->INTFLAG.reg = 0x0F;
+    adc->INTFLAG.reg = 0x0F;
 
     if (dmaDescriptor_ == nullptr)
         return false;
 
-    dma_.changeDescriptor(dmaDescriptor_, (void *)&ADC->RESULT.reg, (void *)&dmaLatestResult_, 1);
+    dma_.changeDescriptor(dmaDescriptor_, (void *)&adc->RESULT.reg,
+                          (void *)&dmaLatestResult_, 1);
     if (dma_.startJob() != DMA_STATUS_OK)
         return false;
 
@@ -562,7 +609,7 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     activeChannel_ = channel;
     activeMonitorMode_ = monitorMode;
 
-    ADC->CTRLA.bit.ENABLE = 1;
+    adc->CTRLA.bit.ENABLE = 1;
     waitAdcSync();
     startConversion();
     return true;
@@ -586,10 +633,13 @@ bool AdcEngine::startMonitorIfIdle() {
 }
 
 void AdcEngine::waitAdcSync() const {
+  Adc *const adc = adcInstance();
 #ifdef FAMILY_SAMD5X
-    while (ADC->SYNCBUSY.reg);
+    while (adc->SYNCBUSY.reg)
+      ;
 #else
-    while (ADC->STATUS.bit.SYNCBUSY);
+    while (adc->STATUS.bit.SYNCBUSY)
+      ;
 #endif
 }
 

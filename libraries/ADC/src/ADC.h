@@ -219,7 +219,13 @@ class AdcEngine {
     bool applyChannelAndStart(ChannelADC *channel, bool monitorMode = false);
     bool startMonitorIfIdle();
     void waitAdcSync() const;
-    inline void startConversion() const { ADC->SWTRIG.bit.START = 1;}
+        inline void startConversion() const {
+    #ifdef FAMILY_SAMD5X
+        ADC0->SWTRIG.bit.START = 1;
+    #else
+        ADC->SWTRIG.bit.START = 1;
+    #endif
+        }
     static void dmaDoneCallback(Adafruit_ZeroDMA *dma);
 
     ChannelADC *queue_[kResultContainerSize]{};
