@@ -4,6 +4,28 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// SercomTxn represents a single bus transaction that occupies one queue slot.
+// For multi-phase operations (e.g., TMC2130 read phase1 then phase2, or is31fl3733
+// multi-frame sequences), callbacks can set chainNext=true to hold the queue slot
+// across phases without dequeuing. This provides bus atomicity: the transaction
+// remains active, preventing other queued transactions from interleaving.
+//
+// Example multi-phase flow:
+//   1. allocateTxn() -> sets chainNext=false
+//   2. Phase1: enqueueSPI(txn) -> txn occupies queue slot
+//   3. Phase1 DMA completes -> onComplete() callback runs
+//   4. Callback updates txPtr/rxPtr/length for phase2, sets chainNext=true
+//   5. stopTransmissionSPI() sees chainNext, calls startTransmissionSPI() without dequeue
+//   6. Phase2 DMA completes -> onComplete() callback runs
+//   7. Callback clears chainNext (or callback already cleared it)
+//   8. stopTransmissionSPI() dequeues txn, starts next queued transaction
+// 
+// This design:
+//   - Avoids explicit claim/release calls (no NVIC priority dance)
+//   - Keeps atomicity logic in one place (the callback)
+//   - Allows other devices on different queue slots to proceed normally
+//   - Prevents queue-full failure during multi-phase chains (slot remains reserved)
+
 struct SercomTxn {
   uint16_t config;     // common + protocol-specific flags/fields
   uint16_t address;    // I2C addr, SPI CS/baud, UART RTS/CTS
