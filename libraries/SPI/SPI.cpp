@@ -31,6 +31,50 @@
 #define SPI_IMODE_EXTINT 1
 #define SPI_IMODE_GLOBAL 2
 
+// Derive SERCOM ISR symbols from PERIPH_SPI* tokens (e.g. sercom4 ->
+// SERCOM4_Handler) so variants don't need to duplicate SPI_IT_HANDLER
+// definitions.
+#define SPI_SERCOM_INDEX_sercom0 0
+#define SPI_SERCOM_INDEX_sercom1 1
+#define SPI_SERCOM_INDEX_sercom2 2
+#define SPI_SERCOM_INDEX_sercom3 3
+#define SPI_SERCOM_INDEX_sercom4 4
+#define SPI_SERCOM_INDEX_sercom5 5
+#if defined(SERCOM6)
+#define SPI_SERCOM_INDEX_sercom6 6
+#endif
+#if defined(SERCOM7)
+#define SPI_SERCOM_INDEX_sercom7 7
+#endif
+
+#define SPI_SERCOM_INDEX(token) SPI_SERCOM_INDEX_##token
+#define SPI_SERCOM_HANDLER_FROM_INDEX(idx) SPI_SERCOM_HANDLER_FROM_INDEX_2(idx)
+#define SPI_SERCOM_HANDLER_FROM_INDEX_2(idx) SERCOM##idx##_Handler
+#define SPI_SERCOM_HANDLER_FROM_TOKEN(token)                                   \
+  SPI_SERCOM_HANDLER_FROM_INDEX(SPI_SERCOM_INDEX(token))
+
+#define SPI_SERCOM_HANDLER0_FROM_INDEX(idx)                                    \
+  SPI_SERCOM_HANDLER0_FROM_INDEX_2(idx)
+#define SPI_SERCOM_HANDLER0_FROM_INDEX_2(idx) SERCOM##idx##_0_Handler
+#define SPI_SERCOM_HANDLER1_FROM_INDEX(idx)                                    \
+  SPI_SERCOM_HANDLER1_FROM_INDEX_2(idx)
+#define SPI_SERCOM_HANDLER1_FROM_INDEX_2(idx) SERCOM##idx##_1_Handler
+#define SPI_SERCOM_HANDLER2_FROM_INDEX(idx)                                    \
+  SPI_SERCOM_HANDLER2_FROM_INDEX_2(idx)
+#define SPI_SERCOM_HANDLER2_FROM_INDEX_2(idx) SERCOM##idx##_2_Handler
+#define SPI_SERCOM_HANDLER3_FROM_INDEX(idx)                                    \
+  SPI_SERCOM_HANDLER3_FROM_INDEX_2(idx)
+#define SPI_SERCOM_HANDLER3_FROM_INDEX_2(idx) SERCOM##idx##_3_Handler
+
+#define SPI_SERCOM_HANDLER0_FROM_TOKEN(token)                                  \
+  SPI_SERCOM_HANDLER0_FROM_INDEX(SPI_SERCOM_INDEX(token))
+#define SPI_SERCOM_HANDLER1_FROM_TOKEN(token)                                  \
+  SPI_SERCOM_HANDLER1_FROM_INDEX(SPI_SERCOM_INDEX(token))
+#define SPI_SERCOM_HANDLER2_FROM_TOKEN(token)                                  \
+  SPI_SERCOM_HANDLER2_FROM_INDEX(SPI_SERCOM_INDEX(token))
+#define SPI_SERCOM_HANDLER3_FROM_TOKEN(token)                                  \
+  SPI_SERCOM_HANDLER3_FROM_INDEX(SPI_SERCOM_INDEX(token))
+
 const SPISettings DEFAULT_SPI_SETTINGS = SPISettings();
 
 namespace sercomPinMux {
@@ -410,110 +454,216 @@ void SPIClass::detachInterrupt() {
   SPIClass SPI (&PERIPH_SPI,  PIN_SPI_MISO,  PIN_SPI_SCK,  PIN_SPI_MOSI,  PAD_SPI_TX,  PAD_SPI_RX);
 
   #ifndef SPI_IT_HANDLER
-    #define SPI_IT_HANDLER      SERCOM4_Handler
-  #endif
+#define SPI_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI)
+#endif
   void SPI_IT_HANDLER(void) __attribute__ ((weak));
   void SPI_IT_HANDLER(void) { SPI.onService(); }
 
   #ifdef FAMILY_SAMD5X
     #ifndef SPI_IT_HANDLER_0
-      #define SPI_IT_HANDLER_0 SERCOM4_0_Handler
-      #define SPI_IT_HANDLER_1 SERCOM4_1_Handler
-      #define SPI_IT_HANDLER_2 SERCOM4_2_Handler
-      #define SPI_IT_HANDLER_3 SERCOM4_3_Handler
-    #endif
-    void SPI_IT_HANDLER_0(void) __attribute__ ((weak));
-    void SPI_IT_HANDLER_1(void) __attribute__ ((weak));
-    void SPI_IT_HANDLER_2(void) __attribute__ ((weak));
-    void SPI_IT_HANDLER_3(void) __attribute__ ((weak));
-    void SPI_IT_HANDLER_0(void) { SPI.onService(); }
-    void SPI_IT_HANDLER_1(void) { SPI.onService(); }
-    void SPI_IT_HANDLER_2(void) { SPI.onService(); }
-    void SPI_IT_HANDLER_3(void) { SPI.onService(); }
-  #endif
+#define SPI_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI)
+#define SPI_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI)
+#define SPI_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI)
+#define SPI_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI)
+#endif
+  void SPI_IT_HANDLER_0(void) __attribute__((weak));
+  void SPI_IT_HANDLER_1(void) __attribute__((weak));
+  void SPI_IT_HANDLER_2(void) __attribute__((weak));
+  void SPI_IT_HANDLER_3(void) __attribute__((weak));
+  void SPI_IT_HANDLER_0(void) { SPI.onService(); }
+  void SPI_IT_HANDLER_1(void) { SPI.onService(); }
+  void SPI_IT_HANDLER_2(void) { SPI.onService(); }
+  void SPI_IT_HANDLER_3(void) { SPI.onService(); }
+#endif
 #endif
 #if SPI_INTERFACES_COUNT > 1
   SPIClass SPI1(&PERIPH_SPI1, PIN_SPI1_MISO, PIN_SPI1_SCK, PIN_SPI1_MOSI, PAD_SPI1_TX, PAD_SPI1_RX);
 
-  #ifdef FAMILY_SAMD5X
-    void SPI1_IT_HANDLER_0(void) __attribute__ ((weak));
-    void SPI1_IT_HANDLER_1(void) __attribute__ ((weak));
-    void SPI1_IT_HANDLER_2(void) __attribute__ ((weak));
-    void SPI1_IT_HANDLER_3(void) __attribute__ ((weak));
-    void SPI1_IT_HANDLER_0(void) { SPI1.onService(); }
-    void SPI1_IT_HANDLER_1(void) { SPI1.onService(); }
-    void SPI1_IT_HANDLER_2(void) { SPI1.onService(); }
-    void SPI1_IT_HANDLER_3(void) { SPI1.onService(); }
-  #else
-    void SPI1_IT_HANDLER(void) __attribute__ ((weak));
-    void SPI1_IT_HANDLER(void) { SPI1.onService(); }
+#ifndef SPI1_IT_HANDLER
+#define SPI1_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI1)
+#endif
+
+#ifdef FAMILY_SAMD5X
+#ifndef SPI1_IT_HANDLER_0
+#define SPI1_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI1)
+#define SPI1_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI1)
+#define SPI1_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI1)
+#define SPI1_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI1)
+#endif
+  void SPI1_IT_HANDLER_0(void) __attribute__((weak));
+  void SPI1_IT_HANDLER_1(void) __attribute__((weak));
+  void SPI1_IT_HANDLER_2(void) __attribute__((weak));
+  void SPI1_IT_HANDLER_3(void) __attribute__((weak));
+  void SPI1_IT_HANDLER_0(void) { SPI1.onService(); }
+  void SPI1_IT_HANDLER_1(void) { SPI1.onService(); }
+  void SPI1_IT_HANDLER_2(void) { SPI1.onService(); }
+  void SPI1_IT_HANDLER_3(void) { SPI1.onService(); }
+#else
+  void SPI1_IT_HANDLER(void) __attribute__((weak));
+  void SPI1_IT_HANDLER(void) { SPI1.onService(); }
   #endif
 #endif
 #if SPI_INTERFACES_COUNT > 2
   SPIClass SPI2(&PERIPH_SPI2, PIN_SPI2_MISO, PIN_SPI2_SCK, PIN_SPI2_MOSI, PAD_SPI2_TX, PAD_SPI2_RX);
 
-  #ifdef FAMILY_SAMD5X
-    void SPI2_IT_HANDLER_0(void) __attribute__ ((weak));
-    void SPI2_IT_HANDLER_1(void) __attribute__ ((weak));
-    void SPI2_IT_HANDLER_2(void) __attribute__ ((weak));
-    void SPI2_IT_HANDLER_3(void) __attribute__ ((weak));
-    void SPI2_IT_HANDLER_0(void) { SPI2.onService(); }
-    void SPI2_IT_HANDLER_1(void) { SPI2.onService(); }
-    void SPI2_IT_HANDLER_2(void) { SPI2.onService(); }
-    void SPI2_IT_HANDLER_3(void) { SPI2.onService(); }
-  #else
-    void SPI2_IT_HANDLER(void) __attribute__ ((weak));
-    void SPI2_IT_HANDLER(void) { SPI2.onService(); }
+#ifndef SPI2_IT_HANDLER
+#define SPI2_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI2)
+#endif
+
+#ifdef FAMILY_SAMD5X
+#ifndef SPI2_IT_HANDLER_0
+#define SPI2_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI2)
+#define SPI2_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI2)
+#define SPI2_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI2)
+#define SPI2_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI2)
+#endif
+  void SPI2_IT_HANDLER_0(void) __attribute__((weak));
+  void SPI2_IT_HANDLER_1(void) __attribute__((weak));
+  void SPI2_IT_HANDLER_2(void) __attribute__((weak));
+  void SPI2_IT_HANDLER_3(void) __attribute__((weak));
+  void SPI2_IT_HANDLER_0(void) { SPI2.onService(); }
+  void SPI2_IT_HANDLER_1(void) { SPI2.onService(); }
+  void SPI2_IT_HANDLER_2(void) { SPI2.onService(); }
+  void SPI2_IT_HANDLER_3(void) { SPI2.onService(); }
+#else
+  void SPI2_IT_HANDLER(void) __attribute__((weak));
+  void SPI2_IT_HANDLER(void) { SPI2.onService(); }
   #endif
 #endif
 #if SPI_INTERFACES_COUNT > 3
   SPIClass SPI3(&PERIPH_SPI3, PIN_SPI3_MISO, PIN_SPI3_SCK, PIN_SPI3_MOSI, PAD_SPI3_TX, PAD_SPI3_RX);
 
-  #ifdef FAMILY_SAMD5X
-    void SPI3_IT_HANDLER_0(void) __attribute__ ((weak));
-    void SPI3_IT_HANDLER_1(void) __attribute__ ((weak));
-    void SPI3_IT_HANDLER_2(void) __attribute__ ((weak));
-    void SPI3_IT_HANDLER_3(void) __attribute__ ((weak));
-    void SPI3_IT_HANDLER_0(void) { SPI3.onService(); }
-    void SPI3_IT_HANDLER_1(void) { SPI3.onService(); }
-    void SPI3_IT_HANDLER_2(void) { SPI3.onService(); }
-    void SPI3_IT_HANDLER_3(void) { SPI3.onService(); }
-  #else
-    void SPI3_IT_HANDLER(void) __attribute__ ((weak));
-    void SPI3_IT_HANDLER(void) { SPI3.onService(); }
+#ifndef SPI3_IT_HANDLER
+#define SPI3_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI3)
+#endif
+
+#ifdef FAMILY_SAMD5X
+#ifndef SPI3_IT_HANDLER_0
+#define SPI3_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI3)
+#define SPI3_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI3)
+#define SPI3_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI3)
+#define SPI3_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI3)
+#endif
+  void SPI3_IT_HANDLER_0(void) __attribute__((weak));
+  void SPI3_IT_HANDLER_1(void) __attribute__((weak));
+  void SPI3_IT_HANDLER_2(void) __attribute__((weak));
+  void SPI3_IT_HANDLER_3(void) __attribute__((weak));
+  void SPI3_IT_HANDLER_0(void) { SPI3.onService(); }
+  void SPI3_IT_HANDLER_1(void) { SPI3.onService(); }
+  void SPI3_IT_HANDLER_2(void) { SPI3.onService(); }
+  void SPI3_IT_HANDLER_3(void) { SPI3.onService(); }
+#else
+  void SPI3_IT_HANDLER(void) __attribute__((weak));
+  void SPI3_IT_HANDLER(void) { SPI3.onService(); }
   #endif
 #endif
 #if SPI_INTERFACES_COUNT > 4
   SPIClass SPI4(&PERIPH_SPI4, PIN_SPI4_MISO, PIN_SPI4_SCK, PIN_SPI4_MOSI, PAD_SPI4_TX, PAD_SPI4_RX);
 
-  #ifdef FAMILY_SAMD5X
-    void SPI4_IT_HANDLER_0(void) __attribute__ ((weak));
-    void SPI4_IT_HANDLER_1(void) __attribute__ ((weak));
-    void SPI4_IT_HANDLER_2(void) __attribute__ ((weak));
-    void SPI4_IT_HANDLER_3(void) __attribute__ ((weak));
-    void SPI4_IT_HANDLER_0(void) { SPI4.onService(); }
-    void SPI4_IT_HANDLER_1(void) { SPI4.onService(); }
-    void SPI4_IT_HANDLER_2(void) { SPI4.onService(); }
-    void SPI4_IT_HANDLER_3(void) { SPI4.onService(); }
-  #else
-    void SPI4_IT_HANDLER(void) __attribute__ ((weak));
-    void SPI4_IT_HANDLER(void) { SPI4.onService(); }
+#ifndef SPI4_IT_HANDLER
+#define SPI4_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI4)
+#endif
+
+#ifdef FAMILY_SAMD5X
+#ifndef SPI4_IT_HANDLER_0
+#define SPI4_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI4)
+#define SPI4_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI4)
+#define SPI4_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI4)
+#define SPI4_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI4)
+#endif
+  void SPI4_IT_HANDLER_0(void) __attribute__((weak));
+  void SPI4_IT_HANDLER_1(void) __attribute__((weak));
+  void SPI4_IT_HANDLER_2(void) __attribute__((weak));
+  void SPI4_IT_HANDLER_3(void) __attribute__((weak));
+  void SPI4_IT_HANDLER_0(void) { SPI4.onService(); }
+  void SPI4_IT_HANDLER_1(void) { SPI4.onService(); }
+  void SPI4_IT_HANDLER_2(void) { SPI4.onService(); }
+  void SPI4_IT_HANDLER_3(void) { SPI4.onService(); }
+#else
+  void SPI4_IT_HANDLER(void) __attribute__((weak));
+  void SPI4_IT_HANDLER(void) { SPI4.onService(); }
   #endif
 #endif
 #if SPI_INTERFACES_COUNT > 5
   SPIClass SPI5(&PERIPH_SPI5, PIN_SPI5_MISO, PIN_SPI5_SCK, PIN_SPI5_MOSI, PAD_SPI5_TX, PAD_SPI5_RX);
 
-  #ifdef FAMILY_SAMD5X
-    void SPI5_IT_HANDLER_0(void) __attribute__ ((weak));
-    void SPI5_IT_HANDLER_1(void) __attribute__ ((weak));
-    void SPI5_IT_HANDLER_2(void) __attribute__ ((weak));
-    void SPI5_IT_HANDLER_3(void) __attribute__ ((weak));
-    void SPI5_IT_HANDLER_0(void) { SPI5.onService(); }
-    void SPI5_IT_HANDLER_1(void) { SPI5.onService(); }
-    void SPI5_IT_HANDLER_2(void) { SPI5.onService(); }
-    void SPI5_IT_HANDLER_3(void) { SPI5.onService(); }
-  #else
-    void SPI5_IT_HANDLER(void) __attribute__ ((weak));
-    void SPI5_IT_HANDLER(void) { SPI5.onService(); }
+#ifndef SPI5_IT_HANDLER
+#define SPI5_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI5)
+#endif
+
+#ifdef FAMILY_SAMD5X
+#ifndef SPI5_IT_HANDLER_0
+#define SPI5_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI5)
+#define SPI5_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI5)
+#define SPI5_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI5)
+#define SPI5_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI5)
+#endif
+  void SPI5_IT_HANDLER_0(void) __attribute__((weak));
+  void SPI5_IT_HANDLER_1(void) __attribute__((weak));
+  void SPI5_IT_HANDLER_2(void) __attribute__((weak));
+  void SPI5_IT_HANDLER_3(void) __attribute__((weak));
+  void SPI5_IT_HANDLER_0(void) { SPI5.onService(); }
+  void SPI5_IT_HANDLER_1(void) { SPI5.onService(); }
+  void SPI5_IT_HANDLER_2(void) { SPI5.onService(); }
+  void SPI5_IT_HANDLER_3(void) { SPI5.onService(); }
+#else
+  void SPI5_IT_HANDLER(void) __attribute__((weak));
+  void SPI5_IT_HANDLER(void) { SPI5.onService(); }
   #endif
+#endif
+#if SPI_INTERFACES_COUNT > 6
+    SPIClass SPI6(&PERIPH_SPI6, PIN_SPI6_MISO, PIN_SPI6_SCK, PIN_SPI6_MOSI,
+                  PAD_SPI6_TX, PAD_SPI6_RX);
+
+#ifndef SPI6_IT_HANDLER
+#define SPI6_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI6)
+#endif
+
+#ifdef FAMILY_SAMD5X
+#ifndef SPI6_IT_HANDLER_0
+#define SPI6_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI6)
+#define SPI6_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI6)
+#define SPI6_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI6)
+#define SPI6_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI6)
+#endif
+    void SPI6_IT_HANDLER_0(void) __attribute__((weak));
+    void SPI6_IT_HANDLER_1(void) __attribute__((weak));
+    void SPI6_IT_HANDLER_2(void) __attribute__((weak));
+    void SPI6_IT_HANDLER_3(void) __attribute__((weak));
+    void SPI6_IT_HANDLER_0(void) { SPI6.onService(); }
+    void SPI6_IT_HANDLER_1(void) { SPI6.onService(); }
+    void SPI6_IT_HANDLER_2(void) { SPI6.onService(); }
+    void SPI6_IT_HANDLER_3(void) { SPI6.onService(); }
+#else
+    void SPI6_IT_HANDLER(void) __attribute__((weak));
+    void SPI6_IT_HANDLER(void) { SPI6.onService(); }
+#endif
+#endif
+#if SPI_INTERFACES_COUNT > 7
+    SPIClass SPI7(&PERIPH_SPI7, PIN_SPI7_MISO, PIN_SPI7_SCK, PIN_SPI7_MOSI,
+                  PAD_SPI7_TX, PAD_SPI7_RX);
+
+#ifndef SPI7_IT_HANDLER
+#define SPI7_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI7)
+#endif
+
+#ifdef FAMILY_SAMD5X
+#ifndef SPI7_IT_HANDLER_0
+#define SPI7_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI7)
+#define SPI7_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI7)
+#define SPI7_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI7)
+#define SPI7_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI7)
+#endif
+    void SPI7_IT_HANDLER_0(void) __attribute__((weak));
+    void SPI7_IT_HANDLER_1(void) __attribute__((weak));
+    void SPI7_IT_HANDLER_2(void) __attribute__((weak));
+    void SPI7_IT_HANDLER_3(void) __attribute__((weak));
+    void SPI7_IT_HANDLER_0(void) { SPI7.onService(); }
+    void SPI7_IT_HANDLER_1(void) { SPI7.onService(); }
+    void SPI7_IT_HANDLER_2(void) { SPI7.onService(); }
+    void SPI7_IT_HANDLER_3(void) { SPI7.onService(); }
+#else
+    void SPI7_IT_HANDLER(void) __attribute__((weak));
+    void SPI7_IT_HANDLER(void) { SPI7.onService(); }
+#endif
 #endif

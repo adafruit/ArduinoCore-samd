@@ -23,6 +23,10 @@
 #include <Arduino.h>
 #include "SERCOM.h"
 
+#if defined(SERCOM_INST_NUM) && (SPI_INTERFACES_COUNT > SERCOM_INST_NUM)
+#error "SPI_INTERFACES_COUNT exceeds available SERCOM instances for this MCU"
+#endif
+
 // SPI_HAS_TRANSACTION means SPI has
 //   - beginTransaction()
 //   - endTransaction()
@@ -189,15 +193,21 @@ class SPIClass {
 #if SPI_INTERFACES_COUNT > 5
   extern SPIClass SPI5;
 #endif
+#if SPI_INTERFACES_COUNT > 6
+  extern SPIClass SPI6;
+#endif
+#if SPI_INTERFACES_COUNT > 7
+  extern SPIClass SPI7;
+#endif
 
-// For compatibility with sketches designed for AVR @ 16 MHz
-// New programs should use SPI.beginTransaction to set the SPI clock
-#define SPI_CLOCK_DIV2   (MAX_SPI * 2 / 8000000)
-#define SPI_CLOCK_DIV4   (MAX_SPI * 2 / 4000000)
-#define SPI_CLOCK_DIV8   (MAX_SPI * 2 / 2000000)
-#define SPI_CLOCK_DIV16  (MAX_SPI * 2 / 1000000)
-#define SPI_CLOCK_DIV32  (MAX_SPI * 2 / 500000)
-#define SPI_CLOCK_DIV64  (MAX_SPI * 2 / 250000)
+  // For compatibility with sketches designed for AVR @ 16 MHz
+  // New programs should use SPI.beginTransaction to set the SPI clock
+#define SPI_CLOCK_DIV2 (MAX_SPI * 2 / 8000000)
+#define SPI_CLOCK_DIV4 (MAX_SPI * 2 / 4000000)
+#define SPI_CLOCK_DIV8 (MAX_SPI * 2 / 2000000)
+#define SPI_CLOCK_DIV16 (MAX_SPI * 2 / 1000000)
+#define SPI_CLOCK_DIV32 (MAX_SPI * 2 / 500000)
+#define SPI_CLOCK_DIV64 (MAX_SPI * 2 / 250000)
 #define SPI_CLOCK_DIV128 (MAX_SPI * 2 / 125000)
 
 #endif
