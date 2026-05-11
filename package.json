@@ -1,0 +1,11 @@
+{
+  "name": "framework-arduino-samd-adafruit",
+  "version": "1.0.0",
+  "description": "FACTS ArduinoCore-samd fork (SAMD51) for P1AM-200",
+  "keywords": ["framework", "arduino", "samd"],
+  "license": "LGPL-2.1-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/facts-engineering/ArduinoCore-samd.git"
+  }
+}
