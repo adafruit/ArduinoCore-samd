@@ -109,42 +109,81 @@ void SystemInit( void )
     /* Wait for synchronization */
   }
 
-  /* DFLL Configuration in Open Loop mode */
-  
+#ifdef CRYSTALLESS
+  /* DFLL Configuration in Open Loop mode with USB clock recovery */
+
   OSCCTRL->DFLLCTRLA.reg = 0;
-  //GCLK->PCHCTRL[OSCCTRL_GCLK_ID_DFLL48].reg = (1 << GCLK_PCHCTRL_CHEN_Pos) | GCLK_PCHCTRL_GEN(GCLK_PCHCTRL_GEN_GCLK3_Val);
-  
+
   OSCCTRL->DFLLMUL.reg = OSCCTRL_DFLLMUL_CSTEP( 0x1 ) |
     OSCCTRL_DFLLMUL_FSTEP( 0x1 ) |
     OSCCTRL_DFLLMUL_MUL( 0 );
-  
+
   while ( OSCCTRL->DFLLSYNC.reg & OSCCTRL_DFLLSYNC_DFLLMUL )
     {
       /* Wait for synchronization */
     }
-  
+
   OSCCTRL->DFLLCTRLB.reg = 0;
   while ( OSCCTRL->DFLLSYNC.reg & OSCCTRL_DFLLSYNC_DFLLCTRLB )
     {
       /* Wait for synchronization */
     }
-  
+
   OSCCTRL->DFLLCTRLA.reg |= OSCCTRL_DFLLCTRLA_ENABLE;
   while ( OSCCTRL->DFLLSYNC.reg & OSCCTRL_DFLLSYNC_ENABLE )
     {
       /* Wait for synchronization */
     }
-  
+
   OSCCTRL->DFLLVAL.reg = OSCCTRL->DFLLVAL.reg;
   while( OSCCTRL->DFLLSYNC.bit.DFLLVAL );
-  
+
   OSCCTRL->DFLLCTRLB.reg = OSCCTRL_DFLLCTRLB_WAITLOCK |
   OSCCTRL_DFLLCTRLB_CCDIS | OSCCTRL_DFLLCTRLB_USBCRM ;
-  
+
   while ( !OSCCTRL->STATUS.bit.DFLLRDY )
     {
       /* Wait for synchronization */
     }
+#else
+  /* DFLL Configuration in Closed Loop mode against XOSC32K (via GCLK3) */
+
+  GCLK->PCHCTRL[OSCCTRL_GCLK_ID_DFLL48].reg = GCLK_PCHCTRL_CHEN |
+    GCLK_PCHCTRL_GEN(GCLK_PCHCTRL_GEN_GCLK3_Val);
+
+  OSCCTRL->DFLLCTRLA.reg = 0;
+
+  // MUL = round(48000000 / 32768) = 1465 -> DFLL targets 48,005,120 Hz
+  OSCCTRL->DFLLMUL.reg = OSCCTRL_DFLLMUL_CSTEP( 1 ) |
+    OSCCTRL_DFLLMUL_FSTEP( 1 ) |
+    OSCCTRL_DFLLMUL_MUL( (48000000UL + 16384UL) / 32768UL );
+
+  while ( OSCCTRL->DFLLSYNC.reg & OSCCTRL_DFLLSYNC_DFLLMUL )
+    {
+      /* Wait for synchronization */
+    }
+
+  OSCCTRL->DFLLCTRLB.reg = 0;
+  while ( OSCCTRL->DFLLSYNC.reg & OSCCTRL_DFLLSYNC_DFLLCTRLB )
+    {
+      /* Wait for synchronization */
+    }
+
+  OSCCTRL->DFLLCTRLA.reg |= OSCCTRL_DFLLCTRLA_ENABLE;
+  while ( OSCCTRL->DFLLSYNC.reg & OSCCTRL_DFLLSYNC_ENABLE )
+    {
+      /* Wait for synchronization */
+    }
+
+  OSCCTRL->DFLLCTRLB.reg = OSCCTRL_DFLLCTRLB_MODE |
+                          OSCCTRL_DFLLCTRLB_WAITLOCK;
+
+  while ( (OSCCTRL->STATUS.reg & (OSCCTRL_STATUS_DFLLRDY | OSCCTRL_STATUS_DFLLLCKC | OSCCTRL_STATUS_DFLLLCKF))
+          != (OSCCTRL_STATUS_DFLLRDY | OSCCTRL_STATUS_DFLLLCKC | OSCCTRL_STATUS_DFLLLCKF) )
+    {
+      /* Wait for synchronization, coarse lock, and fine lock */
+    }
+#endif
   
   GCLK->GENCTRL[GENERIC_CLOCK_GENERATOR_1M].reg = GCLK_GENCTRL_SRC(GCLK_GENCTRL_SRC_DFLL_Val) | GCLK_GENCTRL_GENEN | GCLK_GENCTRL_DIV(48u);
   
