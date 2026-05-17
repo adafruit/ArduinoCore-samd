@@ -136,20 +136,22 @@ uint8_t TwoWire::requestFrom(uint8_t address, size_t quantity, bool stopBit, uin
 
   loader.config = I2C_CFG_READ | (stopBit ? I2C_CFG_STOP : 0);
   loader.address = address;
-  loader.onComplete = onComplete ? onComplete : &TwoWire::onTxnComplete;
-  
+
   // Allocate fresh transaction from pool and copy loader data
   SercomTxn* txn = allocateTxn();
   *txn = loader;
   txn->chainNext = false;
-  
-  // For async callbacks, pass txn as user so callback can access txn->rxPtr/length directly
-  // For sync calls, pass 'this' so onTxnComplete can update txnStatus/txnDone
-  if (onComplete)
+
+  // For caller callbacks, pass txn as user so callback can access
+  // txn->rxPtr/length directly.
+  if (onComplete) {
+    txn->onComplete = onComplete;
     txn->user = (user == nullptr) ? txn : user;
-  else
+  } else {
+    txn->onComplete = &TwoWire::onTxnComplete;
     txn->user = this;
-  
+  }
+
   awaitingAddressAck = true;
   txnDone = false;
 
@@ -158,28 +160,19 @@ uint8_t TwoWire::requestFrom(uint8_t address, size_t quantity, bool stopBit, uin
     return 0;
 
   if (!onComplete) {
-    // Wait for transaction to complete (onTxnComplete sets txnDone) with timeout
-    uint32_t startMillis = millis();
-    const uint32_t timeout = 1000; // 1 second timeout
-    while (!txnDone) {
-      if (millis() - startMillis > timeout)
-        return 0;
-
+    while (!txnDone)
       yield();
-    }
 
     if (txnStatus != static_cast<int>(SercomWireError::SUCCESS))
       return 0;
 
-    // Set up pointers for Wire.available()/read() to access the data
-    // txn->rxPtr already points to this->rxBuffer (from loader copy)
     rxBufferPtr = loader.rxPtr;
-    rxLength = quantity;
+    rxLength = loader.length;
     rxIndex = 0;
     return rxLength;
   }
 
-  return quantity;
+  return loader.length;
 }
 
 SercomTxn* TwoWire::allocateTxn() {
@@ -222,29 +215,27 @@ uint8_t TwoWire::endTransmission(bool stopBit, void (*onComplete)(void* user, in
   
   // Set parameters that weren't known during beginTransmission/write
   txn->config = stopBit ? I2C_CFG_STOP : 0;
-  txn->onComplete = onComplete ? onComplete : &TwoWire::onTxnComplete;
-  if (onComplete)
+  if (onComplete) {
+    txn->onComplete = onComplete;
     txn->user = (user == nullptr) ? txn : user;
-  else
+  } else {
+    txn->onComplete = &TwoWire::onTxnComplete;
     txn->user = this;
-  
+  }
+
   awaitingAddressAck = true;
   txnDone = false;
 
   // Enqueue the pool transaction, not the loader
-  if (!sercom->enqueueWIRE(txn))
-    return static_cast<uint8_t>(SercomWireError::QUEUE_FULL);
+  if (!sercom->enqueueWIRE(txn)) {
+    if (onComplete)
+      return static_cast<uint8_t>(SercomWireError::QUEUE_FULL);
+    return 4;
+  }
 
   if (!onComplete) {
-    // Wait for transaction to complete (onTxnComplete sets txnDone) with timeout
-    uint32_t startMillis = millis();
-    const uint32_t timeout = 1000; // 1 second timeout
-    while (!txnDone) {
-      if (millis() - startMillis > timeout)
-        return 4; // OTHER error
-  
+    while (!txnDone)
       yield();
-    }
 
     SercomWireError err = static_cast<SercomWireError>(txnStatus);
     switch (err) {
@@ -256,7 +247,7 @@ uint8_t TwoWire::endTransmission(bool stopBit, void (*onComplete)(void* user, in
         return 2;
       case SercomWireError::NACK_ON_DATA:
         return 3;
-      default: // OTHER
+      default:
         return 4;
     }
   }

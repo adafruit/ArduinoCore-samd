@@ -93,19 +93,6 @@ public:
 
     inline void onService(void);
 
-#ifdef _DEBUG_
-  inline SercomTxn *getSlaveTxn(void) { return &slaveTxn; }
-  inline const SercomTxn *getSlaveTxn(void) const { return &slaveTxn; }
-  inline SercomTxn *getLoaderTxn(void) { return &loader; }
-  inline const SercomTxn *getLoaderTxn(void) const { return &loader; }
-  inline SercomTxn *getActiveTxn(void) {
-    return sercom ? sercom->getCurrentTxnWIRE() : nullptr;
-  }
-  inline const SercomTxn *getActiveTxn(void) const {
-    return sercom ? sercom->getCurrentTxnWIRE() : nullptr;
-  }
-#endif // _DEBUG_
-
 private:
   SERCOM *sercom;
     uint8_t _uc_pinSDA;
@@ -175,10 +162,13 @@ inline void TwoWire::onService(void)
   uint16_t status = (uint16_t)sercom->getSTATUS();
   bool isMaster = sercom->isMasterWIRE();
 
-  if ((!isMaster && !sercom->isSlaveWIRE()) || flags == 0) {
+  if (!isMaster && !sercom->isSlaveWIRE()) {
     sercom->clearINTFLAG();
     return;
   }
+
+  if (flags == 0)
+    return;
 
   if (status & SERCOM_I2CM_STATUS_RXNACK) {
     sercom->prepareCommandBitsWIRE(WIRE_MASTER_ACT_STOP);
@@ -223,7 +213,8 @@ inline void TwoWire::onService(void)
     if (sercom->getTxnIndexWIRE() < sercom->getTxnLengthWIRE()) {
       bool more = isRead ? sercom->readDataWIRE() : sercom->sendDataWIRE();
       awaitingAddressAck = false;
-      if (!isRead || more) return;
+      if (!isRead || more)
+        return;
     }
 
     if ((txn->config & I2C_CFG_STOP) && !isRead)

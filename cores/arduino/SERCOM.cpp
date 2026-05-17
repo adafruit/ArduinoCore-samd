@@ -951,9 +951,12 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
     return txn;
   }
 
-  if(isMasterWIRE())
-    _txnQueue.read(txn); // remove the completed transaction from the queue
-  else {
+  bool dequeued = false;
+  SercomTxn* headTxn = nullptr;
+  if (_txnQueue.peek(headTxn) && headTxn == txn)
+    dequeued = _txnQueue.read(txn); // remove completed master txn when it is queue head
+
+  if (!dequeued) {
     // Deliver deferred WIRE callback outside the SERCOM ISR (from PendSV).
     // This avoids running user code in the hardware interrupt context.
     if (_wireDeferredPending && _wireDeferredCb) {
