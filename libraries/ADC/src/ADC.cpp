@@ -550,7 +550,7 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     adc->OFFSETCORR.reg = static_cast<uint16_t>(channel->offsetCorr_);
     adc->GAINCORR.reg = channel->gainCorr_;
 #else
-    const uint16_t inputCtrlReg = static_cast<uint16_t>(
+    const uint32_t inputCtrlReg = static_cast<uint32_t>(
         ADC_INPUTCTRL_MUXPOS(channel->muxPos_) | ADC_INPUTCTRL_MUXNEG(channel->muxNeg_) |
         ADC_INPUTCTRL_GAIN(static_cast<uint8_t>(channel->gain_)));
     adc->INPUTCTRL.reg = inputCtrlReg;
