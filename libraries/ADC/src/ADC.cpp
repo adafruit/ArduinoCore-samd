@@ -589,7 +589,18 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
 
     waitAdcSync();
 
+    adc->CTRLA.bit.ENABLE = 1;
+    waitAdcSync();
+
+    // The first conversion after changing the mux/reference can be stale.
+    // Match Arduino analogRead() by discarding it before arming DMA.
     adc->INTENCLR.reg = 0x0F;
+    adc->INTFLAG.reg = 0x0F;
+    startConversion();
+    while ((adc->INTFLAG.reg & ADC_INTFLAG_RESRDY) == 0u)
+      ;
+    adc->INTFLAG.reg = ADC_INTFLAG_RESRDY;
+
     const uint8_t intensetReg =
         static_cast<uint8_t>(ADC_INTENSET_RESRDY |
                              ((monitorMode && channel->windowEnabled_) ? ADC_INTENSET_WINMON : 0u));
@@ -609,8 +620,6 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     activeChannel_ = channel;
     activeMonitorMode_ = monitorMode;
 
-    adc->CTRLA.bit.ENABLE = 1;
-    waitAdcSync();
     startConversion();
     return true;
 }
