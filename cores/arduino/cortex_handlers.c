@@ -18,6 +18,7 @@
 */
 
 #include <sam.h>
+#include "same5x_compat_shim.h"
 #include <variant.h>
 #include <stdio.h>
 
@@ -25,6 +26,7 @@
 extern void svcHook(void);
 extern void pendSVHook(void);
 extern int sysTickHook(void);
+extern void SystemInit(void);
 
 /* Default empty handler */
 void Dummy_Handler(void)
@@ -35,7 +37,7 @@ void Dummy_Handler(void)
   for (;;) { }
 }
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
 /* Cortex-M4 processor handlers */
 void Reset_Handler               ( void );
@@ -486,7 +488,7 @@ void Reset_Handler(void)
       *pDest = 0;
   }
 
-#if defined(__FPU_USED) && defined(__SAMD51__)
+#if defined(__FPU_USED) && (defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__))
 	/* Enable FPU */
 	SCB->CPACR |= (0xFu << 20);
 	__DSB();
@@ -513,7 +515,7 @@ void SysTick_Handler(void)
 
 static void (*usb_isr)(void) = NULL;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 void USB_0_Handler(void)
 {
 	if (usb_isr)

@@ -34,7 +34,7 @@ uint32_t pulseIn(uint32_t pin, uint32_t state, uint32_t timeout)
   uint32_t bit = 1 << p.ulPin;
   uint32_t stateMask = state ? bit : 0;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   /*
    * The SAMD51 is fast enough to use really obvious code (similar to
    * what was used to produce pulse_asm.S, but using micros() for timing.
@@ -80,4 +80,3 @@ uint32_t pulseIn(uint32_t pin, uint32_t state, uint32_t timeout)
     return 0;
 #endif // SAMD51
 }
-
