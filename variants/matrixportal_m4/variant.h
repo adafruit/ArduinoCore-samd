@@ -141,10 +141,6 @@ static const uint8_t DAC1 = PIN_DAC1;
 #define PAD_SERIAL1_RX       (SERCOM_RX_PAD_1)
 #define PAD_SERIAL1_TX       (UART_TX_PAD_0)
 #define PERIPH_SERIAL1 sercom1
-#define SERIAL1_IT_HANDLER_0 SERCOM1_0_Handler
-#define SERIAL1_IT_HANDLER_1 SERCOM1_1_Handler
-#define SERIAL1_IT_HANDLER_2 SERCOM1_2_Handler
-#define SERIAL1_IT_HANDLER_3 SERCOM1_3_Handler
 
 // Serial2
 #define PIN_SERIAL2_RX       (27ul)
@@ -152,10 +148,6 @@ static const uint8_t DAC1 = PIN_DAC1;
 #define PAD_SERIAL2_RX       (SERCOM_RX_PAD_1)
 #define PAD_SERIAL2_TX       (UART_TX_PAD_0)
 #define PERIPH_SERIAL2 sercom4
-#define SERIAL2_IT_HANDLER_0 SERCOM4_0_Handler
-#define SERIAL2_IT_HANDLER_1 SERCOM4_1_Handler
-#define SERIAL2_IT_HANDLER_2 SERCOM4_2_Handler
-#define SERIAL2_IT_HANDLER_3 SERCOM4_3_Handler
 
 
 /*

@@ -234,19 +234,3 @@ void initVariant() {
   pinMode(NINA_RESETN, OUTPUT);
   digitalWrite(NINA_RESETN, HIGH);
 }
-
-// Serial1
-Uart Serial1( &PERIPH_SERIAL1, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX);
-
-void SERIAL1_IT_HANDLER()
-{
-  Serial1.IrqHandler();
-}
-
-// Serial2
-Uart Serial2( &PERIPH_SERIAL2, PIN_SERIAL2_RX, PIN_SERIAL2_TX, PAD_SERIAL2_RX, PAD_SERIAL2_TX, PIN_SERIAL2_RTS, PIN_SERIAL2_CTS);
-
-void SERIAL2_IT_HANDLER()
-{
-  Serial2.IrqHandler();
-}

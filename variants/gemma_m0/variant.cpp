@@ -85,7 +85,6 @@ SERCOM sercom3( SERCOM3 ) ;
 
 Uart Serial1( &PERIPH_SERIAL1, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
 
-
 // If wire.h isnt included, just do nothing
 void WIRE_IT_HANDLER(void) __attribute__ ((weak));
 
@@ -94,4 +93,3 @@ void SERIAL1_IT_HANDLER()
   Serial1.IrqHandler();
   WIRE_IT_HANDLER();
 }
-

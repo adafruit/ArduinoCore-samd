@@ -158,7 +158,6 @@ extern Uart Serial1;
 #define PAD_SERIAL1_TX (UART_TX_PAD_2)
 #define PAD_SERIAL1_RX (SERCOM_RX_PAD_3)
 #define PERIPH_SERIAL1 sercom5
-#define SERIAL1_IT_HANDLER SERCOM5_Handler
 
 // Serial2 - GSM
 extern Uart Serial2;
@@ -167,7 +166,6 @@ extern Uart Serial2;
 #define PAD_SERIAL2_TX (UART_TX_RTS_CTS_PAD_0_2_3)
 #define PAD_SERIAL2_RX (SERCOM_RX_PAD_1)
 #define PERIPH_SERIAL2 sercom4
-#define SERIAL2_IT_HANDLER SERCOM4_Handler
 #define PIN_SERIAL2_RTS (28u)
 #define PIN_SERIAL2_CTS (29u)
 #define PIN_SERIAL2_DTR (35u)

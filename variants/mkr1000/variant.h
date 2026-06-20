@@ -177,7 +177,6 @@ extern Uart Serial1;
 #define PAD_SERIAL1_TX (UART_TX_PAD_2)
 #define PAD_SERIAL1_RX (SERCOM_RX_PAD_3)
 #define PERIPH_SERIAL1 sercom5
-#define SERIAL1_IT_HANDLER SERCOM5_Handler
 #endif // __cplusplus
 
 // These serial port names are intended to allow libraries and architecture-neutral

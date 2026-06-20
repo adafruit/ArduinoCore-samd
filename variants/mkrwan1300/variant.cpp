@@ -148,7 +148,7 @@ const PinDescription g_APinDescription[] = {
   { PORTA, 14, PIO_DIGITAL,     (PIN_ATTR_NONE                               ), No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_NONE }, // SS:   as GPIO
   { PORTA, 15, PIO_SERCOM_ALT,  (PIN_ATTR_NONE                               ), No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_NONE }, // MISO: SERCOM4/PAD[3]
   { PORTA, 27, PIO_DIGITAL,     (PIN_ATTR_NONE                               ), No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_NONE },
-  
+
   { PORTA, 28, PIO_DIGITAL,    (PIN_ATTR_NONE                                ), No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_NONE },
   { PORTB,  8, PIO_ANALOG,     (PIN_ATTR_DIGITAL|PIN_ATTR_ANALOG             ), ADC_Channel2,   NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_NONE },
   { PORTB,  9, PIO_DIGITAL,    (PIN_ATTR_PWM|PIN_ATTR_TIMER                  ), ADC_Channel3,   PWM4_CH1,   TC4_CH1,      EXTERNAL_INT_9    },
@@ -172,17 +172,5 @@ SERCOM sercom4(SERCOM4);
 SERCOM sercom5(SERCOM5);
 
 // Serial1
-Uart Serial1( &PERIPH_SERIAL1, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX);
-
-void SERIAL1_IT_HANDLER()
-{
-  Serial1.IrqHandler();
-}
 
 // SerialLoRa
-Uart Serial2( &PERIPH_SERIAL2, PIN_SERIAL2_RX, PIN_SERIAL2_TX, PAD_SERIAL2_RX, PAD_SERIAL2_TX);
-
-void SERIAL2_IT_HANDLER()
-{
-  Serial2.IrqHandler();
-}

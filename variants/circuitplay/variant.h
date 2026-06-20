@@ -252,7 +252,6 @@ extern Uart Serial1;
 #define PAD_SERIAL1_TX       (UART_TX_PAD_0)
 #define PAD_SERIAL1_RX       (SERCOM_RX_PAD_1)
 #define PERIPH_SERIAL1 sercom4
-#define SERIAL1_IT_HANDLER SERCOM4_Handler
 #endif // __cplusplus
 
 

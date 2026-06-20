@@ -93,7 +93,7 @@ const PinDescription g_APinDescription[]=
 
   // Unused
   { PORTB,  2, PIO_ANALOG, PIN_ATTR_ANALOG, ADC_Channel14, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_2 },
-  { PORTB,  3, PIO_ANALOG, PIN_ATTR_ANALOG, ADC_Channel15, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_3 }, 
+  { PORTB,  3, PIO_ANALOG, PIN_ATTR_ANALOG, ADC_Channel15, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_3 },
 
   // AREF tied to 3.3V
   { PORTA, 3, PIO_ANALOG, PIN_ATTR_ANALOG, No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_3 }, // DAC/VREFP
@@ -109,22 +109,3 @@ SERCOM sercom2( SERCOM2 ) ;
 SERCOM sercom3( SERCOM3 ) ;
 SERCOM sercom4( SERCOM4 ) ;
 SERCOM sercom5( SERCOM5 ) ;
-
-Uart Serial1( &PERIPH_SERIAL1, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
-
-void SERIAL1_IT_HANDLER_0()
-{
-  Serial1.IrqHandler();
-}
-void SERIAL1_IT_HANDLER_1()
-{
-  Serial1.IrqHandler();
-}
-void SERIAL1_IT_HANDLER_2()
-{
-  Serial1.IrqHandler();
-}
-void SERIAL1_IT_HANDLER_3()
-{
-  Serial1.IrqHandler();
-}
