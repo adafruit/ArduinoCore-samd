@@ -131,21 +131,21 @@ SERCOM sercom3( SERCOM3 ) ;
 SERCOM sercom4( SERCOM4 ) ;
 SERCOM sercom5( SERCOM5 ) ;
 
-Uart Serial1( &sercom4, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
+Uart Serial1( &PERIPH_SERIAL1, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
 
-void SERCOM4_0_Handler()
+void SERIAL1_IT_HANDLER_0()
 {
   Serial1.IrqHandler();
 }
-void SERCOM4_1_Handler()
+void SERIAL1_IT_HANDLER_1()
 {
   Serial1.IrqHandler();
 }
-void SERCOM4_2_Handler()
+void SERIAL1_IT_HANDLER_2()
 {
   Serial1.IrqHandler();
 }
-void SERCOM4_3_Handler()
+void SERIAL1_IT_HANDLER_3()
 {
   Serial1.IrqHandler();
 }

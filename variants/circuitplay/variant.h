@@ -154,6 +154,7 @@ static const uint8_t DAC0 = PIN_DAC0;
 #define PERIPH_SPI           sercom3
 #define PAD_SPI_TX           SPI_PAD_2_SCK_3  // MOSI / SCK
 #define PAD_SPI_RX           SERCOM_RX_PAD_0  // MISO
+#define SPI_IT_HANDLER SERCOM3_Handler
 
 static const uint8_t SS	  = 33 ;
 static const uint8_t MOSI = PIN_SPI_MOSI ;
@@ -168,6 +169,7 @@ static const uint8_t SCK  = PIN_SPI_SCK ;
 #define PERIPH_SPI1           sercom5
 #define PAD_SPI1_TX           SPI_PAD_0_SCK_1  // MOSI / SCK
 #define PAD_SPI1_RX           SERCOM_RX_PAD_2  // MISO not avail
+#define SPI1_IT_HANDLER SERCOM5_Handler
 
 static const uint8_t SS1	  = 42 ;
 static const uint8_t MOSI1 = PIN_SPI_MOSI ;
@@ -183,6 +185,7 @@ static const uint8_t SCK1  = PIN_SPI_SCK ;
 #define PERIPH_SPI2           sercom0
 #define PAD_SPI2_TX           SPI_PAD_2_SCK_3  // MOSI / SCK
 #define PAD_SPI2_RX           SERCOM_RX_PAD_1  // MISO not avail
+#define SPI2_IT_HANDLER SERCOM0_Handler
 
 static const uint8_t SS2   = 5 ;
 static const uint8_t MOSI2 = PIN_SPI2_MOSI ;
@@ -248,6 +251,8 @@ extern Uart Serial1;
 #define PIN_SERIAL1_TX       (1ul)
 #define PAD_SERIAL1_TX       (UART_TX_PAD_0)
 #define PAD_SERIAL1_RX       (SERCOM_RX_PAD_1)
+#define PERIPH_SERIAL1 sercom4
+#define SERIAL1_IT_HANDLER SERCOM4_Handler
 #endif // __cplusplus
 
 

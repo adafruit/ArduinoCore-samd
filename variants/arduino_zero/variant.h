@@ -121,12 +121,16 @@ static const uint8_t ATN = PIN_ATN;
 #define PIN_SERIAL_TX       (30ul)
 #define PAD_SERIAL_TX       (UART_TX_PAD_2)
 #define PAD_SERIAL_RX       (SERCOM_RX_PAD_3)
+#define PERIPH_SERIAL5 sercom5
+#define SERIAL5_IT_HANDLER SERCOM5_Handler
 
 // Serial1
 #define PIN_SERIAL1_RX       (0ul)
 #define PIN_SERIAL1_TX       (1ul)
 #define PAD_SERIAL1_TX       (UART_TX_PAD_2)
 #define PAD_SERIAL1_RX       (SERCOM_RX_PAD_3)
+#define PERIPH_SERIAL1 sercom0
+#define SERIAL1_IT_HANDLER SERCOM0_Handler
 
 /*
  * SPI Interfaces
@@ -139,6 +143,7 @@ static const uint8_t ATN = PIN_ATN;
 #define PERIPH_SPI           sercom4
 #define PAD_SPI_TX           SPI_PAD_2_SCK_3
 #define PAD_SPI_RX           SERCOM_RX_PAD_0
+#define SPI_IT_HANDLER SERCOM4_Handler
 
 static const uint8_t SS	  = PIN_A2 ;	// SERCOM4 last PAD is present on A2 but HW SS isn't used. Set here only for reference.
 static const uint8_t MOSI = PIN_SPI_MOSI ;

@@ -116,6 +116,8 @@ static const uint8_t DAC0 = PIN_DAC0;
 #define PAD_SERIAL1_RX       (SERCOM_RX_PAD_1)
 #define PIN_SERIAL1_TX       (0ul) // PA04
 #define PAD_SERIAL1_TX       (UART_TX_PAD_0)
+#define PERIPH_SERIAL1 sercom0
+#define SERIAL1_IT_HANDLER SERCOM0_Handler
 
 /*
  * SPI Interfaces
@@ -128,6 +130,7 @@ static const uint8_t DAC0 = PIN_DAC0;
 #define PERIPH_SPI           sercom0
 #define PAD_SPI_TX           SPI_PAD_0_SCK_1
 #define PAD_SPI_RX         SERCOM_RX_PAD_2
+#define SPI_IT_HANDLER SERCOM0_Handler
 
 static const uint8_t SS	  = 1 ;	// only pin remaining (shrug)
 static const uint8_t MOSI = PIN_SPI_MOSI ;
