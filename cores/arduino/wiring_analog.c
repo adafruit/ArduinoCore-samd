@@ -480,7 +480,7 @@ void analogWrite(uint32_t pin, uint32_t value)
 			syncDAC();
 			DAC->CTRLA.bit.ENABLE = 0x01;     // Enable DAC
 			syncDAC();
-#endif // __SAMD51__
+#endif // SAMD51/SAME5x
 				return;
 	  }
 	}
