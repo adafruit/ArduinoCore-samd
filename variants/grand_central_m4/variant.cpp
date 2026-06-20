@@ -198,22 +198,3 @@ SERCOM sercom4( SERCOM4 ) ;
 SERCOM sercom5( SERCOM5 ) ;
 SERCOM sercom6( SERCOM6 ) ;
 SERCOM sercom7( SERCOM7 ) ;
-
-Uart Serial1( &sercom0, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
-
-void SERCOM0_0_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM0_1_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM0_2_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM0_3_Handler()
-{
-  Serial1.IrqHandler();
-}

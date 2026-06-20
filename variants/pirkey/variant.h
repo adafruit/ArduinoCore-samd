@@ -117,6 +117,7 @@ static const uint8_t DAC0 = PIN_DAC0;
 #define PAD_SERIAL1_RX       (SERCOM_RX_PAD_3)
 #define PIN_SERIAL1_TX       (3ul) // SWCLK PA30
 #define PAD_SERIAL1_TX       (UART_TX_PAD_2)
+#define PERIPH_SERIAL1 sercom1
 
 /*
  * SPI Interfaces
