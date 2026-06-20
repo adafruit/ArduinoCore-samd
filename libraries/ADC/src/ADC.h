@@ -4,12 +4,15 @@
 #include <stdint.h>
 
 #include <Adafruit_ZeroDMA.h>
-#include <SERCOM_PinMux.h>
+
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+#define ADC_HAS_D5X_E5X_REGISTERS
+#endif
 
 static constexpr uint8_t ADC_MUX_SOURCE_INVALID = 0xFF;
 
 void analogReadCorrection(int offset, uint16_t gain);
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
 float analogReadTemperatureC(uint16_t ptatReading, uint16_t ctatReading);
 #else
 float analogReadTemperatureC(uint16_t adcReading);
@@ -30,7 +33,7 @@ enum class AdcSampleNum : uint8_t {
 };
 
 enum class AdcWinMode : uint8_t {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     ADC_WINMODE_DISABLE = ADC_CTRLB_WINMODE_DISABLE_Val, ///< No window mode (disabled)
     ADC_WINMODE_MODE1 = ADC_CTRLB_WINMODE_MODE1_Val,     ///< Window mode 1: RESULT > WINLT.
     ADC_WINMODE_MODE2 = ADC_CTRLB_WINMODE_MODE2_Val,     ///< Window mode 2: RESULT < WINUT.
@@ -47,7 +50,7 @@ enum class AdcWinMode : uint8_t {
 };
 
 enum class AdcRefSel : uint8_t {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     ADC_REFSEL_INT1V = ADC_REFCTRL_REFSEL_INTREF_Val,
 #else
     ADC_REFSEL_INT1V = ADC_REFCTRL_REFSEL_INT1V_Val,
@@ -59,7 +62,7 @@ enum class AdcRefSel : uint8_t {
 };
 
 enum class AdcGain : uint8_t {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     ADC_GAIN_1X = 0x0,
     ADC_GAIN_2X = 0x1,
     ADC_GAIN_4X = 0x2,
@@ -84,7 +87,7 @@ enum class AdcResSel : uint8_t {
 };
 
 enum class AdcPrescaler : uint8_t {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     ADC_PRESCALER_DIV4 = ADC_CTRLA_PRESCALER_DIV4_Val,
     ADC_PRESCALER_DIV8 = ADC_CTRLA_PRESCALER_DIV8_Val,
     ADC_PRESCALER_DIV16 = ADC_CTRLA_PRESCALER_DIV16_Val,
@@ -105,7 +108,7 @@ enum class AdcPrescaler : uint8_t {
 };
 
 enum class AdcMuxPos : uint8_t {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     ADC_MUXPOS_PIN0 = ADC_INPUTCTRL_MUXPOS_AIN0_Val,
     ADC_MUXPOS_PIN1 = ADC_INPUTCTRL_MUXPOS_AIN1_Val,
     ADC_MUXPOS_PIN2 = ADC_INPUTCTRL_MUXPOS_AIN2_Val,
@@ -158,7 +161,7 @@ enum class AdcMuxPos : uint8_t {
 };
 
 enum class AdcMuxNeg : uint8_t {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     ADC_MUXNEG_PIN0 = ADC_INPUTCTRL_MUXNEG_AIN0_Val,
     ADC_MUXNEG_PIN1 = ADC_INPUTCTRL_MUXNEG_AIN1_Val,
     ADC_MUXNEG_PIN2 = ADC_INPUTCTRL_MUXNEG_AIN2_Val,
@@ -220,7 +223,7 @@ class AdcEngine {
     bool startMonitorIfIdle();
     void waitAdcSync() const;
         inline void startConversion() const {
-    #ifdef FAMILY_SAMD5X
+    #ifdef ADC_HAS_D5X_E5X_REGISTERS
         ADC0->SWTRIG.bit.START = 1;
     #else
         ADC->SWTRIG.bit.START = 1;

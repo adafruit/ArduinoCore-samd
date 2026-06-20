@@ -3,7 +3,7 @@
 #include <PendSV.h>
 #include <wiring_private.h>
 
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
 #ifndef NVMCTRL_TEMP_LOG
 #ifdef NVMCTRL_TEMP_LOG_W0
 #define NVMCTRL_TEMP_LOG NVMCTRL_TEMP_LOG_W0
@@ -19,7 +19,7 @@ static inline float decToFrac(uint8_t val) {
     return static_cast<float>(val) / 100.0f;
 }
 
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
 float analogReadTemperatureC(uint16_t tp, uint16_t tc) {
     const uint32_t roomInt = (*(uint32_t *)FUSES_ROOM_TEMP_VAL_INT_ADDR & FUSES_ROOM_TEMP_VAL_INT_Msk) >>
                              FUSES_ROOM_TEMP_VAL_INT_Pos;
@@ -98,7 +98,7 @@ float analogReadTemperatureC(uint16_t adcReading) {
 
 void analogReadCorrection(int offset, uint16_t gain) {
     Adc *adc;
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     adc = ADC0;
 #else
     adc = ADC;
@@ -108,7 +108,7 @@ void analogReadCorrection(int offset, uint16_t gain) {
     adc->GAINCORR.reg = gain;
     adc->CTRLB.bit.CORREN = 1;
 
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     while (adc->SYNCBUSY.reg);
 #else
     while (adc->STATUS.bit.SYNCBUSY);
@@ -121,7 +121,7 @@ constexpr uint8_t kMaxAdjres = 4;
 constexpr uint8_t kAdcPendSvServiceId = PendSV::kMaxServices - 1;
 constexpr uint32_t kAdcNvicPriority = (1u << __NVIC_PRIO_BITS) - 1u;
 
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
 #ifdef ADC_EVCTRL_SYNCEI
 constexpr uint8_t kAdcEvctrlSynceiBit = ADC_EVCTRL_SYNCEI;
 #elif defined(ADC_EVCTRL_FLUSHEI)
@@ -134,7 +134,7 @@ constexpr uint8_t kAdcEvctrlSynceiBit = ADC_EVCTRL_SYNCEI;
 #endif
 
 uint8_t adcDmacResrdyTrigger() {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
   return ADC0_DMAC_ID_RESRDY;
 #else
   return ADC_DMAC_ID_RESRDY;
@@ -142,7 +142,7 @@ uint8_t adcDmacResrdyTrigger() {
 }
 
 inline Adc *adcInstance() {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
   return ADC0;
 #else
   return ADC;
@@ -157,7 +157,7 @@ inline Adc *adcInstance() {
 // callbacks continue to work together on 5x devices.
 
 uint8_t adcIrqCount() {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     return 2;
 #else
     return 1;
@@ -165,7 +165,7 @@ uint8_t adcIrqCount() {
 }
 
 IRQn_Type adcIrqAt(uint8_t index) {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     return (index == 0) ? ADC0_0_IRQn : ADC0_1_IRQn;
 #else
     (void)index;
@@ -510,7 +510,7 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     const uint8_t refctrlReg = static_cast<uint8_t>(ADC_REFCTRL_REFSEL(channel->refSel_));
     adc->REFCTRL.reg = refctrlReg;
 
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     const uint16_t inputCtrlReg = static_cast<uint16_t>(
         ADC_INPUTCTRL_MUXPOS(channel->muxPos_) | ADC_INPUTCTRL_MUXNEG(channel->muxNeg_) |
         (channel->differentialMode_ ? ADC_INPUTCTRL_DIFFMODE : 0u));
@@ -643,7 +643,7 @@ bool AdcEngine::startMonitorIfIdle() {
 
 void AdcEngine::waitAdcSync() const {
   Adc *const adc = adcInstance();
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     while (adc->SYNCBUSY.reg)
       ;
 #else
@@ -860,7 +860,7 @@ void ChannelADC::end() {
     AdcEngine::instance().unregisterChannel(this);
 }
 
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
 extern "C" void ADC0_0_Handler(void) {
     AdcEngine::instance().onResrdyIsr();
 }

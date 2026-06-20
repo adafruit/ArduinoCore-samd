@@ -1,6 +1,6 @@
 #include <ADC.h>
 
-#ifndef FAMILY_SAMD5X
+#ifndef ADC_HAS_D5X_E5X_REGISTERS
 static inline void waitAdcSyncRaw() {
   while (ADC->STATUS.bit.SYNCBUSY) {
   }
@@ -62,7 +62,7 @@ void setup() {
   while (!Serial) {
   }
 
-#ifndef FAMILY_SAMD5X
+#ifndef ADC_HAS_D5X_E5X_REGISTERS
   Serial.println("Sync temperature register read example");
 #else
   Serial.println("SyncTempRegisterRead is SAMD21-specific (direct ADC register path).");
@@ -70,7 +70,7 @@ void setup() {
 }
 
 void loop() {
-#ifndef FAMILY_SAMD5X
+#ifndef ADC_HAS_D5X_E5X_REGISTERS
   const uint16_t raw = readTempRawDirectSync();
   Serial.print("Raw temp register ADC: ");
   Serial.println(raw);

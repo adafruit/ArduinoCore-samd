@@ -16,7 +16,7 @@ void setup() {
   while (!Serial)
     ;
 
-  if (!adc.attach(A0)) 
+  if (!adc.attach(A0))
     Serial.println("ADC attach failed");
   adc.setReadCallback(onAdcRead, nullptr);
 }
@@ -27,7 +27,7 @@ void loop() {
 
   if (now - lastTriggerMs >= 100) {
     lastTriggerMs = now;
-    if (!adc.read()) 
+    if (!adc.read())
       Serial.println("ADC read enqueue failed");
   }
 

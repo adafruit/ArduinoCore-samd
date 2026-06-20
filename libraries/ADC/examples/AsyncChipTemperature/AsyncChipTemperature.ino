@@ -11,7 +11,7 @@ void onTempRead(ChannelADC *channel, uint16_t result, void *userData) {
 }
 
 ChannelADC g_temp;
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
 ChannelADC g_ctat;
 #endif
 
@@ -23,7 +23,7 @@ void setup() {
   g_temp.setReference(AdcRefSel::ADC_REFSEL_INT1V);
   g_temp.setCtrlB(AdcResSel::ADC_RESSEL_12BIT, AdcPrescaler::ADC_PRESCALER_DIV32);
 
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
   g_ctat.setReadCallback(onTempRead, nullptr);
   g_ctat.setReference(AdcRefSel::ADC_REFSEL_INT1V);
   g_ctat.setCtrlB(AdcResSel::ADC_RESSEL_12BIT, AdcPrescaler::ADC_PRESCALER_DIV32);
@@ -46,7 +46,7 @@ void setup() {
 }
 
 void loop() {
-#ifdef FAMILY_SAMD5X
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
   g_readComplete = false;
   if (!g_temp.read()) {
     Serial.println("PTAT async enqueue failed");
