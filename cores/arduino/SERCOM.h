@@ -326,6 +326,7 @@ class SERCOM
 		static void release(uint8_t sercomId);
 		static bool registerService(uint8_t sercomId, ServiceFn fn);
 		static void setPending(uint8_t sercomId);
+		static void dispatchService(uint8_t sercomId, void *context);
 		static void dispatchPending(void);
 
 #ifdef USE_ZERODMA
@@ -410,7 +411,6 @@ class SERCOM
 
 		static std::array<SercomState, kSercomCount> s_states;
 		static std::array<SERCOM*, kSercomCount> s_instances;
-		static volatile uint32_t s_pendingMask;
 		uint8_t calculateBaudrateSynchronous(uint32_t baudrate) ;
 		uint32_t division(uint32_t dividend, uint32_t divisor) ;
 		void initClockNVIC( void ) ;

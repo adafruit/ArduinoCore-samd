@@ -20,6 +20,7 @@
 #include "SERCOM.h"
 #include "variant.h"
 #include "Arduino.h"
+#include "PendSV.h"
 
 #ifdef USE_ZERODMA
 #include <Adafruit_ZeroDMA.h>
@@ -1053,7 +1054,6 @@ static const SercomData sercomData[] = {
 
 std::array<SERCOM::SercomState, SERCOM::kSercomCount> SERCOM::s_states = {};
 std::array<SERCOM*, SERCOM::kSercomCount> SERCOM::s_instances = {};
-volatile uint32_t SERCOM::s_pendingMask = 0;
 
 bool SERCOM::claim(uint8_t sercomId, Role role)
 {
@@ -1076,10 +1076,10 @@ void SERCOM::release(uint8_t sercomId)
   SercomState &state = s_states[sercomId];
   state.role = Role::None;
   state.service = nullptr;
+  PendSV::instance().clearService(sercomId);
 #ifdef SERCOM_STRICT_PADS
   clearPads(sercomId);
 #endif // SERCOM_STRICT_PADS
-  s_pendingMask &= ~(1u << sercomId);
 }
 
 bool SERCOM::registerService(uint8_t sercomId, ServiceFn fn)
@@ -1088,6 +1088,12 @@ bool SERCOM::registerService(uint8_t sercomId, ServiceFn fn)
     return false;
 
   s_states[sercomId].service = fn;
+  if (!PendSV::instance().registerService(sercomId, &SERCOM::dispatchService, nullptr))
+  {
+    s_states[sercomId].service = nullptr;
+    return false;
+  }
+
   return true;
 }
 
@@ -1406,37 +1412,26 @@ void SERCOM::setPending(uint8_t sercomId)
   if (sercomId >= kSercomCount)
     return;
 
-  __disable_irq();
-  s_pendingMask |= (1u << sercomId);
-  __enable_irq();
-  __DMB();
-  SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
+  PendSV::instance().setPending(sercomId);
+}
+
+void SERCOM::dispatchService(uint8_t sercomId, void *context)
+{
+  (void)context;
+
+  if (sercomId >= kSercomCount)
+    return;
+
+  ServiceFn fn = s_states[sercomId].service;
+  SERCOM* inst = s_instances[sercomId];
+  if (fn && inst)
+    (inst->*fn)();
 }
 
 void SERCOM::dispatchPending(void)
 {
-  uint32_t pending;
-
-  __disable_irq();
-  pending = s_pendingMask;
-  s_pendingMask = 0;
-  __enable_irq();
-
-  for (size_t i = 0; i < kSercomCount; ++i)
-  {
-    if ((pending & (1u << i)) == 0)
-      continue;
-
-    ServiceFn fn = s_states[i].service;
-    SERCOM* inst = s_instances[i];
-    if (fn && inst)
-      (inst->*fn)();
-  }
-}
-
-extern "C" void PendSV_Handler(void)
-{
-  SERCOM::dispatchPending();
+  for (uint8_t i = 0; i < kSercomCount; ++i)
+    dispatchService(i, nullptr);
 }
 
 int8_t SERCOM::getSercomIndex(void) {
