@@ -19,3 +19,5 @@
 #pragma once
 
 #include <ADC.h>
+
+void analogReadCorrection(int offset, uint16_t gain);

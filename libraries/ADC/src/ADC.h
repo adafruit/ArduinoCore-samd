@@ -222,13 +222,13 @@ class AdcEngine {
     bool applyChannelAndStart(ChannelADC *channel, bool monitorMode = false);
     bool startMonitorIfIdle();
     void waitAdcSync() const;
-        inline void startConversion() const {
-    #ifdef ADC_HAS_D5X_E5X_REGISTERS
+    inline void startConversion() const {
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
         ADC0->SWTRIG.bit.START = 1;
-    #else
+#else
         ADC->SWTRIG.bit.START = 1;
-    #endif
-        }
+#endif
+    }
     static void dmaDoneCallback(Adafruit_ZeroDMA *dma);
 
     ChannelADC *queue_[kResultContainerSize]{};
