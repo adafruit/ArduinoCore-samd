@@ -116,7 +116,6 @@ void analogReadCorrection(int offset, uint16_t gain) {
 }
 
 namespace {
-constexpr uint8_t kInvalidMux = 0xFF;
 constexpr uint8_t kMaxAdjres = 4;
 constexpr uint8_t kAdcPendSvServiceId = PendSV::kMaxServices - 1;
 constexpr uint32_t kAdcNvicPriority = (1u << __NVIC_PRIO_BITS) - 1u;
@@ -193,11 +192,11 @@ uint8_t sampleNumToCode(AdcSampleNum sampleNum) {
 
 uint8_t pinToMux(uint8_t arduinoPin) {
     if (arduinoPin >= PINS_COUNT)
-        return kInvalidMux;
+        return ADC_MUX_SOURCE_INVALID;
 
     const EAnalogChannel channel = g_APinDescription[arduinoPin].ulADCChannelNumber;
     if (channel == No_ADC_Channel)
-        return kInvalidMux;
+        return ADC_MUX_SOURCE_INVALID;
 
     return static_cast<uint8_t>(channel);
 }
@@ -216,7 +215,7 @@ void configureAnalogPin(uint8_t arduinoPin) {
 
 uint8_t ADC_MUXPOS_PIN(uint8_t pin) {
     const uint8_t mux = pinToMux(pin);
-    if (mux == kInvalidMux)
+    if (mux == ADC_MUX_SOURCE_INVALID)
         return ADC_MUX_SOURCE_INVALID;
 
     return mux;
@@ -224,7 +223,7 @@ uint8_t ADC_MUXPOS_PIN(uint8_t pin) {
 
 uint8_t ADC_MUXNEG_PIN(uint8_t pin) {
     const uint8_t mux = pinToMux(pin);
-    if (mux == kInvalidMux)
+    if (mux == ADC_MUX_SOURCE_INVALID)
         return ADC_MUX_SOURCE_INVALID;
 
     return mux;
@@ -692,9 +691,6 @@ void AdcEngine::dmaDoneCallback(Adafruit_ZeroDMA *dma) {
 
 bool ChannelADC::setAttachedSources(uint8_t muxPos, uint8_t muxNeg, AdcSampleNum sampleNum) {
     if (muxPos == ADC_MUX_SOURCE_INVALID || muxNeg == ADC_MUX_SOURCE_INVALID)
-        return false;
-
-    if (muxPos == kInvalidMux || muxNeg == kInvalidMux)
         return false;
 
     muxPos_ = muxPos;

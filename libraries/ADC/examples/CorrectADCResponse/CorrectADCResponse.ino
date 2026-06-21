@@ -153,7 +153,7 @@ void setup() {
     if (highLevelRead == ADC_TOP_VALUE)
       maxGain = ADC_UNITY_GAIN;
 
-    for (uint16_t gain = ADC_UNITY_GAIN - 1; gain >= ADC_MIN_GAIN; --gain) {
+    for (int gain = ADC_UNITY_GAIN - 1; gain >= ADC_MIN_GAIN; --gain) {
       applyCalibration(offsetCorrectionValue, gain);
 
       Serial.print("   Gain = ");
@@ -168,7 +168,7 @@ void setup() {
         minGain = gain;
       }
 
-      if (highLevelRead < ADC_TOP_VALUE || gain == ADC_MIN_GAIN)
+      if (highLevelRead < ADC_TOP_VALUE)
         break;
     }
   }
