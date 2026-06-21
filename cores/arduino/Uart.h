@@ -72,12 +72,12 @@ class Uart : public HardwareSerial
 
     volatile bool txnDone = false;
     volatile int txnStatus = 0;
-    
+
     // Transaction pool for async operations (matches SERCOM queue depth)
     static constexpr size_t TXN_POOL_SIZE = 8;
     SercomTxn txnPool[TXN_POOL_SIZE];
     uint8_t txnPoolHead = 0;
-    
+
     SercomTxn* allocateTxn();
     static void onTxnComplete(void* user, int status);
     bool rxExternalActive = false;

@@ -151,7 +151,7 @@ const PinDescription g_APinDescription[] = {
   { PORTA, 14, PIO_DIGITAL,    (PIN_ATTR_NONE                                ), No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_NONE }, // SS:   as GPIO
   { PORTA, 15, PIO_SERCOM_ALT, (PIN_ATTR_NONE                                ), No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_NONE }, // MISO: SERCOM4/PAD[3]
   { PORTA, 27, PIO_DIGITAL,    (PIN_ATTR_NONE                                ), No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_15 },
-  
+
   { PORTB,  8, PIO_DIGITAL,    (PIN_ATTR_DIGITAL|PIN_ATTR_ANALOG             ), ADC_Channel2,   NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_NONE },
   { PORTB,  9, PIO_ANALOG,     (PIN_ATTR_PWM|PIN_ATTR_TIMER                  ), ADC_Channel3,   PWM4_CH1,   TC4_CH1,      EXTERNAL_INT_9    },
 
@@ -194,7 +194,7 @@ static inline void enable_battery_charging() {
   txn.address = PMIC_ADDRESS;
   txn.length = 2;
   txn.txPtr = txData;
-  
+
   PERIPH_WIRE.enqueueWIRE(&txn);
   PERIPH_WIRE.startTransmissionWIRE();
 }
@@ -211,13 +211,13 @@ static inline void disable_battery_fet(bool disabled) {
   // No D+/D– detection + Safety timer not slowed by 2X during input DPM or thermal regulation +
   // BAT fet disabled/enabled + charge and bat fault INT
   txData[1] = 0x0B | (disabled ? 0x20 : 0x00);
-  
+
   txn = SercomTxn{};
   txn.config = I2C_CFG_STOP;
   txn.address = PMIC_ADDRESS;
   txn.length = 2;
   txn.txPtr = txData;
-  
+
   PERIPH_WIRE.enqueueWIRE(&txn);
   PERIPH_WIRE.startTransmissionWIRE();
 }

@@ -19,7 +19,7 @@
 //   6. Phase2 DMA completes -> onComplete() callback runs
 //   7. Callback clears chainNext (or callback already cleared it)
 //   8. stopTransmissionSPI() dequeues txn, starts next queued transaction
-// 
+//
 // This design:
 //   - Avoids explicit claim/release calls (no NVIC priority dance)
 //   - Keeps atomicity logic in one place (the callback)

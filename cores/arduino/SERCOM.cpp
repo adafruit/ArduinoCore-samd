@@ -67,7 +67,7 @@ void SERCOM::resetSERCOM()
 
   // DBGCTRL is not affected by SWRST, so explicitly clear it here to ensure debug behavior is
   // consistent after reset
-  sercom->USART.DBGCTRL.bit.DBGSTOP = 0; 
+  sercom->USART.DBGCTRL.bit.DBGSTOP = 0;
 }
 
 /* =========================
@@ -661,7 +661,7 @@ void SERCOM::initWIRE(void)
   uint8_t idx = getSercomIndex();
   initClockNVIC();
   registerService(idx, static_cast<ServiceFn>(&SERCOM::stopTransmissionWIRE));
-  
+
 #ifdef USE_ZERODMA
   dmaSetCallbacks(SERCOM::dmaTxCallbackWIRE, SERCOM::dmaRxCallbackWIRE);
   if (idx >= 0)

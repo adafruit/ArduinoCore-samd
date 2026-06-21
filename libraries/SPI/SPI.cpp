@@ -132,7 +132,7 @@ SPIClass::SPIClass(SERCOM *p_sercom, uint8_t uc_pinMISO, uint8_t uc_pinSCK, uint
   // SERCOM pads
   _padTx=PadTx;
   _padRx=PadRx;
-  
+
   // Transaction pool initialization
   txnPoolHead = 0;
 }
@@ -383,7 +383,7 @@ void SPIClass::onService(void)
   if (flags & SERCOM_SPI_INTFLAG_RXC) {
     // Read completes after write, so read previous byte
     bool hasMore = _p_sercom->readDataSPI();
-    
+
     if (!hasMore) {
       _p_sercom->disableInterrupts(SERCOM_SPI_INTENCLR_DRE | SERCOM_SPI_INTENCLR_RXC | SERCOM_SPI_INTENCLR_ERROR);
       _p_sercom->setReturnValueSPI(SercomSpiError::SUCCESS);

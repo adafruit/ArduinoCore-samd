@@ -51,7 +51,7 @@ void Uart::begin(unsigned long baudrate, uint16_t config)
   pinPeripheral(uc_pinRX, g_APinDescription[uc_pinRX].ulPinType);
   pinPeripheral(uc_pinTX, g_APinDescription[uc_pinTX].ulPinType);
 
-  if (uc_padTX == UART_TX_RTS_CTS_PAD_0_2_3) { 
+  if (uc_padTX == UART_TX_RTS_CTS_PAD_0_2_3) {
     if (uc_pinCTS != NO_CTS_PIN) {
       pinPeripheral(uc_pinCTS, g_APinDescription[uc_pinCTS].ulPinType);
     }

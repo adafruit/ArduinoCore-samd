@@ -124,7 +124,7 @@ uint8_t TwoWire::requestFrom(uint8_t address, size_t quantity, bool stopBit, uin
   if(quantity == 0)
     return 0;
 
-  loader = SercomTxn{}; 
+  loader = SercomTxn{};
 
   if (rxBuffer != nullptr) {
     loader.rxPtr = rxBuffer;
@@ -212,7 +212,7 @@ uint8_t TwoWire::endTransmission(bool stopBit, void (*onComplete)(void* user, in
   SercomTxn* txn = allocateTxn();
   *txn = loader;  // Copy staged transaction data
   txn->chainNext = false;
-  
+
   // Set parameters that weren't known during beginTransmission/write
   txn->config = stopBit ? I2C_CFG_STOP : 0;
   if (onComplete) {
