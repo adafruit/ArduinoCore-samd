@@ -23,6 +23,12 @@ typedef volatile const uint8_t RoReg8;
 #define NVMCTRL_SW0 SW0_FUSES_BASE_ADDRESS
 #endif
 
+#if !defined(NVMCTRL_TEMP_LOG) && defined(TEMP_LOG_ADDR)
+#define NVMCTRL_TEMP_LOG TEMP_LOG_ADDR
+#elif !defined(NVMCTRL_TEMP_LOG) && defined(TEMP_LOG_FUSES_BASE_ADDRESS)
+#define NVMCTRL_TEMP_LOG TEMP_LOG_FUSES_BASE_ADDRESS
+#endif
+
 #if defined(__has_include)
 #if __has_include("samd51/include/component/sercom.h")
 #include "samd51/include/component/sercom.h"
@@ -204,6 +210,18 @@ typedef volatile const uint8_t RoReg8;
 #endif
 #ifndef USB_3_IRQn
 #define USB_3_IRQn USB_TRCPT1_IRQn
+#endif
+#ifndef ADC0_0_IRQn
+#define ADC0_0_IRQn ADC0_OTHER_IRQn
+#endif
+#ifndef ADC0_1_IRQn
+#define ADC0_1_IRQn ADC0_RESRDY_IRQn
+#endif
+#ifndef ADC1_0_IRQn
+#define ADC1_0_IRQn ADC1_OTHER_IRQn
+#endif
+#ifndef ADC1_1_IRQn
+#define ADC1_1_IRQn ADC1_RESRDY_IRQn
 #endif
 #ifndef DMAC_4_IRQn
 #define DMAC_4_IRQn DMAC_3_IRQn
