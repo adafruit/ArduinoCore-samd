@@ -190,10 +190,10 @@ class ChannelADC;
 class AdcEngine {
   public:
     static constexpr uint8_t kMuxMin = 0x00;
-    static constexpr uint8_t kMuxMax = 0x1C;
+    static constexpr uint8_t kMuxMax = 0x1D;
     static constexpr uint8_t kSkippedMuxStart = 0x14;
     static constexpr uint8_t kSkippedMuxEnd = 0x17;
-    static constexpr uint8_t kResultContainerSize = 25;
+    static constexpr uint8_t kResultContainerSize = 26;
 
     static AdcEngine &instance();
 
@@ -221,6 +221,7 @@ class AdcEngine {
 
     bool applyChannelAndStart(ChannelADC *channel, bool monitorMode = false);
     bool startMonitorIfIdle();
+    bool startActiveDmaConversion();
     void waitAdcSync() const;
     inline void startConversion() const {
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
@@ -257,6 +258,13 @@ class AdcEngine {
     bool dmaActive_ = false;
     bool initialized_ = false;
     volatile bool pendSvPending_ = false;
+    volatile bool pendingStartConversion_ = false;
+    enum class ConversionState : uint8_t {
+        Idle,
+        Discarding,
+        Sampling,
+    };
+    volatile ConversionState conversionState_ = ConversionState::Idle;
 };
 
 class ChannelADC {
@@ -295,6 +303,7 @@ class ChannelADC {
 
     bool setAttachedSources(uint8_t encodedPos, uint8_t encodedNeg, AdcSampleNum sampleNum);
     bool monitorConfigured() const;
+    static void onSyncReadComplete(ChannelADC *channel, uint16_t result, void *userData);
 
     uint8_t muxPos_ = 0;
     uint8_t muxNeg_ = 0x18;
@@ -308,6 +317,7 @@ class ChannelADC {
     bool differentialMode_ = false;
     bool enqueued_ = false;
     bool registered_ = false;
+    volatile bool syncReadDone_ = false;
     Callback onReadComplete_ = nullptr;
     void *userData_ = nullptr;
 

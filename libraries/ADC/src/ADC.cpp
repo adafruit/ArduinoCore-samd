@@ -148,6 +148,35 @@ inline Adc *adcInstance() {
 #endif
 }
 
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
+void configureInternalReference(uint8_t refSel) {
+    if (refSel != ADC_REFCTRL_REFSEL_INTREF_Val)
+        return;
+
+    SUPC->VREF.bit.SEL = SUPC_VREF_SEL_1V0_Val;
+    SUPC->VREF.bit.VREFOE = 1;
+}
+
+void configureTemperatureSensor(uint8_t muxPos) {
+    if (muxPos != ADC_INPUTCTRL_MUXPOS_PTAT_Val &&
+        muxPos != ADC_INPUTCTRL_MUXPOS_CTAT_Val)
+        return;
+
+    SUPC->VREF.bit.ONDEMAND = 0;
+    SUPC->VREF.bit.VREFOE = 0;
+    SUPC->VREF.bit.TSSEL = (muxPos == ADC_INPUTCTRL_MUXPOS_CTAT_Val) ? 1 : 0;
+    SUPC->VREF.bit.TSEN = 1;
+}
+
+uint8_t sampleTimeForMux(uint8_t muxPos) {
+    if (muxPos == ADC_INPUTCTRL_MUXPOS_PTAT_Val ||
+        muxPos == ADC_INPUTCTRL_MUXPOS_CTAT_Val)
+        return 0x3Fu;
+
+    return 5u;
+}
+#endif
+
 // ADC IRQ routing mirrors SERCOM family handling:
 // - SAMD2x exposes a single ADC_IRQn vector.
 // - SAME/SAMD5x splits ADC0 interrupts across two NVIC lines:
@@ -250,6 +279,8 @@ bool AdcEngine::begin() {
     enabledMask_ = 0;
     registeredCount_ = 0;
     monitorCursor_ = 0;
+    pendingStartConversion_ = false;
+    conversionState_ = ConversionState::Idle;
 
     for (uint8_t i = 0; i < kResultContainerSize; ++i) {
         queue_[i] = nullptr;
@@ -287,8 +318,8 @@ bool AdcEngine::begin() {
         NVIC_EnableIRQ(irq);
     }
 
+    adc->INTENCLR.reg = 0x0F;
     adc->INTFLAG.reg = ADC_INTFLAG_RESRDY | ADC_INTFLAG_WINMON;
-    adc->INTENSET.bit.RESRDY = 1;
     initialized_ = true;
     return true;
 }
@@ -321,6 +352,8 @@ void AdcEngine::end() {
 
     initialized_ = false;
     dmaActive_ = false;
+    pendingStartConversion_ = false;
+    conversionState_ = ConversionState::Idle;
     activeChannel_ = nullptr;
     activeMonitorMode_ = false;
     pendingChannel_ = nullptr;
@@ -442,8 +475,17 @@ void AdcEngine::onResrdyIsr() {
     }
   }
 
-    if ((flags & ADC_INTFLAG_RESRDY) != 0u)
-      adc->INTFLAG.reg = ADC_INTFLAG_RESRDY;
+    if ((flags & ADC_INTFLAG_RESRDY) != 0u) {
+      if (conversionState_ == ConversionState::Discarding) {
+        (void)adc->RESULT.reg;
+        adc->INTENCLR.bit.RESRDY = 1;
+        pendingStartConversion_ = true;
+        pendSvPending_ = true;
+        PendSV::instance().setPending(kAdcPendSvServiceId);
+      } else {
+        adc->INTFLAG.reg = ADC_INTFLAG_RESRDY;
+      }
+    }
 
     adc->INTFLAG.reg = 0x0F;
 }
@@ -453,6 +495,20 @@ void AdcEngine::onPendSv() {
         return;
 
     pendSvPending_ = false;
+
+    if (pendingStartConversion_) {
+        pendingStartConversion_ = false;
+        if (!startActiveDmaConversion()) {
+            ChannelADC *channel = activeChannel_;
+            if (channel != nullptr) {
+                channel->enqueued_ = false;
+                enabledMask_ &= ~(1u << channel->muxPos_);
+            }
+            activeChannel_ = nullptr;
+            activeMonitorMode_ = false;
+            conversionState_ = ConversionState::Idle;
+        }
+    }
 
     if (pendingCallback_ != nullptr && pendingChannel_ != nullptr)
         pendingCallback_(pendingChannel_, pendingResult_, pendingUserData_);
@@ -510,6 +566,9 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     adc->REFCTRL.reg = refctrlReg;
 
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
+    configureInternalReference(channel->refSel_);
+    configureTemperatureSensor(channel->muxPos_);
+
     const uint16_t inputCtrlReg = static_cast<uint16_t>(
         ADC_INPUTCTRL_MUXPOS(channel->muxPos_) | ADC_INPUTCTRL_MUXNEG(channel->muxNeg_) |
         (channel->differentialMode_ ? ADC_INPUTCTRL_DIFFMODE : 0u));
@@ -519,6 +578,7 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
         static_cast<uint8_t>(ADC_AVGCTRL_SAMPLENUM(sampleNumToCode(channel->sampleNum_)) |
                              ADC_AVGCTRL_ADJRES(channel->adjres_));
     adc->AVGCTRL.reg = avgCtrlReg;
+    adc->SAMPCTRL.reg = sampleTimeForMux(channel->muxPos_);
 
     uint16_t ctrlaReg = adc->CTRLA.reg;
     ctrlaReg =
@@ -591,20 +651,31 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     adc->CTRLA.bit.ENABLE = 1;
     waitAdcSync();
 
-    // The first conversion after changing the mux/reference can be stale.
-    // Match Arduino analogRead() by discarding it before arming DMA.
     adc->INTENCLR.reg = 0x0F;
     adc->INTFLAG.reg = 0x0F;
-    startConversion();
-    while ((adc->INTFLAG.reg & ADC_INTFLAG_RESRDY) == 0u)
-      ;
-    adc->INTFLAG.reg = ADC_INTFLAG_RESRDY;
 
     const uint8_t intensetReg =
         static_cast<uint8_t>(ADC_INTENSET_RESRDY |
                              ((monitorMode && channel->windowEnabled_) ? ADC_INTENSET_WINMON : 0u));
     adc->INTENSET.reg = intensetReg;
 
+    adc->INTFLAG.reg = 0x0F;
+
+    activeChannel_ = channel;
+    activeMonitorMode_ = monitorMode;
+    conversionState_ = ConversionState::Discarding;
+
+    startConversion();
+    return true;
+}
+
+bool AdcEngine::startActiveDmaConversion() {
+    ChannelADC *channel = activeChannel_;
+    if (channel == nullptr)
+        return false;
+
+    Adc *const adc = adcInstance();
+    adc->INTENCLR.bit.RESRDY = 1;
     adc->INTFLAG.reg = 0x0F;
 
     if (dmaDescriptor_ == nullptr)
@@ -616,8 +687,7 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
         return false;
 
     dmaActive_ = true;
-    activeChannel_ = channel;
-    activeMonitorMode_ = monitorMode;
+    conversionState_ = ConversionState::Sampling;
 
     startConversion();
     return true;
@@ -656,6 +726,7 @@ void AdcEngine::dmaDoneCallback(Adafruit_ZeroDMA *dma) {
 
     AdcEngine &engine = AdcEngine::instance();
     engine.dmaActive_ = false;
+    engine.conversionState_ = ConversionState::Idle;
 
     ChannelADC *channel = engine.activeChannel_;
     if (channel == nullptr)
@@ -824,20 +895,55 @@ bool ChannelADC::monitorConfigured() const {
     return windowEnabled_;
 }
 
+void ChannelADC::onSyncReadComplete(ChannelADC *channel, uint16_t result, void *userData) {
+    (void)result;
+
+    ChannelADC *target = static_cast<ChannelADC *>(userData);
+    if (target == nullptr)
+        target = channel;
+
+    if (target != nullptr)
+        target->syncReadDone_ = true;
+}
+
 bool ChannelADC::read() {
     if (!initialized_ || !attached_)
         return false;
 
     hasFreshValue_ = false;
+    syncReadDone_ = false;
 
     AdcEngine &engine = AdcEngine::instance();
-    if (!engine.enqueue(this))
-        return false;
+    const bool syncRead = (onReadComplete_ == nullptr);
+    Callback savedCallback = onReadComplete_;
+    void *savedUserData = userData_;
 
-    // No callback means caller requested blocking/synchronous behavior.
-    if (onReadComplete_ == nullptr) {
-        while (!hasFreshValue_)
+    if (syncRead) {
+        onReadComplete_ = &ChannelADC::onSyncReadComplete;
+        userData_ = this;
+    }
+
+    if (!engine.enqueue(this)) {
+        if (syncRead) {
+            onReadComplete_ = savedCallback;
+            userData_ = savedUserData;
+        }
+        return false;
+    }
+
+    if (syncRead) {
+        const uint32_t startMs = millis();
+        while (!syncReadDone_) {
             engine.service();
+            if ((millis() - startMs) > 50u) {
+                onReadComplete_ = savedCallback;
+                userData_ = savedUserData;
+                return false;
+            }
+        }
+
+        onReadComplete_ = savedCallback;
+        userData_ = savedUserData;
     }
 
     return true;

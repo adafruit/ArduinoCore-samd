@@ -20,20 +20,26 @@ void setup() {
   while (!Serial);
 
   g_temp.setReadCallback(onTempRead, nullptr);
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
+  // On SAMD5x/SAME5x, the PTAT/CTAT sensors are routed by SUPC.VREF.TSSEL
+  // with VREFOE disabled. Use a non-SUPC ADC reference for these channels.
+  g_temp.setReference(AdcRefSel::ADC_REFSEL_INTVCC1);
+#else
   g_temp.setReference(AdcRefSel::ADC_REFSEL_INT1V);
+#endif
   g_temp.setCtrlB(AdcResSel::ADC_RESSEL_12BIT, AdcPrescaler::ADC_PRESCALER_DIV32);
 
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
   g_ctat.setReadCallback(onTempRead, nullptr);
-  g_ctat.setReference(AdcRefSel::ADC_REFSEL_INT1V);
+  g_ctat.setReference(AdcRefSel::ADC_REFSEL_INTVCC1);
   g_ctat.setCtrlB(AdcResSel::ADC_RESSEL_12BIT, AdcPrescaler::ADC_PRESCALER_DIV32);
 
-  if (!g_temp.attach(AdcMuxPos::ADC_MUXPOS_TEMP, AdcMuxNeg::ADC_MUXNEG_IOGND,
+  if (!g_temp.attach(AdcMuxPos::ADC_MUXPOS_TEMP, AdcMuxNeg::ADC_MUXNEG_GND,
                      AdcSampleNum::ADC_SAMPLENUM_16)) {
     Serial.println("Attach PTAT failed");
   }
 
-  if (!g_ctat.attach(AdcMuxPos::ADC_MUXPOS_TEMP_CTAT, AdcMuxNeg::ADC_MUXNEG_IOGND,
+  if (!g_ctat.attach(AdcMuxPos::ADC_MUXPOS_TEMP_CTAT, AdcMuxNeg::ADC_MUXNEG_GND,
                      AdcSampleNum::ADC_SAMPLENUM_16)) {
     Serial.println("Attach CTAT failed");
   }
@@ -70,6 +76,11 @@ void loop() {
   const uint16_t ctat = g_lastValue;
 
   const float tempC = analogReadTemperatureC(ptat, ctat);
+  Serial.print("PTAT raw: ");
+  Serial.print(ptat);
+  Serial.print(" CTAT raw: ");
+  Serial.print(ctat);
+  Serial.print(" ");
   Serial.print("Async chip temp (C): ");
   Serial.println(tempC, 2);
 #else
