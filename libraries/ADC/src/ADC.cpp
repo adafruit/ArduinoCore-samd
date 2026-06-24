@@ -117,7 +117,7 @@ void analogReadCorrection(int offset, uint16_t gain) {
 
 namespace {
 constexpr uint8_t kMaxAdjres = 4;
-constexpr uint8_t kAdcPendSvServiceId = PendSV::kMaxServices - 1;
+constexpr uint8_t kAdcPendSvServiceId = PendSVChannels::Adc;
 constexpr uint32_t kAdcNvicPriority = (1u << __NVIC_PRIO_BITS) - 1u;
 
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
@@ -202,8 +202,10 @@ IRQn_Type adcIrqAt(uint8_t index) {
 }
 
 void adcPendSvService(uint8_t serviceId, void *context) {
-    (void)serviceId;
     (void)context;
+    if (serviceId != kAdcPendSvServiceId)
+        return;
+
     AdcEngine::instance().onPendSv();
 }
 
@@ -266,6 +268,9 @@ AdcEngine &AdcEngine::instance() {
 bool AdcEngine::begin() {
     if (initialized_)
         return true;
+
+    if (!PendSVChannels::isAvailable(kAdcPendSvServiceId))
+        return false;
 
     queueHead_ = 0;
     queueTail_ = 0;
