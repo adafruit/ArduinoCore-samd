@@ -224,31 +224,67 @@ typedef volatile const uint8_t RoReg8;
 #define ADC1_1_IRQn ADC1_RESRDY_IRQn
 #endif
 #ifndef DMAC_4_IRQn
+#ifdef DMAC_OTHER_IRQn
+#define DMAC_4_IRQn DMAC_OTHER_IRQn
+#else
 #define DMAC_4_IRQn DMAC_3_IRQn
 #endif
+#endif
 #ifndef SERCOM0_3_IRQn
+#ifdef SERCOM0_OTHER_IRQn
+#define SERCOM0_3_IRQn SERCOM0_OTHER_IRQn
+#else
 #define SERCOM0_3_IRQn SERCOM0_2_IRQn
 #endif
+#endif
 #ifndef SERCOM1_3_IRQn
+#ifdef SERCOM1_OTHER_IRQn
+#define SERCOM1_3_IRQn SERCOM1_OTHER_IRQn
+#else
 #define SERCOM1_3_IRQn SERCOM1_2_IRQn
 #endif
+#endif
 #ifndef SERCOM2_3_IRQn
+#ifdef SERCOM2_OTHER_IRQn
+#define SERCOM2_3_IRQn SERCOM2_OTHER_IRQn
+#else
 #define SERCOM2_3_IRQn SERCOM2_2_IRQn
 #endif
+#endif
 #ifndef SERCOM3_3_IRQn
+#ifdef SERCOM3_OTHER_IRQn
+#define SERCOM3_3_IRQn SERCOM3_OTHER_IRQn
+#else
 #define SERCOM3_3_IRQn SERCOM3_2_IRQn
 #endif
+#endif
 #ifndef SERCOM4_3_IRQn
+#ifdef SERCOM4_OTHER_IRQn
+#define SERCOM4_3_IRQn SERCOM4_OTHER_IRQn
+#else
 #define SERCOM4_3_IRQn SERCOM4_2_IRQn
 #endif
+#endif
 #ifndef SERCOM5_3_IRQn
+#ifdef SERCOM5_OTHER_IRQn
+#define SERCOM5_3_IRQn SERCOM5_OTHER_IRQn
+#else
 #define SERCOM5_3_IRQn SERCOM5_2_IRQn
 #endif
+#endif
 #ifndef SERCOM6_3_IRQn
+#ifdef SERCOM6_OTHER_IRQn
+#define SERCOM6_3_IRQn SERCOM6_OTHER_IRQn
+#else
 #define SERCOM6_3_IRQn SERCOM6_2_IRQn
 #endif
+#endif
 #ifndef SERCOM7_3_IRQn
+#ifdef SERCOM7_OTHER_IRQn
+#define SERCOM7_3_IRQn SERCOM7_OTHER_IRQn
+#else
 #define SERCOM7_3_IRQn SERCOM7_2_IRQn
+#endif
 #endif
 
 #endif
