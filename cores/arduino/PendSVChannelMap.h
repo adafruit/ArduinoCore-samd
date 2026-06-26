@@ -4,8 +4,8 @@
 
 template <bool HasSercom0, bool HasSercom1, bool HasSercom2, bool HasSercom3,
           bool HasSercom4, bool HasSercom5, bool HasSercom6, bool HasSercom7,
-          bool HasUsb, bool HasGmac, bool HasAdc, bool HasAes, bool HasPukcc,
-          bool HasTrng>
+          bool HasUsb, bool HasGmac, bool HasPhy, bool HasAdc, bool HasAes,
+          bool HasPukcc, bool HasTrng>
 struct PendSVChannelMap {
   static constexpr uint8_t kMaxServices = 32;
   static constexpr uint8_t kUnavailable = 0xFF;
@@ -30,7 +30,8 @@ private:
   static constexpr uint8_t kAfterSercom7 = advance(HasSercom7, kAfterSercom6);
   static constexpr uint8_t kAfterUsb = advance(HasUsb, kAfterSercom7);
   static constexpr uint8_t kAfterGmac = advance(HasGmac, kAfterUsb);
-  static constexpr uint8_t kAfterAdc = advance(HasAdc, kAfterGmac);
+  static constexpr uint8_t kAfterPhy = advance(HasPhy, kAfterGmac);
+  static constexpr uint8_t kAfterAdc = advance(HasAdc, kAfterPhy);
   static constexpr uint8_t kAfterAes = advance(HasAes, kAfterAdc);
   static constexpr uint8_t kAfterPukcc = advance(HasPukcc, kAfterAes);
 
@@ -45,7 +46,8 @@ public:
   static constexpr uint8_t Sercom7 = assign(HasSercom7, kAfterSercom6);
   static constexpr uint8_t Usb = assign(HasUsb, kAfterSercom7);
   static constexpr uint8_t Gmac = assign(HasGmac, kAfterUsb);
-  static constexpr uint8_t Adc = assign(HasAdc, kAfterGmac);
+  static constexpr uint8_t Phy = assign(HasPhy, kAfterGmac);
+  static constexpr uint8_t Adc = assign(HasAdc, kAfterPhy);
   static constexpr uint8_t Aes = assign(HasAes, kAfterAdc);
   static constexpr uint8_t Pukcc = assign(HasPukcc, kAfterAes);
   static constexpr uint8_t Trng = assign(HasTrng, kAfterPukcc);
