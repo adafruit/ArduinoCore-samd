@@ -17,7 +17,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include <sam.h>
+#include "sam.h"
 #include "same5x_compat_shim.h"
 #include <variant.h>
 #include <stdio.h>
