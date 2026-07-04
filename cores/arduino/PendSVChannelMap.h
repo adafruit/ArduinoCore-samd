@@ -5,7 +5,7 @@
 template <bool HasSercom0, bool HasSercom1, bool HasSercom2, bool HasSercom3,
           bool HasSercom4, bool HasSercom5, bool HasSercom6, bool HasSercom7,
           bool HasUsb, bool HasGmac, bool HasPhy, bool HasAdc, bool HasAes,
-          bool HasPukcc, bool HasTrng>
+          bool HasPukcc, bool HasTrng, bool HasRtc>
 struct PendSVChannelMap {
   static constexpr uint8_t kMaxServices = 32;
   static constexpr uint8_t kUnavailable = 0xFF;
@@ -34,6 +34,7 @@ private:
   static constexpr uint8_t kAfterAdc = advance(HasAdc, kAfterPhy);
   static constexpr uint8_t kAfterAes = advance(HasAes, kAfterAdc);
   static constexpr uint8_t kAfterPukcc = advance(HasPukcc, kAfterAes);
+  static constexpr uint8_t kAfterTrng = advance(HasTrng, kAfterPukcc);
 
 public:
   static constexpr uint8_t Sercom0 = assign(HasSercom0, kBase);
@@ -51,7 +52,8 @@ public:
   static constexpr uint8_t Aes = assign(HasAes, kAfterAdc);
   static constexpr uint8_t Pukcc = assign(HasPukcc, kAfterAes);
   static constexpr uint8_t Trng = assign(HasTrng, kAfterPukcc);
-  static constexpr uint8_t Count = advance(HasTrng, kAfterPukcc);
+  static constexpr uint8_t Rtc = assign(HasRtc, kAfterTrng);
+  static constexpr uint8_t Count = advance(HasRtc, kAfterTrng);
 
   static constexpr bool isAvailable(uint8_t channel) {
     return channel != kUnavailable;
