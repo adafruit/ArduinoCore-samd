@@ -4,7 +4,8 @@
 #pragma GCC system_header
 #endif
 
-#if defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+#if defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__) ||                             \
+    defined(ARDUINO_SAME54_XPLAINED_PRO)
 
 #include "sam.h"
 
