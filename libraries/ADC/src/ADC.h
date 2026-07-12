@@ -311,7 +311,14 @@ class ChannelADC {
     uint8_t adjres_ = 4;
     uint8_t refSel_ = static_cast<uint8_t>(AdcRefSel::ADC_REFSEL_INTVCC1);
     AdcResSel ressel_ = AdcResSel::ADC_RESSEL_16BIT;
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
     AdcPrescaler prescaler_ = AdcPrescaler::ADC_PRESCALER_DIV4;
+#else
+    // SAMD21 runs GCLK_ADC at 48 MHz. DIV32 yields 1.5 MHz, within the
+    // datasheet ADC clock limit; DIV4 drove the converter at 12 MHz and
+    // produced invalid, weakly input-dependent results.
+    AdcPrescaler prescaler_ = AdcPrescaler::ADC_PRESCALER_DIV32;
+#endif
     bool freeRun_ = false;
     bool leftAdjust_ = false;
     bool differentialMode_ = false;
