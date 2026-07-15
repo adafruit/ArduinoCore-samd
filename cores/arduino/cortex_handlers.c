@@ -131,10 +131,17 @@ void SERCOM7_2_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Han
 void SERCOM7_3_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void CAN0_Handler                ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void CAN1_Handler                ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAME53__) || defined(__SAME54__)
+void USB_OTHER_Handler           ( void ) __attribute__ ((weak));
+void USB_SOF_HSOF_Handler        ( void ) __attribute__ ((weak));
+void USB_TRCPT0_Handler          ( void ) __attribute__ ((weak));
+void USB_TRCPT1_Handler          ( void ) __attribute__ ((weak));
+#else
 void USB_0_Handler               ( void ) __attribute__ ((weak));
 void USB_1_Handler               ( void ) __attribute__ ((weak));
 void USB_2_Handler               ( void ) __attribute__ ((weak));
 void USB_3_Handler               ( void ) __attribute__ ((weak));
+#endif
 void GMAC_Handler                ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void TCC0_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void TCC0_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
@@ -302,10 +309,17 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 	  (void*) SERCOM7_3_Handler,             /* 77 Serial Communication Interface 7 IRQ 3 */
 	  (void*) CAN0_Handler,                  /* 78 Control Area Network 0 (SAM E5x) */
 	  (void*) CAN1_Handler,                  /* 79 Control Area Network 0 (SAM E5x) */
+#if defined(__SAME53__) || defined(__SAME54__)
+	  (void*) USB_OTHER_Handler,             /* 80 Universal Serial Bus other IRQ */
+	  (void*) USB_SOF_HSOF_Handler,          /* 81 Universal Serial Bus SOF/HSOF IRQ */
+	  (void*) USB_TRCPT0_Handler,            /* 82 Universal Serial Bus transaction 0 IRQ */
+	  (void*) USB_TRCPT1_Handler,            /* 83 Universal Serial Bus transaction 1 IRQ */
+#else
 	  (void*) USB_0_Handler,                 /* 80 Universal Serial Bus IRQ 0 */
 	  (void*) USB_1_Handler,                 /* 81 Universal Serial Bus IRQ 1 */
 	  (void*) USB_2_Handler,                 /* 82 Universal Serial Bus IRQ 2 */
 	  (void*) USB_3_Handler,                 /* 83 Universal Serial Bus IRQ 3 */
+#endif
 	  (void*) GMAC_Handler,					 /* 84 Ethernet MAC */
 	  (void*) TCC0_0_Handler,                /* 85 Timer Counter Control 0 IRQ 0 */
 	  (void*) TCC0_1_Handler,                /* 86 Timer Counter Control 0 IRQ 1 */
@@ -515,7 +529,28 @@ void SysTick_Handler(void)
 
 static void (*usb_isr)(void) = NULL;
 
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+#if defined(__SAME53__) || defined(__SAME54__)
+void USB_OTHER_Handler(void)
+{
+	if (usb_isr)
+	usb_isr();
+}
+void USB_SOF_HSOF_Handler(void)
+{
+	if (usb_isr)
+	usb_isr();
+}
+void USB_TRCPT0_Handler(void)
+{
+	if (usb_isr)
+	usb_isr();
+}
+void USB_TRCPT1_Handler(void)
+{
+	if (usb_isr)
+	usb_isr();
+}
+#elif defined(__SAMD51__) || defined(__SAME51__)
 void USB_0_Handler(void)
 {
 	if (usb_isr)
