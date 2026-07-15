@@ -272,7 +272,7 @@ uint32_t analogRead(uint32_t pin)
   } else 
 #endif
   if (pin <= 5) {
-    pin += A0;
+    pin = analogInputToDigitalPin(pin);
   }
 
   pinPeripheral(pin, PIO_ANALOG);
