@@ -87,7 +87,11 @@ void DMAC_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Han
 void DMAC_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void DMAC_2_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void DMAC_3_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAME53__) || defined(__SAME54__)
+void DMAC_OTHER_Handler          ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
 void DMAC_4_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#endif
 void EVSYS_0_Handler             ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void EVSYS_1_Handler             ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void EVSYS_2_Handler             ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
@@ -264,7 +268,11 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 	  (void*) DMAC_1_Handler,                /* 32 Direct Memory Access Controller IRQ 1 */
 	  (void*) DMAC_2_Handler,                /* 33 Direct Memory Access Controller IRQ 2 */
 	  (void*) DMAC_3_Handler,                /* 34 Direct Memory Access Controller IRQ 3 */
+#if defined(__SAME53__) || defined(__SAME54__)
+	  (void*) DMAC_OTHER_Handler,            /* 35 Direct Memory Access Controller other IRQ */
+#else
 	  (void*) DMAC_4_Handler,                /* 35 Direct Memory Access Controller IRQ 4 */
+#endif
 	  (void*) EVSYS_0_Handler,               /* 36 Event System Interface IRQ 0 */
 	  (void*) EVSYS_1_Handler,               /* 37 Event System Interface IRQ 1 */
 	  (void*) EVSYS_2_Handler,               /* 38 Event System Interface IRQ 2 */
