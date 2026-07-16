@@ -687,6 +687,7 @@ void SERCOM::initSlaveWIRE( uint16_t ucAddress, bool enableGeneralCall, uint8_t 
                SERCOM_I2CS_ADDR_ADDRMASK(0x00ul) |             // 0x00, only match exact address
                (enable10Bit ? SERCOM_I2CS_ADDR_TENBITEN : 0) | // 10-bit addressing
                enableGeneralCall;                              // enable general call (address 0x00)
+  _wire.slaveConfigured = true;
   setSlaveWIRE();
 }
 
@@ -695,6 +696,7 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
   initWIRE();
 
   setBaudrateWIRE(baudrate);
+  _wire.slaveConfigured = false;
   setMasterWIRE();
 }
 
@@ -874,8 +876,14 @@ bool SERCOM::enqueueWIRE(SercomTxn* txn)
     return false;  // Queue full; caller must retry at runtime
   if (!_txnQueue.store(txn))
     return false;
-  if (!_wire.active)
+  if (!_wire.active) {
+    // dI2C uses a single SERCOM as both an addressed client and a host. A
+    // queued host operation is the role-transition point; callers must not
+    // tear down and re-begin Wire around every transaction.
+    if (!isMasterWIRE())
+      setMasterWIRE();
     return startTransmissionWIRE() != nullptr;
+  }
   return true;
 }
 
@@ -974,10 +982,13 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
 
   if (_txnQueue.peek(next) && isMaster)
     startTransmissionWIRE();
-  else if (isMaster)
+  else if (isMaster) {
     sercom->I2CM.INTENCLR.reg = SERCOM_I2CM_INTENCLR_ERROR |
                                 SERCOM_I2CM_INTENCLR_MB    |
                                 SERCOM_I2CM_INTENCLR_SB;
+    if (_wire.slaveConfigured)
+      setSlaveWIRE();
+  }
 
   return txn;
 }

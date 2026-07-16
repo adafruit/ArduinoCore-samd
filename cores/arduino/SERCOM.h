@@ -428,6 +428,7 @@ class SERCOM
 			uint8_t masterSpeed = 0x0;               // default to lowest speed
 			uint8_t slaveSpeed = 0x0;                // default to lowest speed
 			bool inited = false;		             // whether initMaster/SlaveWIRE has been called
+			bool slaveConfigured = false;             // return to client mode after queued host work
 			bool useDma = false;		             // per transaction DMA use flag for Host/Client modes
 			bool active = false;                     // active transaction in progress
 			uint8_t retryCount = 0;                  // retry count for recoverable bus errors
