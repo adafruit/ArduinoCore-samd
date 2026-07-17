@@ -103,29 +103,35 @@ const uint8_t g_AAnalogPinMap[NUM_ANALOG_INPUTS] = {
     PIN_A8, PIN_A9, PIN_A10, PIN_A11, PIN_A12, PIN_A13, PIN_A14, PIN_A15,
 };
 
-const void *g_apTCInstances[TCC_INST_NUM + TC_INST_NUM] = {TCC0, TCC1, TCC2, TCC3, TCC4, TC0, TC1, TC2, TC3, TC4, TC5};
-const uint32_t GCLK_CLKCTRL_IDs[TCC_INST_NUM + TC_INST_NUM] = {TCC0_GCLK_ID, TCC1_GCLK_ID, TCC2_GCLK_ID, TCC3_GCLK_ID, TCC4_GCLK_ID, TC0_GCLK_ID, TC1_GCLK_ID, TC2_GCLK_ID, TC3_GCLK_ID, TC4_GCLK_ID, TC5_GCLK_ID};
+const void *g_apTCInstances[ARDUINO_TCC_INSTANCE_COUNT + ARDUINO_TC_INSTANCE_COUNT] = {
+    TCC0_REGS, TCC1_REGS, TCC2_REGS, TCC3_REGS, TCC4_REGS,
+    TC0_REGS, TC1_REGS, TC2_REGS, TC3_REGS, TC4_REGS, TC5_REGS,
+    TC6_REGS, TC7_REGS};
+const uint32_t GCLK_CLKCTRL_IDs[ARDUINO_TCC_INSTANCE_COUNT + ARDUINO_TC_INSTANCE_COUNT] = {
+    TCC0_GCLK_ID, TCC1_GCLK_ID, TCC2_GCLK_ID, TCC3_GCLK_ID, TCC4_GCLK_ID,
+    TC0_GCLK_ID, TC1_GCLK_ID, TC2_GCLK_ID, TC3_GCLK_ID, TC4_GCLK_ID,
+    TC5_GCLK_ID, TC6_GCLK_ID, TC7_GCLK_ID};
 
 // Multi-serial objects instantiation
-SERCOM sercom0(SERCOM0);
-SERCOM sercom1(SERCOM1);
-SERCOM sercom2(SERCOM2);
-SERCOM sercom3(SERCOM3);
-SERCOM sercom4(SERCOM4);
-SERCOM sercom5(SERCOM5);
-SERCOM sercom6(SERCOM6);
-SERCOM sercom7(SERCOM7);
+SERCOM sercom0(SERCOM0_REGS);
+SERCOM sercom1(SERCOM1_REGS);
+SERCOM sercom2(SERCOM2_REGS);
+SERCOM sercom3(SERCOM3_REGS);
+SERCOM sercom4(SERCOM4_REGS);
+SERCOM sercom5(SERCOM5_REGS);
+SERCOM sercom6(SERCOM6_REGS);
+SERCOM sercom7(SERCOM7_REGS);
 
 Uart Serial1(&sercom0, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX);
 Uart Serial2(&sercom5, PIN_SERIAL2_RX, PIN_SERIAL2_TX, PAD_SERIAL2_RX, PAD_SERIAL2_TX);
 Uart Serial3(&sercom1, PIN_SERIAL3_RX, PIN_SERIAL3_TX, PAD_SERIAL3_RX, PAD_SERIAL3_TX);
 Uart Serial4(&sercom2, PIN_SERIAL4_RX, PIN_SERIAL4_TX, PAD_SERIAL4_RX, PAD_SERIAL4_TX);
 
-#define UART_HANDLERS(n, serial)                                                                     \
-    void SERCOM##n##_0_Handler() { serial.IrqHandler(); }                                             \
-    void SERCOM##n##_1_Handler() { serial.IrqHandler(); }                                             \
-    void SERCOM##n##_2_Handler() { serial.IrqHandler(); }                                             \
-    void SERCOM##n##_3_Handler() { serial.IrqHandler(); }
+#define UART_HANDLERS(n, serial)                                                                         \
+    void SERCOM##n##_0_Handler() { serial.IrqHandler(); }                                                 \
+    void SERCOM##n##_1_Handler() { serial.IrqHandler(); }                                                 \
+    void SERCOM##n##_2_Handler() { serial.IrqHandler(); }                                                 \
+    void SERCOM##n##_OTHER_Handler() { serial.IrqHandler(); }
 
 UART_HANDLERS(0, Serial1)
 UART_HANDLERS(5, Serial2)

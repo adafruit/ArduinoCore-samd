@@ -211,7 +211,7 @@ extern const uint8_t g_AAnalogPinMap[NUM_ANALOG_INPUTS];
 #define WIRE_IT_HANDLER_0 SERCOM3_0_Handler
 #define WIRE_IT_HANDLER_1 SERCOM3_1_Handler
 #define WIRE_IT_HANDLER_2 SERCOM3_2_Handler
-#define WIRE_IT_HANDLER_3 SERCOM3_3_Handler
+#define WIRE_IT_HANDLER_OTHER SERCOM3_OTHER_Handler
 
   static const uint8_t SDA = PIN_WIRE_SDA;
   static const uint8_t SCL = PIN_WIRE_SCL;
@@ -223,7 +223,7 @@ extern const uint8_t g_AAnalogPinMap[NUM_ANALOG_INPUTS];
 #define WIRE1_IT_HANDLER_0 SERCOM7_0_Handler
 #define WIRE1_IT_HANDLER_1 SERCOM7_1_Handler
 #define WIRE1_IT_HANDLER_2 SERCOM7_2_Handler
-#define WIRE1_IT_HANDLER_3 SERCOM7_3_Handler
+#define WIRE1_IT_HANDLER_OTHER SERCOM7_OTHER_Handler
 
   static const uint8_t SDA1 = PIN_WIRE1_SDA;
   static const uint8_t SCL1 = PIN_WIRE1_SCL;

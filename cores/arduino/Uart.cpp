@@ -60,8 +60,13 @@ void Uart::begin(unsigned long baudrate, uint16_t config)
     pinMode(uc_pinRTS, OUTPUT);
 
     EPortType rtsPort = g_APinDescription[uc_pinRTS].ulPort;
+#if defined(ARDUINO_SAME53_E54)
+    pul_outsetRTS = &PORT_REGS->GROUP[rtsPort].PORT_OUTSET;
+    pul_outclrRTS = &PORT_REGS->GROUP[rtsPort].PORT_OUTCLR;
+#else
     pul_outsetRTS = &PORT->Group[rtsPort].OUTSET.reg;
     pul_outclrRTS = &PORT->Group[rtsPort].OUTCLR.reg;
+#endif
     ul_pinMaskRTS = (1ul << g_APinDescription[uc_pinRTS].ulPin);
 
     *pul_outclrRTS = ul_pinMaskRTS;

@@ -33,7 +33,7 @@ extern const uint32_t __text_start__;
 
 #else
 
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 #define APP_START 0x00004004
 #else
 #define APP_START 0x00002004
@@ -42,8 +42,10 @@ extern const uint32_t __text_start__;
 #endif
 
 static inline bool nvmReady(void) {
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51)
 		return NVMCTRL->STATUS.reg & NVMCTRL_STATUS_READY;
+#elif defined(ARDUINO_SAME53_E54)
+		return NVMCTRL_REGS->NVMCTRL_STATUS & NVMCTRL_STATUS_READY_Msk;
 #else
         return NVMCTRL->INTFLAG.reg & NVMCTRL_INTFLAG_READY;
 #endif
@@ -54,7 +56,7 @@ static void banzai() {
 	// Disable all interrupts
 	__disable_irq();
 	
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 	//THESE MUST MATCH THE BOOTLOADER
 	#define DOUBLE_TAP_MAGIC 			0xf01669efUL
 	#define BOOT_DOUBLE_TAP_ADDRESS     (HSRAM_ADDR + HSRAM_SIZE - 4)

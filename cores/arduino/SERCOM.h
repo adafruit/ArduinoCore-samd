@@ -168,7 +168,13 @@ typedef enum {
 class SERCOM
 {
 	public:
+#if defined(ARDUINO_SAMD51_E51)
 		SERCOM(Sercom* s) ;
+#elif defined(ARDUINO_SAME53_E54)
+		SERCOM(sercom_registers_t* s) ;
+#else
+		SERCOM(Sercom* s) ;
+#endif
 
 		/* ========== UART ========== */
 		void initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint32_t baudrate=0) ;
@@ -238,7 +244,7 @@ class SERCOM
 		uint8_t readDataWIRE( void ) ;
 		int8_t getSercomIndex(void);
                 uint32_t getSercomFreqRef(void);
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 		// SERCOM clock source override is only available on
 		// SAMD51 (not 21) ... but these functions are declared
 		// regardless so user code doesn't need ifdefs or lengthy
@@ -255,9 +261,15 @@ class SERCOM
 #endif
 
           private:
+#if defined(ARDUINO_SAMD51_E51)
                 Sercom *sercom;
+#elif defined(ARDUINO_SAME53_E54)
+                sercom_registers_t *sercom;
+#else
+                Sercom *sercom;
+#endif
                 uint32_t freqRef = 48000000ul; // Frequency corresponding to clockSource
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
                 SercomClockSource clockSource;
 #endif
 		uint8_t calculateBaudrateSynchronous(uint32_t baudrate);

@@ -23,6 +23,23 @@
 #include "sam.h"
 #include <limits.h>
 
+#if defined(ARDUINO_SAMD51_E51)
+enum {
+  ARDUINO_TCC_INSTANCE_COUNT = TCC_INST_NUM,
+  ARDUINO_TC_INSTANCE_COUNT = TC_INST_NUM,
+};
+#elif defined(ARDUINO_SAME53_E54)
+enum {
+  ARDUINO_TCC_INSTANCE_COUNT = 5,
+  ARDUINO_TC_INSTANCE_COUNT = 8,
+};
+#else
+enum {
+  ARDUINO_TCC_INSTANCE_COUNT = TCC_INST_NUM,
+  ARDUINO_TC_INSTANCE_COUNT = TC_INST_NUM,
+};
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -39,18 +56,30 @@ typedef enum _EAnalogChannel
   ADC_Channel5=5,
   ADC_Channel6=6,
   ADC_Channel7=7,
-#if defined __SAMD21J18A__ || defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
   ADC_Channel8=8,
   ADC_Channel9=9,
-#endif // __SAMD21J18A__
+#else
+  #if defined(__SAMD21J18A__)
+    ADC_Channel8=8,
+    ADC_Channel9=9,
+  #endif
+#endif
   ADC_Channel10=10,
   ADC_Channel11=11,
-#if defined __SAMD21J18A__ || defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
   ADC_Channel12=12,
   ADC_Channel13=13,
   ADC_Channel14=14,
   ADC_Channel15=15,
-#endif // __SAMD21J18A__
+#else
+  #if defined(__SAMD21J18A__)
+    ADC_Channel12=12,
+    ADC_Channel13=13,
+    ADC_Channel14=14,
+    ADC_Channel15=15,
+  #endif
+#endif
   ADC_Channel16=16,
   ADC_Channel17=17,
   ADC_Channel18=18,
@@ -61,7 +90,7 @@ typedef enum _EAnalogChannel
   ADC_Channel_PTAT=0x1C,
 } EAnalogChannel ;
 
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 
 #if defined(__SAMD51G19A__) || defined(__SAME51G19A__)
 
@@ -136,7 +165,7 @@ typedef enum _ETCChannel
   TC7_CH1 =  (12<<8)|(1),
 } ETCChannel ;
 
-#elif defined(__SAME53N20A__) || defined(__SAME53N19A__) || defined(__SAME54P20A__) || defined(__SAME54P19A__) || defined(__SAME54N20A__) || defined(__SAME54N19A__) || defined(__SAMD51P20A__) || defined(__SAMD51P19A__) || defined(__SAMD51N20A__) || defined(__SAMD51N19A__) || defined(__SAME51N20A__) || defined(__SAME51N19A__)
+#else
 
 typedef enum _ETCChannel
 {
@@ -179,7 +208,7 @@ typedef enum _ETCChannel
 #endif
 
 typedef ETCChannel EPWMChannel;
-extern const uint32_t GCLK_CLKCTRL_IDs[TCC_INST_NUM+TC_INST_NUM];
+extern const uint32_t GCLK_CLKCTRL_IDs[ARDUINO_TCC_INSTANCE_COUNT + ARDUINO_TC_INSTANCE_COUNT];
 
 #define NOT_ON_PWM NOT_ON_TIMER
 
@@ -254,7 +283,7 @@ typedef enum _EPWMChannel
 
 #endif
 
-extern const void* g_apTCInstances[TCC_INST_NUM+TC_INST_NUM] ;
+extern const void* g_apTCInstances[ARDUINO_TCC_INSTANCE_COUNT + ARDUINO_TC_INSTANCE_COUNT] ;
 
 #define GetTCNumber( x ) ( (x) >> 8 )
 #define GetTCChannelNumber( x ) ( (x) & 0xff )
@@ -307,7 +336,7 @@ typedef enum _EPioType
   PIO_SERCOM_ALT,       /* The pin is controlled by the associated signal of peripheral D. */
   PIO_TIMER,            /* The pin is controlled by the associated signal of peripheral E. */
   PIO_TIMER_ALT,        /* The pin is controlled by the associated signal of peripheral F. */
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
   PIO_TCC_PDEC,			/* The pin is controlled by the associated signal of peripheral G. */
   PIO_COM,             /* The pin is controlled by the associated signal of peripheral H. */
   PIO_SDHC,             /* The pin is controlled by the associated signal of peripheral I. */
@@ -341,7 +370,7 @@ typedef enum _EPioType
 #define PIN_ATTR_EXTINT        (1UL<<6)
 #define PIN_ATTR_ANALOG_ALT	   (1UL<<7)
 
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 // these correspond to the mux table
 #define PIN_ATTR_PWM_E         (1UL<<3)
 #define PIN_ATTR_PWM_F         (1UL<<8)
