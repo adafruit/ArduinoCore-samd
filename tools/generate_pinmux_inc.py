@@ -245,22 +245,27 @@ def pin_name_to_port_pin(pin_name: str) -> Tuple[str, int]:
 
 def macro_candidates(dev: str) -> List[str]:
     """
-    Return the canonical sam.h device macro for a device name.
+    Return CMSIS sam.h device macros for a device name.
 
-    sam.h defines exactly one macro per device with pattern __DEVICENAME__
-    where DEVICENAME is the datasheet name with "AT" prefix stripped.
+    CMSIS sam.h accepts both stripped and AT-prefixed forms for the selected
+    device. SAMD51/E5x datasheet tables omit the revision suffix, while the
+    CMSIS device selectors include it.
 
     Examples:
         ATSAMD21E18A → __SAMD21E18A__
         ATSAMDA1E14B → __SAMDA1E14B__
-        SAMD51J19A → __SAMD51J19A__
-        SAME53N20 → __SAME53N20__
+        SAMD51J19 → __SAMD51J19A__ or __ATSAMD51J19A__
+        SAME53N20 → __SAME53N20A__ or __ATSAME53N20A__
     """
     dev_upper = dev.upper()
     # Strip "AT" prefix if present (ATSAMD21E18A → SAMD21E18A)
     if dev_upper.startswith("AT"):
         dev_upper = dev_upper[2:]
-    return [f"__{dev_upper}__"]
+
+    if re.match(r"SAM[DE]5[134][GJNP]\d\d$", dev_upper):
+        dev_upper = f"{dev_upper}A"
+
+    return [f"__{dev_upper}__", f"__AT{dev_upper}__"]
 
 
 def classify_device_series(device: str, pin_count: str) -> str:
@@ -466,7 +471,7 @@ def format_series_macro(series_name: str, device_macros: List[str]) -> List[str]
 
         lines.extend(output_lines)
 
-    lines.append("#endif")
+    lines.append(f"#endif // {series_name}")
     return lines
 
 
@@ -504,16 +509,21 @@ def emit_series_macros(
         lines.extend(format_series_macro(series_name, unique_checks))
         lines.append("")
 
-    lines.append("#ifdef FAMILY_SAMD2X")
+    lines.append("#if !defined(ARDUINO_SAMD51_E51) && !defined(ARDUINO_SAME53_E54)")
     lines.append("#if !(SAMD21E_SERIES || SAMD21G_SERIES || SAMD21J_SERIES || SAMDA1_SERIES)")
     lines.append("#define SAMD21E_SERIES 1")
-    lines.append("#endif")
-    lines.append("#endif")
-    lines.append("#ifdef FAMILY_SAMD5X")
-    lines.append("#if !(SAMD51_SERIES || SAMD51_120_SERIES || SAME51_SERIES || SAME53_SERIES || SAME54_SERIES || SAME54_120_SERIES)")
+    lines.append("#endif // !(SAMD21E_SERIES || SAMD21G_SERIES || SAMD21J_SERIES || SAMDA1_SERIES)")
+    lines.append("#endif // !ARDUINO_SAMD51_E51 && !ARDUINO_SAME53_E54")
+    lines.append("#if defined(ARDUINO_SAMD51_E51)")
+    lines.append("#if !(SAMD51_SERIES || SAMD51_120_SERIES || SAME51_SERIES)")
     lines.append("#define SAMD51_SERIES 1")
-    lines.append("#endif")
-    lines.append("#endif")
+    lines.append("#endif // !(SAMD51_SERIES || SAMD51_120_SERIES || SAME51_SERIES)")
+    lines.append("#endif // ARDUINO_SAMD51_E51")
+    lines.append("#if defined(ARDUINO_SAME53_E54)")
+    lines.append("#if !(SAME53_SERIES || SAME54_SERIES || SAME54_120_SERIES)")
+    lines.append("#define SAME54_SERIES 1")
+    lines.append("#endif // !(SAME53_SERIES || SAME54_SERIES || SAME54_120_SERIES)")
+    lines.append("#endif // ARDUINO_SAME53_E54")
     lines.append("")
     return lines
 
@@ -538,7 +548,7 @@ def emit_i2c_entries(
         for pin_name, s0, p0, s1, p1 in pin_config:
             port, pin = pin_name_to_port_pin(pin_name)
             lines.append(f"SERCOM_I2C_PIN('{port}', {pin}, {s0}, {p0}, {s1}, {p1})")
-        lines.append("#endif\n")
+        lines.append(f"#endif // {guard_expr}\n")
     return lines
 
 
@@ -572,7 +582,7 @@ def emit_spi_entries(
         for pin_name, (s0, p0, s1, p1) in spi_series_map[series_name]:
             port, pin = pin_name_to_port_pin(pin_name)
             lines.append(f"SERCOM_SPI_PIN('{port}', {pin}, {s0}, {p0}, {s1}, {p1})")
-        lines.append("#endif\n")
+        lines.append(f"#endif // {series_name}\n")
     return lines
 
 
@@ -588,12 +598,12 @@ def emit_sercom_inc(
 
     lines.append("#if defined(SERCOM_PINMUX_EMIT_I2C)")
     lines.extend(emit_i2c_entries(series_map))
-    lines.append("#endif")
+    lines.append("#endif // SERCOM_PINMUX_EMIT_I2C")
     lines.append("")
 
     lines.append("#if defined(SERCOM_PINMUX_EMIT_SPI)")
     lines.extend(emit_spi_entries(series_map, spi_series_map))
-    lines.append("#endif")
+    lines.append("#endif // SERCOM_PINMUX_EMIT_SPI")
     lines.append("")
 
     return "\n".join(lines)

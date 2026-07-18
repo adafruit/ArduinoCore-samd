@@ -25,7 +25,7 @@
 
 #if defined(SERCOM_INST_NUM) && (SPI_INTERFACES_COUNT > SERCOM_INST_NUM)
 #error "SPI_INTERFACES_COUNT exceeds available SERCOM instances for this MCU"
-#endif
+#endif // SERCOM_INST_NUM && SPI_INTERFACES_COUNT > SERCOM_INST_NUM
 
 // SPI_HAS_TRANSACTION means SPI has
 //   - beginTransaction()
@@ -42,7 +42,7 @@
 #define SPI_MODE2 0x03
 #define SPI_MODE3 0x01
 
-#ifdef FAMILY_SAMD5X
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
 // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
 // this affects ALL SPI peripherals including some that should NOT be
@@ -50,20 +50,20 @@
 // directly via the SERCOM API instead. This is left here for compatibility.
 #if !defined(MAX_SPI)
 #define MAX_SPI 24000000
-#endif
+#endif // !MAX_SPI
 #define SPI_MIN_CLOCK_DIVIDER 1
 #else
-  // The datasheet specifies a typical SPI SCK period (tSCK) of 42 ns,
-  // see "Table 36-48. SPI Timing Characteristics and Requirements",
-  // which translates into a maximum SPI clock of 23.8 MHz.
-  // We'll permit use of 24 MHz SPI even though this is slightly out
-  // of spec. Given how clock dividers work, the next "sensible"
-  // threshold would be a substantial drop down to 12 MHz.
-  #if !defined(MAX_SPI)
-    #define MAX_SPI 24000000
-  #endif
-  #define SPI_MIN_CLOCK_DIVIDER (uint8_t)(1 + ((F_CPU - 1) / MAX_SPI))
-#endif
+// The datasheet specifies a typical SPI SCK period (tSCK) of 42 ns,
+// see "Table 36-48. SPI Timing Characteristics and Requirements",
+// which translates into a maximum SPI clock of 23.8 MHz.
+// We'll permit use of 24 MHz SPI even though this is slightly out
+// of spec. Given how clock dividers work, the next "sensible"
+// threshold would be a substantial drop down to 12 MHz.
+#if !defined(MAX_SPI)
+#define MAX_SPI 24000000
+#endif // !MAX_SPI
+#define SPI_MIN_CLOCK_DIVIDER (uint8_t)(1 + ((F_CPU - 1) / MAX_SPI))
+#endif // ARDUINO_SAMD51_E51 || ARDUINO_SAME53_E54
 
 class SPISettings {
   public:
@@ -84,11 +84,11 @@ class SPISettings {
   }
 
   void init_AlwaysInline(uint32_t clock, BitOrder bitOrder, uint8_t dataMode) __attribute__((__always_inline__)) {
-#ifdef FAMILY_SAMD5X
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
     this->clockFreq = clock; // Clipping handled in SERCOM.cpp
 #else
     this->clockFreq = clock >= MAX_SPI ? MAX_SPI : clock;
-#endif
+#endif // ARDUINO_SAMD51_E51 || ARDUINO_SAME53_E54
 
     this->bitOrder = (bitOrder == MSBFIRST ? MSB_FIRST : LSB_FIRST);
 
@@ -177,28 +177,28 @@ class SPIClass {
 
 #if SPI_INTERFACES_COUNT > 0
   extern SPIClass SPI;
-#endif
+#endif // SPI_INTERFACES_COUNT > 0
 #if SPI_INTERFACES_COUNT > 1
   extern SPIClass SPI1;
-#endif
+#endif // SPI_INTERFACES_COUNT > 1
 #if SPI_INTERFACES_COUNT > 2
   extern SPIClass SPI2;
-#endif
+#endif // SPI_INTERFACES_COUNT > 2
 #if SPI_INTERFACES_COUNT > 3
   extern SPIClass SPI3;
-#endif
+#endif // SPI_INTERFACES_COUNT > 3
 #if SPI_INTERFACES_COUNT > 4
   extern SPIClass SPI4;
-#endif
+#endif // SPI_INTERFACES_COUNT > 4
 #if SPI_INTERFACES_COUNT > 5
   extern SPIClass SPI5;
-#endif
+#endif // SPI_INTERFACES_COUNT > 5
 #if SPI_INTERFACES_COUNT > 6
   extern SPIClass SPI6;
-#endif
+#endif // SPI_INTERFACES_COUNT > 6
 #if SPI_INTERFACES_COUNT > 7
   extern SPIClass SPI7;
-#endif
+#endif // SPI_INTERFACES_COUNT > 7
 
   // For compatibility with sketches designed for AVR @ 16 MHz
   // New programs should use SPI.beginTransaction to set the SPI clock
@@ -210,4 +210,4 @@ class SPIClass {
 #define SPI_CLOCK_DIV64 (MAX_SPI * 2 / 250000)
 #define SPI_CLOCK_DIV128 (MAX_SPI * 2 / 125000)
 
-#endif
+#endif // _SPI_H_INCLUDED

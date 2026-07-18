@@ -2,71 +2,76 @@
 // Define SERCOM_PINMUX_EMIT_I2C and/or SERCOM_PINMUX_EMIT_SPI before including.
 
 #ifndef SAMD21E_SERIES
-#define SAMD21E_SERIES (defined(__SAMD21E15A__) || defined(__SAMD21E15B__) || defined(__SAMD21E15C__) || defined(__SAMD21E15L__) || \
-                        defined(__SAMD21E16A__) || defined(__SAMD21E16B__) || defined(__SAMD21E16C__) || defined(__SAMD21E16L__) || \
-                        defined(__SAMD21E17A__) || defined(__SAMD21E17D__) || defined(__SAMD21E17L__) || \
-                        defined(__SAMD21E18A__))
-#endif
+#define SAMD21E_SERIES (defined(__ATSAMD21E15A__) || defined(__ATSAMD21E15B__) || defined(__ATSAMD21E15C__) || defined(__ATSAMD21E15L__) || defined(__SAMD21E15A__) || defined(__SAMD21E15B__) || defined(__SAMD21E15C__) || defined(__SAMD21E15L__) || \
+                        defined(__ATSAMD21E16A__) || defined(__ATSAMD21E16B__) || defined(__ATSAMD21E16C__) || defined(__ATSAMD21E16L__) || defined(__SAMD21E16A__) || defined(__SAMD21E16B__) || defined(__SAMD21E16C__) || defined(__SAMD21E16L__) || \
+                        defined(__ATSAMD21E17A__) || defined(__ATSAMD21E17D__) || defined(__ATSAMD21E17L__) || defined(__SAMD21E17A__) || defined(__SAMD21E17D__) || defined(__SAMD21E17L__) || \
+                        defined(__ATSAMD21E18A__) || defined(__SAMD21E18A__))
+#endif // SAMD21E_SERIES
 
 #ifndef SAMD21G_SERIES
-#define SAMD21G_SERIES (defined(__SAMD21G15A__) || defined(__SAMD21G15B__) || \
-                        defined(__SAMD21G16A__) || defined(__SAMD21G16B__) || defined(__SAMD21G16L__) || \
-                        defined(__SAMD21G17A__) || defined(__SAMD21G17D__) || defined(__SAMD21G17L__) || \
-                        defined(__SAMD21G18A__))
-#endif
+#define SAMD21G_SERIES (defined(__ATSAMD21G15A__) || defined(__ATSAMD21G15B__) || defined(__SAMD21G15A__) || defined(__SAMD21G15B__) || \
+                        defined(__ATSAMD21G16A__) || defined(__ATSAMD21G16B__) || defined(__ATSAMD21G16L__) || defined(__SAMD21G16A__) || defined(__SAMD21G16B__) || defined(__SAMD21G16L__) || \
+                        defined(__ATSAMD21G17A__) || defined(__ATSAMD21G17D__) || defined(__ATSAMD21G17L__) || defined(__SAMD21G17A__) || defined(__SAMD21G17D__) || defined(__SAMD21G17L__) || \
+                        defined(__ATSAMD21G18A__) || defined(__SAMD21G18A__))
+#endif // SAMD21G_SERIES
 
 #ifndef SAMD21J_SERIES
-#define SAMD21J_SERIES (defined(__SAMD21J15A__) || defined(__SAMD21J15B__) || \
-                        defined(__SAMD21J16A__) || defined(__SAMD21J16B__) || \
-                        defined(__SAMD21J17A__) || defined(__SAMD21J17D__) || \
-                        defined(__SAMD21J18A__))
-#endif
+#define SAMD21J_SERIES (defined(__ATSAMD21J15A__) || defined(__ATSAMD21J15B__) || defined(__SAMD21J15A__) || defined(__SAMD21J15B__) || \
+                        defined(__ATSAMD21J16A__) || defined(__ATSAMD21J16B__) || defined(__SAMD21J16A__) || defined(__SAMD21J16B__) || \
+                        defined(__ATSAMD21J17A__) || defined(__ATSAMD21J17D__) || defined(__SAMD21J17A__) || defined(__SAMD21J17D__) || \
+                        defined(__ATSAMD21J18A__) || defined(__SAMD21J18A__))
+#endif // SAMD21J_SERIES
 
 #ifndef SAMDA1_SERIES
-#define SAMDA1_SERIES (defined(__SAMDA1E14B__) || defined(__SAMDA1G14B__) || defined(__SAMDA1J14B__) || \
-                        defined(__SAMDA1E15B__) || defined(__SAMDA1G15B__) || defined(__SAMDA1J15B__) || \
-                        defined(__SAMDA1E16B__) || defined(__SAMDA1G16B__) || defined(__SAMDA1J16B__))
-#endif
+#define SAMDA1_SERIES (defined(__ATSAMDA1E14B__) || defined(__ATSAMDA1G14B__) || defined(__ATSAMDA1J14B__) || defined(__SAMDA1E14B__) || defined(__SAMDA1G14B__) || defined(__SAMDA1J14B__) || \
+                        defined(__ATSAMDA1E15B__) || defined(__ATSAMDA1G15B__) || defined(__ATSAMDA1J15B__) || defined(__SAMDA1E15B__) || defined(__SAMDA1G15B__) || defined(__SAMDA1J15B__) || \
+                        defined(__ATSAMDA1E16B__) || defined(__ATSAMDA1G16B__) || defined(__ATSAMDA1J16B__) || defined(__SAMDA1E16B__) || defined(__SAMDA1G16B__) || defined(__SAMDA1J16B__))
+#endif // SAMDA1_SERIES
 
 #ifndef SAMD51_120_SERIES
-#define SAMD51_120_SERIES (defined(__SAMD51P19__) || defined(__SAMD51P20__))
-#endif
+#define SAMD51_120_SERIES (defined(__ATSAMD51P19A__) || defined(__ATSAMD51P20A__) || defined(__SAMD51P19A__) || defined(__SAMD51P20A__))
+#endif // SAMD51_120_SERIES
 
 #ifndef SAMD51_SERIES
-#define SAMD51_SERIES (defined(__SAMD51G18__) || defined(__SAMD51G19__) || \
-                        defined(__SAMD51J18__) || defined(__SAMD51J19__) || defined(__SAMD51J20__) || \
-                        defined(__SAMD51N19__) || defined(__SAMD51N20__))
-#endif
+#define SAMD51_SERIES (defined(__ATSAMD51G18A__) || defined(__ATSAMD51G19A__) || defined(__SAMD51G18A__) || defined(__SAMD51G19A__) || \
+                        defined(__ATSAMD51J18A__) || defined(__ATSAMD51J19A__) || defined(__ATSAMD51J20A__) || defined(__SAMD51J18A__) || defined(__SAMD51J19A__) || defined(__SAMD51J20A__) || \
+                        defined(__ATSAMD51N19A__) || defined(__ATSAMD51N20A__) || defined(__SAMD51N19A__) || defined(__SAMD51N20A__))
+#endif // SAMD51_SERIES
 
 #ifndef SAME51_SERIES
-#define SAME51_SERIES (defined(__SAME51G18__) || defined(__SAME51G19__) || \
-                        defined(__SAME51J18__) || defined(__SAME51J19__) || defined(__SAME51J20__) || \
-                        defined(__SAME51N19__) || defined(__SAME51N20__))
-#endif
+#define SAME51_SERIES (defined(__ATSAME51G18A__) || defined(__ATSAME51G19A__) || defined(__SAME51G18A__) || defined(__SAME51G19A__) || \
+                        defined(__ATSAME51J18A__) || defined(__ATSAME51J19A__) || defined(__ATSAME51J20A__) || defined(__SAME51J18A__) || defined(__SAME51J19A__) || defined(__SAME51J20A__) || \
+                        defined(__ATSAME51N19A__) || defined(__ATSAME51N20A__) || defined(__SAME51N19A__) || defined(__SAME51N20A__))
+#endif // SAME51_SERIES
 
 #ifndef SAME53_SERIES
-#define SAME53_SERIES (defined(__SAME53J18__) || defined(__SAME53J19__) || defined(__SAME53J20__) || \
-                        defined(__SAME53N19__) || defined(__SAME53N20__))
-#endif
+#define SAME53_SERIES (defined(__ATSAME53J18A__) || defined(__ATSAME53J19A__) || defined(__ATSAME53J20A__) || defined(__SAME53J18A__) || defined(__SAME53J19A__) || defined(__SAME53J20A__) || \
+                        defined(__ATSAME53N19A__) || defined(__ATSAME53N20A__) || defined(__SAME53N19A__) || defined(__SAME53N20A__))
+#endif // SAME53_SERIES
 
 #ifndef SAME54_SERIES
-#define SAME54_SERIES (defined(__SAME54N19__) || defined(__SAME54N20__))
-#endif
+#define SAME54_SERIES (defined(__ATSAME54N19A__) || defined(__ATSAME54N20A__) || defined(__SAME54N19A__) || defined(__SAME54N20A__))
+#endif // SAME54_SERIES
 
 #ifndef SAME54_120_SERIES
-#define SAME54_120_SERIES (defined(__SAME54P19__) || defined(__SAME54P20__))
-#endif
+#define SAME54_120_SERIES (defined(__ATSAME54P19A__) || defined(__ATSAME54P20A__) || defined(__SAME54P19A__) || defined(__SAME54P20A__))
+#endif // SAME54_120_SERIES
 
-#ifdef FAMILY_SAMD2X
+#if !defined(ARDUINO_SAMD51_E51) && !defined(ARDUINO_SAME53_E54)
 #if !(SAMD21E_SERIES || SAMD21G_SERIES || SAMD21J_SERIES || SAMDA1_SERIES)
 #define SAMD21E_SERIES 1
-#endif
-#endif
-#ifdef FAMILY_SAMD5X
-#if !(SAMD51_SERIES || SAMD51_120_SERIES || SAME51_SERIES || SAME53_SERIES || SAME54_SERIES || SAME54_120_SERIES)
+#endif // !(SAMD21E_SERIES || SAMD21G_SERIES || SAMD21J_SERIES || SAMDA1_SERIES)
+#endif // !ARDUINO_SAMD51_E51 && !ARDUINO_SAME53_E54
+#if defined(ARDUINO_SAMD51_E51)
+#if !(SAMD51_SERIES || SAMD51_120_SERIES || SAME51_SERIES)
 #define SAMD51_SERIES 1
-#endif
-#endif
+#endif // !(SAMD51_SERIES || SAMD51_120_SERIES || SAME51_SERIES)
+#endif // ARDUINO_SAMD51_E51
+#if defined(ARDUINO_SAME53_E54)
+#if !(SAME53_SERIES || SAME54_SERIES || SAME54_120_SERIES)
+#define SAME54_SERIES 1
+#endif // !(SAME53_SERIES || SAME54_SERIES || SAME54_120_SERIES)
+#endif // ARDUINO_SAME53_E54
 
 #if defined(SERCOM_PINMUX_EMIT_I2C)
 #if SAMD21E_SERIES || SAMDA1_SERIES
@@ -76,7 +81,7 @@ SERCOM_I2C_PIN('A', 16, 1, 0, 3, 0)
 SERCOM_I2C_PIN('A', 17, 1, 1, 3, 1)
 SERCOM_I2C_PIN('A', 22, 3, 0, 5, 0)
 SERCOM_I2C_PIN('A', 23, 3, 1, 5, 1)
-#endif
+#endif // SAMD21E_SERIES || SAMDA1_SERIES
 
 #if SAMD21G_SERIES
 SERCOM_I2C_PIN('A', 8, 0, 0, 2, 0)
@@ -87,7 +92,7 @@ SERCOM_I2C_PIN('A', 16, 1, 0, 3, 0)
 SERCOM_I2C_PIN('A', 17, 1, 1, 3, 1)
 SERCOM_I2C_PIN('A', 22, 3, 0, 5, 0)
 SERCOM_I2C_PIN('A', 23, 3, 1, 5, 1)
-#endif
+#endif // SAMD21G_SERIES
 
 #if SAMD21J_SERIES
 SERCOM_I2C_PIN('A', 8, 0, 0, 2, 0)
@@ -104,7 +109,7 @@ SERCOM_I2C_PIN('B', 16, 5, 0, 255, 255)
 SERCOM_I2C_PIN('B', 17, 5, 1, 255, 255)
 SERCOM_I2C_PIN('B', 30, 255, 255, 5, 0)
 SERCOM_I2C_PIN('B', 31, 255, 255, 5, 1)
-#endif
+#endif // SAMD21J_SERIES
 
 #if SAMD51_120_SERIES || SAME54_120_SERIES
 SERCOM_I2C_PIN('A', 8, 0, 0, 2, 1)
@@ -117,7 +122,7 @@ SERCOM_I2C_PIN('A', 22, 3, 0, 5, 1)
 SERCOM_I2C_PIN('A', 23, 3, 1, 5, 0)
 SERCOM_I2C_PIN('D', 8, 7, 0, 6, 1)
 SERCOM_I2C_PIN('D', 9, 7, 1, 6, 0)
-#endif
+#endif // SAMD51_120_SERIES || SAME54_120_SERIES
 
 #if SAMD51_SERIES || SAME51_SERIES || SAME53_SERIES || SAME54_SERIES
 SERCOM_I2C_PIN('A', 8, 0, 0, 2, 1)
@@ -128,9 +133,9 @@ SERCOM_I2C_PIN('A', 16, 1, 0, 3, 1)
 SERCOM_I2C_PIN('A', 17, 1, 1, 3, 0)
 SERCOM_I2C_PIN('A', 22, 3, 0, 5, 1)
 SERCOM_I2C_PIN('A', 23, 3, 1, 5, 0)
-#endif
+#endif // SAMD51_SERIES || SAME51_SERIES || SAME53_SERIES || SAME54_SERIES
 
-#endif
+#endif // SERCOM_PINMUX_EMIT_I2C
 
 #if defined(SERCOM_PINMUX_EMIT_SPI)
 #if SAMD21E_SERIES
@@ -167,7 +172,7 @@ SERCOM_SPI_PIN('B', 16, 5, 0, 255, 255)
 SERCOM_SPI_PIN('B', 22, 255, 255, 5, 2)
 SERCOM_SPI_PIN('B', 23, 255, 255, 5, 3)
 SERCOM_SPI_PIN('B', 30, 255, 255, 5, 0)
-#endif
+#endif // SAMD21E_SERIES
 
 #if SAMD21G_SERIES
 SERCOM_SPI_PIN('A', 0, 255, 255, 1, 0)
@@ -203,7 +208,7 @@ SERCOM_SPI_PIN('B', 16, 5, 0, 255, 255)
 SERCOM_SPI_PIN('B', 22, 255, 255, 5, 2)
 SERCOM_SPI_PIN('B', 23, 255, 255, 5, 3)
 SERCOM_SPI_PIN('B', 30, 255, 255, 5, 0)
-#endif
+#endif // SAMD21G_SERIES
 
 #if SAMD21J_SERIES
 SERCOM_SPI_PIN('A', 0, 255, 255, 1, 0)
@@ -239,7 +244,7 @@ SERCOM_SPI_PIN('B', 16, 5, 0, 255, 255)
 SERCOM_SPI_PIN('B', 22, 255, 255, 5, 2)
 SERCOM_SPI_PIN('B', 23, 255, 255, 5, 3)
 SERCOM_SPI_PIN('B', 30, 255, 255, 5, 0)
-#endif
+#endif // SAMD21J_SERIES
 
 #if SAMDA1_SERIES
 SERCOM_SPI_PIN('A', 0, 255, 255, 1, 0)
@@ -275,7 +280,7 @@ SERCOM_SPI_PIN('B', 16, 5, 0, 255, 255)
 SERCOM_SPI_PIN('B', 22, 255, 255, 5, 2)
 SERCOM_SPI_PIN('B', 23, 255, 255, 5, 3)
 SERCOM_SPI_PIN('B', 30, 255, 255, 5, 0)
-#endif
+#endif // SAMDA1_SERIES
 
 #if SAMD51_120_SERIES
 SERCOM_SPI_PIN('A', 0, 255, 255, 1, 0)
@@ -350,7 +355,7 @@ SERCOM_SPI_PIN('D', 10, 7, 2, 6, 2)
 SERCOM_SPI_PIN('D', 11, 7, 3, 6, 3)
 SERCOM_SPI_PIN('D', 20, 1, 2, 3, 2)
 SERCOM_SPI_PIN('D', 21, 1, 3, 3, 3)
-#endif
+#endif // SAMD51_120_SERIES
 
 #if SAMD51_SERIES
 SERCOM_SPI_PIN('A', 0, 255, 255, 1, 0)
@@ -425,7 +430,7 @@ SERCOM_SPI_PIN('D', 10, 7, 2, 6, 2)
 SERCOM_SPI_PIN('D', 11, 7, 3, 6, 3)
 SERCOM_SPI_PIN('D', 20, 1, 2, 3, 2)
 SERCOM_SPI_PIN('D', 21, 1, 3, 3, 3)
-#endif
+#endif // SAMD51_SERIES
 
 #if SAME51_SERIES
 SERCOM_SPI_PIN('A', 0, 255, 255, 1, 0)
@@ -500,7 +505,7 @@ SERCOM_SPI_PIN('D', 10, 7, 2, 6, 2)
 SERCOM_SPI_PIN('D', 11, 7, 3, 6, 3)
 SERCOM_SPI_PIN('D', 20, 1, 2, 3, 2)
 SERCOM_SPI_PIN('D', 21, 1, 3, 3, 3)
-#endif
+#endif // SAME51_SERIES
 
 #if SAME53_SERIES
 SERCOM_SPI_PIN('A', 0, 255, 255, 1, 0)
@@ -575,7 +580,7 @@ SERCOM_SPI_PIN('D', 10, 7, 2, 6, 2)
 SERCOM_SPI_PIN('D', 11, 7, 3, 6, 3)
 SERCOM_SPI_PIN('D', 20, 1, 2, 3, 2)
 SERCOM_SPI_PIN('D', 21, 1, 3, 3, 3)
-#endif
+#endif // SAME53_SERIES
 
 #if SAME54_SERIES
 SERCOM_SPI_PIN('A', 0, 255, 255, 1, 0)
@@ -650,7 +655,7 @@ SERCOM_SPI_PIN('D', 10, 7, 2, 6, 2)
 SERCOM_SPI_PIN('D', 11, 7, 3, 6, 3)
 SERCOM_SPI_PIN('D', 20, 1, 2, 3, 2)
 SERCOM_SPI_PIN('D', 21, 1, 3, 3, 3)
-#endif
+#endif // SAME54_SERIES
 
 #if SAME54_120_SERIES
 SERCOM_SPI_PIN('A', 0, 255, 255, 1, 0)
@@ -725,6 +730,6 @@ SERCOM_SPI_PIN('D', 10, 7, 2, 6, 2)
 SERCOM_SPI_PIN('D', 11, 7, 3, 6, 3)
 SERCOM_SPI_PIN('D', 20, 1, 2, 3, 2)
 SERCOM_SPI_PIN('D', 21, 1, 3, 3, 3)
-#endif
+#endif // SAME54_120_SERIES
 
-#endif
+#endif // SERCOM_PINMUX_EMIT_SPI

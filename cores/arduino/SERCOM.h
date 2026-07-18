@@ -27,7 +27,7 @@
 
 #ifdef USE_ZERODMA
 class Adafruit_ZeroDMA;
-#endif
+#endif // USE_ZERODMA
 
 // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
 // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
@@ -38,14 +38,14 @@ class Adafruit_ZeroDMA;
   #define SERCOM_SPI_FREQ_REF (MAX_SPI * 2)
 #else
   #define SERCOM_SPI_FREQ_REF 48000000ul
-#endif
+#endif // MAX_SPI
 // Other SERCOM peripherals always use the 48 MHz clock
 #define SERCOM_FREQ_REF       48000000ul
 #define SERCOM_NVIC_PRIORITY  ((1<<__NVIC_PRIO_BITS) - 1)
 
 #ifndef SERCOM_QUEUE_LENGTH
 #define SERCOM_QUEUE_LENGTH 8
-#endif
+#endif // !SERCOM_QUEUE_LENGTH
 
 typedef enum
 {
@@ -180,15 +180,31 @@ typedef enum {
 class SERCOM
 {
 	public:
+#ifdef ARDUINO_SAME53_E54
+		SERCOM(sercom_registers_t* s) ;
+#else
 		SERCOM(Sercom* s) ;
+#endif // ARDUINO_SAME53_E54
 		void resetSERCOM( void ) ;
 		inline void enableSERCOM( void ) ;
 		inline void disableSERCOM( void ) ;
+		inline void waitSyncBusyEnable( void ) ;
+		inline void waitSyncBusySwrst( void ) ;
+		inline void waitSyncBusySysOp( void ) ;
+		inline void waitSyncBusyCtrlB( void ) ;
+#ifdef ARDUINO_SAME53_E54
+		inline void disableInterrupts(uint8_t mask) { sercom->I2CM.SERCOM_INTENCLR = mask; }
+		inline void enableInterrupts(uint8_t mask) { sercom->I2CM.SERCOM_INTENSET = mask; }
+		inline uint8_t getINTFLAG( void ) const { return sercom->I2CM.SERCOM_INTFLAG; }
+		inline uint16_t getSTATUS( void ) const { return sercom->I2CM.SERCOM_STATUS; }
+		inline void clearINTFLAG( void ) { sercom->I2CM.SERCOM_INTFLAG = 0xFF; }
+#else
 		inline void disableInterrupts(uint8_t mask) { sercom->I2CM.INTENCLR.reg = mask; }
 		inline void enableInterrupts(uint8_t mask) { sercom->I2CM.INTENSET.reg = mask; }
 		inline uint8_t getINTFLAG( void ) const { return sercom->I2CM.INTFLAG.reg; }
 		inline uint16_t getSTATUS( void ) const { return sercom->I2CM.STATUS.reg; }
 		inline void clearINTFLAG( void ) { sercom->I2CM.INTFLAG.reg = 0xFF; }
+#endif // ARDUINO_SAME53_E54
 
 		/* ========== UART ========== */
 		void initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint32_t baudrate=0) ;
@@ -210,6 +226,8 @@ class SERCOM
 		int writeDataUART(uint8_t data) ;
 		bool isUARTError() ;
 		void acknowledgeUARTError() ;
+		void enableReceiveCompleteInterruptUART();
+		void disableReceiveCompleteInterruptUART();
 		void enableDataRegisterEmptyInterruptUART();
 		void disableDataRegisterEmptyInterruptUART();
 		bool enqueueUART(SercomTxn* txn);
@@ -265,8 +283,8 @@ class SERCOM
 		inline void enableWIRE( void ) ;
 		inline void disableWIRE( void ) { disableSERCOM(); }
 		void setBaudrateWIRE(uint32_t baudrate) ;
-        inline void prepareNackBitWIRE( void ) { sercom->I2CM.CTRLB.bit.ACKACT = 1; }
-		inline void prepareAckBitWIRE( void ) { sercom->I2CM.CTRLB.bit.ACKACT = 0; }
+		inline void prepareNackBitWIRE( void ) ;
+		inline void prepareAckBitWIRE( void ) ;
         inline void prepareCommandBitsWIRE(uint8_t cmd) ;
 		SercomTxn* startTransmissionWIRE( void ) ;
 		bool startTransmissionWIRE( uint8_t address, SercomWireReadWriteFlag flag ) = delete ;
@@ -276,20 +294,20 @@ class SERCOM
 		void deferStopWIRE(SercomWireError error);
 
 		inline bool sendDataWIRE( void ) ;
-		inline bool isMasterWIRE( void ) { return sercom->I2CM.CTRLA.bit.MODE == I2C_MASTER_OPERATION; }
-		inline bool isSlaveWIRE( void ) { return sercom->I2CS.CTRLA.bit.MODE == I2C_SLAVE_OPERATION; }
-		inline bool isBusIdleWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_IDLE_STATE; }
-		inline bool isBusOwnerWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_OWNER_STATE; }
-		inline bool isBusUnknownWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_UNKNOWN_STATE; }
-		inline bool isArbLostWIRE( void ) { return sercom->I2CM.STATUS.bit.ARBLOST == 1; }
-		inline bool isBusBusyWIRE( void ) { return sercom->I2CM.STATUS.bit.BUSSTATE == WIRE_BUSY_STATE; }
-		inline bool isDataReadyWIRE( void ) { return sercom->I2CS.INTFLAG.bit.DRDY; }
-		inline bool isStopDetectedWIRE( void ) { return sercom->I2CS.INTFLAG.bit.PREC; }
-		inline bool isRestartDetectedWIRE( void ) { return sercom->I2CS.STATUS.bit.SR; }
-		inline bool isAddressMatch( void ) { return sercom->I2CS.INTFLAG.bit.AMATCH; }
-		inline bool isMasterReadOperationWIRE( void ) { return sercom->I2CS.STATUS.bit.DIR; }
-        inline bool isRXNackReceivedWIRE( void ) { return sercom->I2CM.STATUS.bit.RXNACK; }
-		inline int availableWIRE( void ) { return isMasterWIRE() ? sercom->I2CM.INTFLAG.bit.SB : sercom->I2CS.INTFLAG.bit.DRDY; }
+		inline bool isMasterWIRE( void );
+		inline bool isSlaveWIRE( void );
+		inline bool isBusIdleWIRE( void );
+		inline bool isBusOwnerWIRE( void );
+		inline bool isBusUnknownWIRE( void );
+		inline bool isArbLostWIRE( void );
+		inline bool isBusBusyWIRE( void );
+		inline bool isDataReadyWIRE( void );
+		inline bool isStopDetectedWIRE( void );
+		inline bool isRestartDetectedWIRE( void );
+		inline bool isAddressMatch( void );
+		inline bool isMasterReadOperationWIRE( void );
+		inline bool isRXNackReceivedWIRE( void );
+		inline int availableWIRE( void );
 		inline bool readDataWIRE( void );
 		inline SercomTxn* getCurrentTxnWIRE(void) { return _wire.currentTxn; }
 		inline const SercomTxn* getCurrentTxnWIRE(void) const { return _wire.currentTxn; }
@@ -297,13 +315,17 @@ class SERCOM
 		inline size_t getTxnLengthWIRE(void) const { return _wire.txnLength; }
 		inline bool isActiveWIRE(void) const { return _wire.active; }
 
-		inline bool isDBGSTOP( void ) const { return sercom->I2CM.DBGCTRL.bit.DBGSTOP; }
-		inline void setDBGSTOP( bool stop ) { sercom->I2CM.DBGCTRL.bit.DBGSTOP = stop; }
+		inline bool isDBGSTOP( void ) const;
+		inline void setDBGSTOP( bool stop );
+#ifdef ARDUINO_SAME53_E54
+		inline sercom_registers_t* getSercom() const { return sercom; }
+#else
 		inline Sercom* getSercom() const { return sercom; }
+#endif // ARDUINO_SAME53_E54
 		int8_t getSercomIndex(void) ;
         uint32_t getSercomFreqRef(void) ;
 
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 		// SERCOM clock source override is only available on
 		// SAMD51 (not 21) ... but these functions are declared
 		// regardless so user code doesn't need ifdefs or lengthy
@@ -386,18 +408,26 @@ class SERCOM
 #endif // SERCOM_STRICT_PADS
 
     private:
-        Sercom *sercom;
-        uint32_t freqRef = 48000000ul; // Frequency corresponding to clockSource
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
-        SercomClockSource clockSource;
-#endif
+#ifdef ARDUINO_SAME53_E54
+		sercom_registers_t *sercom;
+#else
+		Sercom *sercom;
+#endif // ARDUINO_SAME53_E54
+		uint32_t freqRef = 48000000ul; // Frequency corresponding to clockSource
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+		SercomClockSource clockSource;
+#endif // ARDUINO_SAMD51_E51 || ARDUINO_SAME53_E54
 
 #if defined(SERCOM_INST_NUM) && (SERCOM_INST_NUM > 0)
 		static constexpr size_t kSercomCount = SERCOM_INST_NUM;
+#elif defined(ARDUINO_SAME53_E54) && defined(SERCOM7_REGS)
+		static constexpr size_t kSercomCount = 8;
+#elif defined(ARDUINO_SAME53_E54) && defined(SERCOM5_REGS)
+		static constexpr size_t kSercomCount = 6;
 #else
 		#pragma message("SERCOM_INST_NUM not defined; SERCOM support disabled.")
 		static constexpr size_t kSercomCount = 0;
-#endif // SERCOM_INST_NUM
+#endif // SERCOM_INST_NUM / ARDUINO_SAME53_E54
 
 		struct SercomState {
 			Role role = Role::None;
@@ -411,6 +441,7 @@ class SERCOM
 
 		static std::array<SercomState, kSercomCount> s_states;
 		static std::array<SERCOM*, kSercomCount> s_instances;
+		static volatile uint32_t s_pendingMask;
 		uint8_t calculateBaudrateSynchronous(uint32_t baudrate) ;
 		uint32_t division(uint32_t dividend, uint32_t divisor) ;
 		void initClockNVIC( void ) ;
@@ -422,7 +453,11 @@ class SERCOM
 		// for (hs) mode and DMA.
 		struct WireConfig {
             uint32_t ctrla = 0x00000000;             // default CTRLA value: auto ENABLE
+#ifdef ARDUINO_SAME53_E54
+			uint32_t ctrlb = SERCOM_I2CM_CTRLB_SMEN_Msk; // default CTRLB value: SMEN
+#else
 			uint32_t ctrlb = SERCOM_I2CM_CTRLB_SMEN; // default CTRLB value: SMEN
+#endif // ARDUINO_SAME53_E54
 			uint32_t baud  = 0x000000FF;             // default to lowest supported speed
 			uint32_t addr  = 0x00000000;             // default address no GCEN, no ADDRMASK, 7-bit address only
 			uint8_t masterSpeed = 0x0;               // default to lowest speed
@@ -484,9 +519,9 @@ class SERCOM
 		bool _dmaTxActive = false;
 		bool _dmaRxActive = false;
 		DmaStatus _dmaLastError = DmaStatus::Ok;
-#endif
+#endif // USE_ZERODMA
 };
 
 #include "SERCOM_inline.h"
 
-#endif
+#endif // !_SERCOM_CLASS_

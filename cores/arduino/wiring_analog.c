@@ -27,7 +27,7 @@ extern "C" {
 static int _readResolution = 10;
 static int _ADCResolution = 10;
 
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 static int _writeResolution = 12;
 static int _dacResolution = 12;
 #else
@@ -36,7 +36,7 @@ static int _writeResolution = 8;
 #endif
 
 
-#if !defined(__SAMD51__)
+#if !defined(ARDUINO_SAMD51_E51) && !defined(ARDUINO_SAME53_E54)
 // Wait for synchronization of registers between the clock domains
 static __inline__ void syncADC() __attribute__((always_inline, unused));
 static void syncADC() {
@@ -45,7 +45,7 @@ static void syncADC() {
 }
 
  // ATSAMR, for example, doesn't have a DAC
-#ifdef DAC
+#if defined(DAC) || defined(DAC_REGS)
 // Wait for synchronization of registers between the clock domains
 static __inline__ void syncDAC() __attribute__((always_inline, unused));
 static void syncDAC() {
@@ -73,7 +73,7 @@ static bool dacEnabled[2];
 void analogReadResolution(int res)
 {
   _readResolution = res;
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51)
 
 	if (res > 10) {
 		ADC0->CTRLB.bit.RESSEL = ADC_CTRLB_RESSEL_12BIT_Val;
@@ -92,6 +92,23 @@ void analogReadResolution(int res)
 
 	while(ADC0->SYNCBUSY.reg & ADC_SYNCBUSY_CTRLB); //wait for sync
 	while(ADC1->SYNCBUSY.reg & ADC_SYNCBUSY_CTRLB); //wait for sync
+#elif defined(ARDUINO_SAME53_E54)
+	uint32_t resolution;
+	if (res > 10) {
+		resolution = ADC_CTRLB_RESSEL_12BIT;
+		_ADCResolution = 12;
+	} else if (res > 8) {
+		resolution = ADC_CTRLB_RESSEL_10BIT;
+		_ADCResolution = 10;
+	} else {
+		resolution = ADC_CTRLB_RESSEL_8BIT;
+		_ADCResolution = 8;
+	}
+
+	ADC0_REGS->ADC_CTRLB = (ADC0_REGS->ADC_CTRLB & ~ADC_CTRLB_RESSEL_Msk) | resolution;
+	ADC1_REGS->ADC_CTRLB = (ADC1_REGS->ADC_CTRLB & ~ADC_CTRLB_RESSEL_Msk) | resolution;
+	while (ADC0_REGS->ADC_SYNCBUSY & ADC_SYNCBUSY_CTRLB_Msk);
+	while (ADC1_REGS->ADC_SYNCBUSY & ADC_SYNCBUSY_CTRLB_Msk);
 #else
 
 	if (res > 10) {
@@ -133,7 +150,7 @@ static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to)
  */
 void analogReference(eAnalogReference mode)
 {
-#if defined(__SAMD51__)
+		#if defined(ARDUINO_SAMD51_E51)
 	while(ADC0->SYNCBUSY.reg & ADC_SYNCBUSY_REFCTRL); //wait for sync
 	while(ADC1->SYNCBUSY.reg & ADC_SYNCBUSY_REFCTRL); //wait for sync
 	
@@ -223,7 +240,34 @@ void analogReference(eAnalogReference mode)
 		ADC1->REFCTRL.bit.REFSEL = ADC_REFCTRL_REFSEL_INTVCC1_Val; // 
 		break;
 	}
-	
+
+#elif defined(ARDUINO_SAME53_E54)
+	uint32_t reference = ADC_REFCTRL_REFSEL_INTVCC1;
+	uint32_t vref = SUPC_REGS->SUPC_VREF;
+
+	switch (mode)
+	{
+		case AR_INTERNAL1V0: vref = (vref & ~SUPC_VREF_SEL_Msk) | SUPC_VREF_SEL_1V0; reference = ADC_REFCTRL_REFSEL_INTREF; break;
+		case AR_INTERNAL1V1: vref = (vref & ~SUPC_VREF_SEL_Msk) | SUPC_VREF_SEL_1V1; reference = ADC_REFCTRL_REFSEL_INTREF; break;
+		case AR_INTERNAL1V2: vref = (vref & ~SUPC_VREF_SEL_Msk) | SUPC_VREF_SEL_1V2; reference = ADC_REFCTRL_REFSEL_INTREF; break;
+		case AR_INTERNAL1V25: vref = (vref & ~SUPC_VREF_SEL_Msk) | SUPC_VREF_SEL_1V25; reference = ADC_REFCTRL_REFSEL_INTREF; break;
+		case AR_INTERNAL2V0: vref = (vref & ~SUPC_VREF_SEL_Msk) | SUPC_VREF_SEL_2V0; reference = ADC_REFCTRL_REFSEL_INTREF; break;
+		case AR_INTERNAL2V2: vref = (vref & ~SUPC_VREF_SEL_Msk) | SUPC_VREF_SEL_2V2; reference = ADC_REFCTRL_REFSEL_INTREF; break;
+		case AR_INTERNAL2V4: vref = (vref & ~SUPC_VREF_SEL_Msk) | SUPC_VREF_SEL_2V4; reference = ADC_REFCTRL_REFSEL_INTREF; break;
+		case AR_INTERNAL2V5: vref = (vref & ~SUPC_VREF_SEL_Msk) | SUPC_VREF_SEL_2V5; reference = ADC_REFCTRL_REFSEL_INTREF; break;
+		case AR_EXTERNAL: reference = ADC_REFCTRL_REFSEL_AREFA; break;
+		case AR_INTERNAL1V65: reference = ADC_REFCTRL_REFSEL_INTVCC0; break;
+		case AR_DEFAULT:
+		default: break;
+	}
+
+	if (reference == ADC_REFCTRL_REFSEL_INTREF) {
+		SUPC_REGS->SUPC_VREF = vref | SUPC_VREF_VREFOE_Msk;
+	}
+	ADC0_REGS->ADC_REFCTRL = reference;
+	ADC1_REGS->ADC_REFCTRL = reference;
+	while (ADC0_REGS->ADC_SYNCBUSY & ADC_SYNCBUSY_REFCTRL_Msk);
+	while (ADC1_REGS->ADC_SYNCBUSY & ADC_SYNCBUSY_REFCTRL_Msk);
 #else
   syncADC();
   switch (mode)
@@ -277,9 +321,9 @@ uint32_t analogRead(uint32_t pin)
 
   pinPeripheral(pin, PIO_ANALOG);
  //ATSAMR, for example, doesn't have a DAC
-#ifdef DAC
+#if defined(DAC) || defined(DAC_REGS)
 
-	#if defined(__SAMD51__)
+	#if defined(ARDUINO_SAMD51_E51)
 	  if (pin == PIN_DAC0 || pin == PIN_DAC1) { // Disable DAC, if analogWrite(A0,dval) used previously the DAC is enabled
 		uint8_t channel = (pin == PIN_DAC0 ? 0 : 1);
 		
@@ -297,19 +341,28 @@ uint32_t analogRead(uint32_t pin)
 		}
 		
 		while (DAC->SYNCBUSY.bit.ENABLE);
-	#else
-	  if (pin == PIN_DAC0) { // Disable DAC, if analogWrite(A0,dval) used previously the DAC is enabled
-	    syncDAC();
-		
-		DAC->CTRLA.bit.ENABLE = 0x00; // Disable DAC
-		//DAC->CTRLB.bit.EOEN = 0x00; // The DAC output is turned off.
-		syncDAC();
-	#endif
+		#elif defined(ARDUINO_SAME53_E54)
+		  if (pin == PIN_DAC0) {
+			if (dacEnabled[0]) {
+				dacEnabled[0] = false;
+				while (DAC_REGS->DAC_SYNCBUSY & (DAC_SYNCBUSY_ENABLE_Msk | DAC_SYNCBUSY_SWRST_Msk));
+				DAC_REGS->DAC_CTRLA &= ~DAC_CTRLA_ENABLE_Msk;
+				while (DAC_REGS->DAC_SYNCBUSY & DAC_SYNCBUSY_ENABLE_Msk);
+				DAC_REGS->DAC_DACCTRL[0] &= ~DAC_DACCTRL_ENABLE_Msk;
+				DAC_REGS->DAC_CTRLA |= DAC_CTRLA_ENABLE_Msk;
+			}
+			while (DAC_REGS->DAC_SYNCBUSY & DAC_SYNCBUSY_ENABLE_Msk);
+		#else
+		  if (pin == PIN_DAC0) {
+			syncDAC();
+			DAC->CTRLA.bit.ENABLE = 0x00;
+			syncDAC();
+		#endif
 	  }
 
 #endif
 
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51)
   Adc *adc;
   if(g_APinDescription[pin].ulPinAttribute & PIN_ATTR_ANALOG) adc = ADC0;
   else if(g_APinDescription[pin].ulPinAttribute & PIN_ATTR_ANALOG_ALT) adc = ADC1;
@@ -352,6 +405,32 @@ uint32_t analogRead(uint32_t pin)
   adc->CTRLA.bit.ENABLE = 0x00;             // Disable ADC
   while( adc->SYNCBUSY.reg & ADC_SYNCBUSY_ENABLE ); //wait for sync
   
+#elif defined(ARDUINO_SAME53_E54)
+  adc_registers_t *adc;
+  if (g_APinDescription[pin].ulPinAttribute & PIN_ATTR_ANALOG) adc = ADC0_REGS;
+  else if (g_APinDescription[pin].ulPinAttribute & PIN_ATTR_ANALOG_ALT) adc = ADC1_REGS;
+  else return 0;
+
+  while (adc->ADC_SYNCBUSY & ADC_SYNCBUSY_INPUTCTRL_Msk);
+  adc->ADC_INPUTCTRL =
+      (adc->ADC_INPUTCTRL & ~ADC_INPUTCTRL_MUXPOS_Msk) |
+      ADC_INPUTCTRL_MUXPOS(g_APinDescription[pin].ulADCChannelNumber);
+
+  while (adc->ADC_SYNCBUSY & ADC_SYNCBUSY_ENABLE_Msk);
+  adc->ADC_CTRLA |= ADC_CTRLA_ENABLE_Msk;
+  while (adc->ADC_SYNCBUSY & ADC_SYNCBUSY_ENABLE_Msk);
+
+  adc->ADC_SWTRIG = ADC_SWTRIG_START_Msk;
+  while ((adc->ADC_INTFLAG & ADC_INTFLAG_RESRDY_Msk) == 0);
+  adc->ADC_INTFLAG = ADC_INTFLAG_RESRDY_Msk;
+
+  adc->ADC_SWTRIG = ADC_SWTRIG_START_Msk;
+  while ((adc->ADC_INTFLAG & ADC_INTFLAG_RESRDY_Msk) == 0);
+  valueRead = adc->ADC_RESULT;
+
+  while (adc->ADC_SYNCBUSY & ADC_SYNCBUSY_ENABLE_Msk);
+  adc->ADC_CTRLA &= ~ADC_CTRLA_ENABLE_Msk;
+  while (adc->ADC_SYNCBUSY & ADC_SYNCBUSY_ENABLE_Msk);
 #else
   syncADC();
   ADC->INPUTCTRL.bit.MUXPOS = g_APinDescription[pin].ulADCChannelNumber; // Selection for the positive ADC input
@@ -408,17 +487,19 @@ void analogWrite(uint32_t pin, uint32_t value)
   uint32_t attr = pinDesc.ulPinAttribute;
 
  // ATSAMR, for example, doesn't have a DAC
-#ifdef DAC
+#if defined(DAC) || defined(DAC_REGS)
 	  if ((attr & PIN_ATTR_ANALOG) == PIN_ATTR_ANALOG)
 	  {
 	    // DAC handling code
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51)
 		if (pin == PIN_DAC0 || pin == PIN_DAC1) { // 2 DACs on A0 (PA02) and A1 (PA05)
+#elif defined(ARDUINO_SAME53_E54)
+		if (pin == PIN_DAC0) {
 #else
 	    if (pin == PIN_DAC0) { // Only 1 DAC on A0 (PA02)
 #endif
 
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51)
 
 	    value = mapResolution(value, _writeResolution, _dacResolution);
 
@@ -473,25 +554,41 @@ void analogWrite(uint32_t pin, uint32_t value)
 				DAC->DATA[1].reg = value;  // DAC on 10 bits.
 			}
 
+#elif defined(ARDUINO_SAME53_E54)
+		value = mapResolution(value, _writeResolution, _dacResolution);
+		uint8_t channel = 0;
+		pinPeripheral(pin, PIO_ANALOG);
 
+		if (!dacEnabled[channel]) {
+			dacEnabled[channel] = true;
+			while (DAC_REGS->DAC_SYNCBUSY & (DAC_SYNCBUSY_ENABLE_Msk | DAC_SYNCBUSY_SWRST_Msk));
+			DAC_REGS->DAC_CTRLA &= ~DAC_CTRLA_ENABLE_Msk;
+			while (DAC_REGS->DAC_SYNCBUSY & DAC_SYNCBUSY_ENABLE_Msk);
+			DAC_REGS->DAC_DACCTRL[channel] |= DAC_DACCTRL_ENABLE_Msk;
+			DAC_REGS->DAC_CTRLA |= DAC_CTRLA_ENABLE_Msk;
+		}
+
+		while ((DAC_REGS->DAC_STATUS & (DAC_STATUS_READY0_Msk << channel)) == 0);
+		while (DAC_REGS->DAC_SYNCBUSY & (DAC_SYNCBUSY_DATA0_Msk << channel));
+		DAC_REGS->DAC_DATA[channel] = value;
 #else
 			syncDAC();
 			DAC->DATA.reg = value & 0x3FF;  // DAC on 10 bits.
 			syncDAC();
 			DAC->CTRLA.bit.ENABLE = 0x01;     // Enable DAC
 			syncDAC();
-#endif // __SAMD51__
+#endif
 				return;
 	  }
 	}
 #endif // DAC
 
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51)
 	if(attr & (PIN_ATTR_PWM_E|PIN_ATTR_PWM_F|PIN_ATTR_PWM_G)){
 
 		uint32_t tcNum = GetTCNumber(pinDesc.ulPWMChannel);
 		uint8_t tcChannel = GetTCChannelNumber(pinDesc.ulPWMChannel);
-		static bool tcEnabled[TCC_INST_NUM+TC_INST_NUM];
+		static bool tcEnabled[ARDUINO_TCC_INSTANCE_COUNT + ARDUINO_TC_INSTANCE_COUNT];
 
 		if(attr & PIN_ATTR_PWM_E)
 			pinPeripheral(pin, PIO_TIMER);
@@ -505,7 +602,7 @@ void analogWrite(uint32_t pin, uint32_t value)
 	      GCLK->PCHCTRL[GCLK_CLKCTRL_IDs[tcNum]].reg = GCLK_PCHCTRL_GEN_GCLK0_Val | (1 << GCLK_PCHCTRL_CHEN_Pos); //use clock generator 0
 
 	      // Set PORT
-	      if (tcNum >= TCC_INST_NUM) {
+	      if (tcNum >= ARDUINO_TCC_INSTANCE_COUNT) {
 				// -- Configure TC
 				Tc* TCx = (Tc*) GetTC(pinDesc.ulPWMChannel);
 
@@ -560,7 +657,7 @@ void analogWrite(uint32_t pin, uint32_t value)
 			}
 		}
 		else {
-			if (tcNum >= TCC_INST_NUM) {
+			if (tcNum >= ARDUINO_TCC_INSTANCE_COUNT) {
 				Tc* TCx = (Tc*) GetTC(pinDesc.ulPWMChannel);
 				TCx->COUNT8.CC[tcChannel].reg = (uint8_t) value;
 				while (TCx->COUNT8.SYNCBUSY.bit.CC0 || TCx->COUNT8.SYNCBUSY.bit.CC1);
@@ -577,7 +674,63 @@ void analogWrite(uint32_t pin, uint32_t value)
 
 		return;
 	}
-	  
+
+#elif defined(ARDUINO_SAME53_E54)
+	if (attr & (PIN_ATTR_PWM_E | PIN_ATTR_PWM_F | PIN_ATTR_PWM_G)) {
+		uint32_t tcNum = GetTCNumber(pinDesc.ulPWMChannel);
+		uint8_t tcChannel = GetTCChannelNumber(pinDesc.ulPWMChannel);
+		static bool tcEnabled[ARDUINO_TCC_INSTANCE_COUNT + ARDUINO_TC_INSTANCE_COUNT];
+
+		if (attr & PIN_ATTR_PWM_E) pinPeripheral(pin, PIO_TIMER);
+		else if (attr & PIN_ATTR_PWM_F) pinPeripheral(pin, PIO_TIMER_ALT);
+		else pinPeripheral(pin, PIO_TCC_PDEC);
+
+		if (!tcEnabled[tcNum]) {
+			tcEnabled[tcNum] = true;
+			GCLK_REGS->GCLK_PCHCTRL[GCLK_CLKCTRL_IDs[tcNum]] =
+			    GCLK_PCHCTRL_GEN_GCLK0 | GCLK_PCHCTRL_CHEN_Msk;
+
+			if (tcNum >= ARDUINO_TCC_INSTANCE_COUNT) {
+				tc_registers_t *TCx = (tc_registers_t *)GetTC(pinDesc.ulPWMChannel);
+				TCx->COUNT8.TC_CTRLA = TC_CTRLA_SWRST_Msk;
+				while (TCx->COUNT8.TC_SYNCBUSY & TC_SYNCBUSY_SWRST_Msk);
+				TCx->COUNT8.TC_CTRLA = TC_CTRLA_MODE_COUNT8 | TC_CTRLA_PRESCALER_DIV256;
+				TCx->COUNT8.TC_WAVE = TC_WAVE_WAVEGEN_NPWM;
+				TCx->COUNT8.TC_CC[tcChannel] = (uint8_t)value;
+				while (TCx->COUNT8.TC_SYNCBUSY & (TC_SYNCBUSY_CC0_Msk << tcChannel));
+				TCx->COUNT8.TC_PER = 0xff;
+				while (TCx->COUNT8.TC_SYNCBUSY & TC_SYNCBUSY_PER_Msk);
+				TCx->COUNT8.TC_CTRLA |= TC_CTRLA_ENABLE_Msk;
+				while (TCx->COUNT8.TC_SYNCBUSY & TC_SYNCBUSY_ENABLE_Msk);
+			} else {
+				tcc_registers_t *TCCx = (tcc_registers_t *)GetTC(pinDesc.ulPWMChannel);
+				TCCx->TCC_CTRLA = TCC_CTRLA_SWRST_Msk;
+				while (TCCx->TCC_SYNCBUSY & TCC_SYNCBUSY_SWRST_Msk);
+				TCCx->TCC_CTRLA = TCC_CTRLA_PRESCALER_DIV256 | TCC_CTRLA_PRESCSYNC_GCLK;
+				TCCx->TCC_WAVE = TCC_WAVE_WAVEGEN_NPWM;
+				while (TCCx->TCC_SYNCBUSY & TCC_SYNCBUSY_WAVE_Msk);
+				TCCx->TCC_CC[tcChannel] = value;
+				while (TCCx->TCC_SYNCBUSY & (TCC_SYNCBUSY_CC0_Msk << tcChannel));
+				TCCx->TCC_PER = 0xff;
+				while (TCCx->TCC_SYNCBUSY & TCC_SYNCBUSY_PER_Msk);
+				TCCx->TCC_CTRLA |= TCC_CTRLA_ENABLE_Msk;
+				while (TCCx->TCC_SYNCBUSY & TCC_SYNCBUSY_ENABLE_Msk);
+			}
+		} else if (tcNum >= ARDUINO_TCC_INSTANCE_COUNT) {
+			tc_registers_t *TCx = (tc_registers_t *)GetTC(pinDesc.ulPWMChannel);
+			TCx->COUNT8.TC_CC[tcChannel] = (uint8_t)value;
+			while (TCx->COUNT8.TC_SYNCBUSY & (TC_SYNCBUSY_CC0_Msk << tcChannel));
+		} else {
+			tcc_registers_t *TCCx = (tcc_registers_t *)GetTC(pinDesc.ulPWMChannel);
+			while (TCCx->TCC_SYNCBUSY & TCC_SYNCBUSY_CTRLB_Msk);
+			TCCx->TCC_CCBUF[tcChannel] = value;
+			while (TCCx->TCC_SYNCBUSY & (TCC_SYNCBUSY_CC0_Msk << tcChannel));
+			TCCx->TCC_CTRLBCLR = TCC_CTRLBCLR_LUPD_Msk;
+			while (TCCx->TCC_SYNCBUSY & TCC_SYNCBUSY_CTRLB_Msk);
+		}
+
+		return;
+	}
 #else
 
   if ((attr & PIN_ATTR_PWM) == PIN_ATTR_PWM)
@@ -586,7 +739,7 @@ void analogWrite(uint32_t pin, uint32_t value)
 
 	  uint32_t tcNum = GetTCNumber(pinDesc.ulPWMChannel);
 	  uint8_t tcChannel = GetTCChannelNumber(pinDesc.ulPWMChannel);
-	  static bool tcEnabled[TCC_INST_NUM+TC_INST_NUM];
+	  static bool tcEnabled[ARDUINO_TCC_INSTANCE_COUNT + ARDUINO_TC_INSTANCE_COUNT];
 
 	    if (attr & PIN_ATTR_TIMER) {
 #if !(ARDUINO_SAMD_VARIANT_COMPLIANCE >= 10603)
@@ -622,7 +775,7 @@ void analogWrite(uint32_t pin, uint32_t value)
 		  while (GCLK->STATUS.bit.SYNCBUSY == 1);
 
 		  // Set PORT
-		  if (tcNum >= TCC_INST_NUM) {
+		  if (tcNum >= ARDUINO_TCC_INSTANCE_COUNT) {
 			// -- Configure TC
 			Tc* TCx = (Tc*) GetTC(pinDesc.ulPWMChannel);
 			// Disable TCx
@@ -657,7 +810,7 @@ void analogWrite(uint32_t pin, uint32_t value)
 			syncTCC(TCCx);
 		  }
 		} else {
-		  if (tcNum >= TCC_INST_NUM) {
+		  if (tcNum >= ARDUINO_TCC_INSTANCE_COUNT) {
 			Tc* TCx = (Tc*) GetTC(pinDesc.ulPWMChannel);
 			TCx->COUNT16.CC[tcChannel].reg = (uint32_t) value;
 			syncTC_16(TCx);

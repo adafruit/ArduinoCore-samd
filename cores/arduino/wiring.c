@@ -24,7 +24,7 @@ extern "C" {
 #endif
 
 
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 uint32_t SystemCoreClock=F_CPU;
 #else
 /*
@@ -77,7 +77,7 @@ void init( void )
 //  // Clock EIC for I/O interrupts
 //  PM->APBAMASK.reg |= PM_APBAMASK_EIC ;
 
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51)
   MCLK->APBAMASK.reg |= MCLK_APBAMASK_SERCOM0 | MCLK_APBAMASK_SERCOM1 | MCLK_APBAMASK_TC0 | MCLK_APBAMASK_TC1;
   
   MCLK->APBBMASK.reg |= MCLK_APBBMASK_SERCOM2 | MCLK_APBBMASK_SERCOM3 | MCLK_APBBMASK_TCC0 | MCLK_APBBMASK_TCC1 | MCLK_APBBMASK_TC3 | MCLK_APBBMASK_TC2;
@@ -86,6 +86,20 @@ void init( void )
   
   MCLK->APBDMASK.reg |= MCLK_APBDMASK_DAC | MCLK_APBDMASK_SERCOM4 | MCLK_APBDMASK_SERCOM5 | MCLK_APBDMASK_ADC0 | MCLK_APBDMASK_ADC1 | MCLK_APBDMASK_TCC4
 		  | MCLK_APBDMASK_TC6 | MCLK_APBDMASK_TC7 | MCLK_APBDMASK_SERCOM6 | MCLK_APBDMASK_SERCOM7;
+
+#elif defined(ARDUINO_SAME53_E54)
+  MCLK_REGS->MCLK_APBAMASK |= MCLK_APBAMASK_SERCOM0_Msk | MCLK_APBAMASK_SERCOM1_Msk |
+                              MCLK_APBAMASK_TC0_Msk | MCLK_APBAMASK_TC1_Msk;
+  MCLK_REGS->MCLK_APBBMASK |= MCLK_APBBMASK_SERCOM2_Msk | MCLK_APBBMASK_SERCOM3_Msk |
+                              MCLK_APBBMASK_TCC0_Msk | MCLK_APBBMASK_TCC1_Msk |
+                              MCLK_APBBMASK_TC2_Msk | MCLK_APBBMASK_TC3_Msk;
+  MCLK_REGS->MCLK_APBCMASK |= MCLK_APBCMASK_TCC2_Msk | MCLK_APBCMASK_TCC3_Msk |
+                              MCLK_APBCMASK_TC4_Msk | MCLK_APBCMASK_TC5_Msk;
+  MCLK_REGS->MCLK_APBDMASK |= MCLK_APBDMASK_DAC_Msk | MCLK_APBDMASK_SERCOM4_Msk |
+                              MCLK_APBDMASK_SERCOM5_Msk | MCLK_APBDMASK_ADC0_Msk |
+                              MCLK_APBDMASK_ADC1_Msk | MCLK_APBDMASK_TCC4_Msk |
+                              MCLK_APBDMASK_TC6_Msk | MCLK_APBDMASK_TC7_Msk |
+                              MCLK_APBDMASK_SERCOM6_Msk | MCLK_APBDMASK_SERCOM7_Msk;
 
 #else
   // Clock SERCOM for Serial
@@ -114,7 +128,7 @@ void init( void )
 
   // Initialize Analog Controller
   // Setting clock
-#if defined(__SAMD51__)
+#if defined(ARDUINO_SAMD51_E51)
   //set to 1/(1/(48000000/32) * 6) = 250000 SPS
 	GCLK->PCHCTRL[ADC0_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos); //use clock generator 1 (48Mhz)
 	GCLK->PCHCTRL[ADC1_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos); //use clock generator 1 (48Mhz)
@@ -155,6 +169,46 @@ void init( void )
 	//set refresh rates
 	DAC->DACCTRL[0].bit.REFRESH = 2;
 	DAC->DACCTRL[1].bit.REFRESH = 2;
+
+#elif defined(ARDUINO_SAME53_E54)
+  GCLK_REGS->GCLK_PCHCTRL[ADC0_GCLK_ID] = GCLK_PCHCTRL_GEN_GCLK1 |
+                                                 GCLK_PCHCTRL_CHEN_Msk;
+  GCLK_REGS->GCLK_PCHCTRL[ADC1_GCLK_ID] = GCLK_PCHCTRL_GEN_GCLK1 |
+                                                 GCLK_PCHCTRL_CHEN_Msk;
+
+  adc_registers_t *adcs[] = {ADC0_REGS, ADC1_REGS};
+  for (uint32_t i = 0; i < 2; i++) {
+    adcs[i]->ADC_CTRLA = (adcs[i]->ADC_CTRLA & ~ADC_CTRLA_PRESCALER_Msk) |
+                         ADC_CTRLA_PRESCALER_DIV32;
+    adcs[i]->ADC_CTRLB = (adcs[i]->ADC_CTRLB & ~ADC_CTRLB_RESSEL_Msk) |
+                         ADC_CTRLB_RESSEL_10BIT;
+    while (adcs[i]->ADC_SYNCBUSY & ADC_SYNCBUSY_CTRLB_Msk);
+
+    adcs[i]->ADC_SAMPCTRL = ADC_SAMPCTRL_SAMPLEN(5);
+    while (adcs[i]->ADC_SYNCBUSY & ADC_SYNCBUSY_SAMPCTRL_Msk);
+
+    adcs[i]->ADC_INPUTCTRL = ADC_INPUTCTRL_MUXNEG_GND;
+    while (adcs[i]->ADC_SYNCBUSY & ADC_SYNCBUSY_INPUTCTRL_Msk);
+
+    adcs[i]->ADC_AVGCTRL = ADC_AVGCTRL_SAMPLENUM_1 | ADC_AVGCTRL_ADJRES(0);
+    while (adcs[i]->ADC_SYNCBUSY & ADC_SYNCBUSY_AVGCTRL_Msk);
+  }
+
+  analogReference(AR_DEFAULT);
+
+  GCLK_REGS->GCLK_PCHCTRL[DAC_GCLK_ID] = GCLK_PCHCTRL_GEN_GCLK4 |
+                                                GCLK_PCHCTRL_CHEN_Msk;
+  while ((GCLK_REGS->GCLK_PCHCTRL[DAC_GCLK_ID] & GCLK_PCHCTRL_CHEN_Msk) == 0);
+
+  while (DAC_REGS->DAC_SYNCBUSY & DAC_SYNCBUSY_SWRST_Msk);
+  DAC_REGS->DAC_CTRLA |= DAC_CTRLA_SWRST_Msk;
+  while (DAC_REGS->DAC_SYNCBUSY & DAC_SYNCBUSY_SWRST_Msk);
+
+  DAC_REGS->DAC_CTRLB = DAC_CTRLB_REFSEL_VREFPU;
+  DAC_REGS->DAC_DACCTRL[0] =
+      (DAC_REGS->DAC_DACCTRL[0] & ~DAC_DACCTRL_REFRESH_Msk) | DAC_DACCTRL_REFRESH(2);
+  DAC_REGS->DAC_DACCTRL[1] =
+      (DAC_REGS->DAC_DACCTRL[1] & ~DAC_DACCTRL_REFRESH_Msk) | DAC_DACCTRL_REFRESH(2);
 
 #else
   //set to 1/(1/(48000000/32) * 6) = 250000 SPS

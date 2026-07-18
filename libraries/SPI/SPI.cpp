@@ -25,7 +25,7 @@
 #ifdef USE_TINYUSB
 // For Serial when selecting TinyUSB
 #include <Adafruit_TinyUSB.h>
-#endif
+#endif // USE_TINYUSB
 
 #define SPI_IMODE_NONE   0
 #define SPI_IMODE_EXTINT 1
@@ -42,10 +42,10 @@
 #define SPI_SERCOM_INDEX_sercom5 5
 #if defined(SERCOM6)
 #define SPI_SERCOM_INDEX_sercom6 6
-#endif
+#endif // SERCOM6
 #if defined(SERCOM7)
 #define SPI_SERCOM_INDEX_sercom7 7
-#endif
+#endif // SERCOM7
 
 #define SPI_SERCOM_INDEX(token) SPI_SERCOM_INDEX_##token
 #define SPI_SERCOM_HANDLER_FROM_INDEX(idx) SPI_SERCOM_HANDLER_FROM_INDEX_2(idx)
@@ -65,6 +65,9 @@
 #define SPI_SERCOM_HANDLER3_FROM_INDEX(idx)                                    \
   SPI_SERCOM_HANDLER3_FROM_INDEX_2(idx)
 #define SPI_SERCOM_HANDLER3_FROM_INDEX_2(idx) SERCOM##idx##_3_Handler
+#define SPI_SERCOM_HANDLEROTHER_FROM_INDEX(idx)                                \
+  SPI_SERCOM_HANDLEROTHER_FROM_INDEX_2(idx)
+#define SPI_SERCOM_HANDLEROTHER_FROM_INDEX_2(idx) SERCOM##idx##_OTHER_Handler
 
 #define SPI_SERCOM_HANDLER0_FROM_TOKEN(token)                                  \
   SPI_SERCOM_HANDLER0_FROM_INDEX(SPI_SERCOM_INDEX(token))
@@ -74,6 +77,51 @@
   SPI_SERCOM_HANDLER2_FROM_INDEX(SPI_SERCOM_INDEX(token))
 #define SPI_SERCOM_HANDLER3_FROM_TOKEN(token)                                  \
   SPI_SERCOM_HANDLER3_FROM_INDEX(SPI_SERCOM_INDEX(token))
+#define SPI_SERCOM_HANDLEROTHER_FROM_TOKEN(token)                              \
+  SPI_SERCOM_HANDLEROTHER_FROM_INDEX(SPI_SERCOM_INDEX(token))
+
+#define SPI_DEFINE_SINGLE_HANDLER(handler, instance)                           \
+  void handler(void) __attribute__((weak));                                    \
+  void handler(void) { instance.onService(); }
+
+#define SPI_DEFINE_SAMD51_E51_HANDLERS(handler0, handler1, handler2, handler3, \
+                                       instance)                               \
+  void handler0(void) __attribute__((weak));                                   \
+  void handler1(void) __attribute__((weak));                                   \
+  void handler2(void) __attribute__((weak));                                   \
+  void handler3(void) __attribute__((weak));                                   \
+  void handler0(void) { instance.onService(); }                                \
+  void handler1(void) { instance.onService(); }                                \
+  void handler2(void) { instance.onService(); }                                \
+  void handler3(void) { instance.onService(); }
+
+#define SPI_DEFINE_SAME53_E54_HANDLERS(handler0, handler1, handler2,           \
+                                       handlerOther, instance)                 \
+  void handler0(void) __attribute__((weak));                                   \
+  void handler1(void) __attribute__((weak));                                   \
+  void handler2(void) __attribute__((weak));                                   \
+  void handlerOther(void) __attribute__((weak));                               \
+  void handler0(void) { instance.onService(); }                                \
+  void handler1(void) { instance.onService(); }                                \
+  void handler2(void) { instance.onService(); }                                \
+  void handlerOther(void) { instance.onService(); }
+
+#ifdef ARDUINO_SAMD51_E51
+#define SPI_DEFINE_SERCOM_HANDLERS(prefix, instance, periph)                   \
+  SPI_DEFINE_SAMD51_E51_HANDLERS(prefix##_IT_HANDLER_0,                        \
+                                 prefix##_IT_HANDLER_1,                        \
+                                 prefix##_IT_HANDLER_2,                        \
+                                 prefix##_IT_HANDLER_3, instance)
+#elif defined(ARDUINO_SAME53_E54)
+#define SPI_DEFINE_SERCOM_HANDLERS(prefix, instance, periph)                   \
+  SPI_DEFINE_SAME53_E54_HANDLERS(prefix##_IT_HANDLER_0,                        \
+                                 prefix##_IT_HANDLER_1,                        \
+                                 prefix##_IT_HANDLER_2,                        \
+                                 prefix##_IT_HANDLER_OTHER, instance)
+#else
+#define SPI_DEFINE_SERCOM_HANDLERS(prefix, instance, periph)                   \
+  SPI_DEFINE_SINGLE_HANDLER(prefix##_IT_HANDLER, instance)
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
 
 const SPISettings DEFAULT_SPI_SETTINGS = SPISettings();
 
@@ -148,7 +196,7 @@ bool SPIClass::begin()
 
 #ifdef USE_ZERODMA
   _p_sercom->dmaInit(_p_sercom->getSercomIndex());
-#endif
+#endif // USE_ZERODMA
 
   // PIO init
   const uint8_t sercomIndex = static_cast<uint8_t>(_p_sercom->getSercomIndex());
@@ -189,7 +237,7 @@ static inline unsigned char __interruptsStatus(void)
   // See http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0497a/CHDBIBGJ.html
   return (__get_PRIMASK() ? 0 : 1);
 }
-#endif
+#endif // !interruptsStatus
 
 void SPIClass::usingInterrupt(int interruptNumber)
 {
@@ -240,8 +288,13 @@ void SPIClass::beginTransaction(SPISettings settings)
       interruptSave = interruptsStatus();
       noInterrupts();
     }
-    else if (interruptMode & SPI_IMODE_EXTINT)
+    else if (interruptMode & SPI_IMODE_EXTINT) {
+#ifdef ARDUINO_SAME53_E54
+      EIC_REGS->EIC_INTENCLR = EIC_INTENCLR_EXTINT(interruptMask);
+#else
       EIC->INTENCLR.reg = EIC_INTENCLR_EXTINT(interruptMask);
+#endif // ARDUINO_SAME53_E54
+    }
   }
 
   config(settings);
@@ -256,8 +309,13 @@ void SPIClass::endTransaction(void)
       if (interruptSave)
         interrupts();
     }
-    else if (interruptMode & SPI_IMODE_EXTINT)
+    else if (interruptMode & SPI_IMODE_EXTINT) {
+#ifdef ARDUINO_SAME53_E54
+      EIC_REGS->EIC_INTENSET = EIC_INTENSET_EXTINT(interruptMask);
+#else
       EIC->INTENSET.reg = EIC_INTENSET_EXTINT(interruptMask);
+#endif // ARDUINO_SAME53_E54
+    }
   }
 }
 
@@ -372,7 +430,25 @@ void SPIClass::onService(void)
 
   uint8_t flags = _p_sercom->getINTFLAG();
 
-  if (flags & SERCOM_SPI_INTFLAG_ERROR)
+#ifdef ARDUINO_SAME53_E54
+  const bool isError = flags & SERCOM_SPIM_INTFLAG_ERROR_Msk;
+  const bool isRxc = flags & SERCOM_SPIM_INTFLAG_RXC_Msk;
+  const bool isDre = flags & SERCOM_SPIM_INTFLAG_DRE_Msk;
+  const uint8_t disableDoneMask = SERCOM_SPIM_INTENCLR_DRE_Msk |
+                                  SERCOM_SPIM_INTENCLR_RXC_Msk |
+                                  SERCOM_SPIM_INTENCLR_ERROR_Msk;
+  const uint8_t disableDreMask = SERCOM_SPIM_INTENCLR_DRE_Msk;
+#else
+  const bool isError = flags & SERCOM_SPI_INTFLAG_ERROR;
+  const bool isRxc = flags & SERCOM_SPI_INTFLAG_RXC;
+  const bool isDre = flags & SERCOM_SPI_INTFLAG_DRE;
+  const uint8_t disableDoneMask = SERCOM_SPI_INTENCLR_DRE |
+                                  SERCOM_SPI_INTENCLR_RXC |
+                                  SERCOM_SPI_INTENCLR_ERROR;
+  const uint8_t disableDreMask = SERCOM_SPI_INTENCLR_DRE;
+#endif // ARDUINO_SAME53_E54
+
+  if (isError)
   {
     _p_sercom->setReturnValueSPI(SercomSpiError::BUF_OVERFLOW);
     _p_sercom->clearINTFLAG();
@@ -380,22 +456,22 @@ void SPIClass::onService(void)
     return;
   }
 
-  if (flags & SERCOM_SPI_INTFLAG_RXC) {
+  if (isRxc) {
     // Read completes after write, so read previous byte
     bool hasMore = _p_sercom->readDataSPI();
 
     if (!hasMore) {
-      _p_sercom->disableInterrupts(SERCOM_SPI_INTENCLR_DRE | SERCOM_SPI_INTENCLR_RXC | SERCOM_SPI_INTENCLR_ERROR);
+      _p_sercom->disableInterrupts(disableDoneMask);
       _p_sercom->setReturnValueSPI(SercomSpiError::SUCCESS);
       _p_sercom->deferStopSPI(SercomSpiError::SUCCESS);
       return;
     }
   }
 
-  if (flags & SERCOM_SPI_INTFLAG_DRE) {
+  if (isDre) {
     bool hasMore = _p_sercom->sendDataSPI();
     if (!hasMore)
-      _p_sercom->disableInterrupts(SERCOM_SPI_INTENCLR_DRE);
+      _p_sercom->disableInterrupts(disableDreMask);
   }
 }
 
@@ -437,233 +513,177 @@ void SPIClass::detachInterrupt() {
 }
 
 #if SPI_INTERFACES_COUNT > 0
-  /* In case new variant doesn't define these macros,
-   * we put here the ones for Arduino Zero.
-   *
-   * These values should be different on some variants!
-   *
-   * The SPI PAD values can be found in cores/arduino/SERCOM.h:
-   *   - SercomSpiTXPad
-   *   - SercomRXPad
-   */
-  #ifndef PERIPH_SPI
-    #define PERIPH_SPI           sercom4
-    #define PAD_SPI_TX           SPI_PAD_2_SCK_3
-    #define PAD_SPI_RX           SERCOM_RX_PAD_0
-  #endif // PERIPH_SPI
-  SPIClass SPI (&PERIPH_SPI,  PIN_SPI_MISO,  PIN_SPI_SCK,  PIN_SPI_MOSI,  PAD_SPI_TX,  PAD_SPI_RX);
+/* In case new variant doesn't define these macros,
+ * we put here the ones for Arduino Zero.
+ *
+ * These values should be different on some variants!
+ *
+ * The SPI PAD values can be found in cores/arduino/SERCOM.h:
+ *   - SercomSpiTXPad
+ *   - SercomRXPad
+ */
+#ifndef PERIPH_SPI
+#define PERIPH_SPI sercom4
+#define PAD_SPI_TX SPI_PAD_2_SCK_3
+#define PAD_SPI_RX SERCOM_RX_PAD_0
+#endif // PERIPH_SPI
 
-  #ifndef SPI_IT_HANDLER
+SPIClass SPI(&PERIPH_SPI, PIN_SPI_MISO, PIN_SPI_SCK, PIN_SPI_MOSI, PAD_SPI_TX, PAD_SPI_RX);
+
+#ifndef SPI_IT_HANDLER
 #define SPI_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI)
-#endif
-  void SPI_IT_HANDLER(void) __attribute__ ((weak));
-  void SPI_IT_HANDLER(void) { SPI.onService(); }
-
-  #ifdef FAMILY_SAMD5X
-    #ifndef SPI_IT_HANDLER_0
+#endif // !SPI_IT_HANDLER
+#ifndef SPI_IT_HANDLER_0
 #define SPI_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI)
 #define SPI_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI)
 #define SPI_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI)
+#ifdef ARDUINO_SAMD51_E51
 #define SPI_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI)
-#endif
-  void SPI_IT_HANDLER_0(void) __attribute__((weak));
-  void SPI_IT_HANDLER_1(void) __attribute__((weak));
-  void SPI_IT_HANDLER_2(void) __attribute__((weak));
-  void SPI_IT_HANDLER_3(void) __attribute__((weak));
-  void SPI_IT_HANDLER_0(void) { SPI.onService(); }
-  void SPI_IT_HANDLER_1(void) { SPI.onService(); }
-  void SPI_IT_HANDLER_2(void) { SPI.onService(); }
-  void SPI_IT_HANDLER_3(void) { SPI.onService(); }
-#endif
-#endif
+#elif defined(ARDUINO_SAME53_E54)
+#define SPI_IT_HANDLER_OTHER SPI_SERCOM_HANDLEROTHER_FROM_TOKEN(PERIPH_SPI)
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !SPI_IT_HANDLER_0
+SPI_DEFINE_SERCOM_HANDLERS(SPI, SPI, PERIPH_SPI)
+#endif // SPI_INTERFACES_COUNT > 0
+
 #if SPI_INTERFACES_COUNT > 1
-  SPIClass SPI1(&PERIPH_SPI1, PIN_SPI1_MISO, PIN_SPI1_SCK, PIN_SPI1_MOSI, PAD_SPI1_TX, PAD_SPI1_RX);
+SPIClass SPI1(&PERIPH_SPI1, PIN_SPI1_MISO, PIN_SPI1_SCK, PIN_SPI1_MOSI, PAD_SPI1_TX, PAD_SPI1_RX);
 
 #ifndef SPI1_IT_HANDLER
 #define SPI1_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI1)
-#endif
+#endif // !SPI1_IT_HANDLER
 
-#ifdef FAMILY_SAMD5X
 #ifndef SPI1_IT_HANDLER_0
 #define SPI1_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI1)
 #define SPI1_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI1)
 #define SPI1_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI1)
+#ifdef ARDUINO_SAMD51_E51
 #define SPI1_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI1)
-#endif
-  void SPI1_IT_HANDLER_0(void) __attribute__((weak));
-  void SPI1_IT_HANDLER_1(void) __attribute__((weak));
-  void SPI1_IT_HANDLER_2(void) __attribute__((weak));
-  void SPI1_IT_HANDLER_3(void) __attribute__((weak));
-  void SPI1_IT_HANDLER_0(void) { SPI1.onService(); }
-  void SPI1_IT_HANDLER_1(void) { SPI1.onService(); }
-  void SPI1_IT_HANDLER_2(void) { SPI1.onService(); }
-  void SPI1_IT_HANDLER_3(void) { SPI1.onService(); }
-#else
-  void SPI1_IT_HANDLER(void) __attribute__((weak));
-  void SPI1_IT_HANDLER(void) { SPI1.onService(); }
-  #endif
-#endif
+#elif defined(ARDUINO_SAME53_E54)
+#define SPI1_IT_HANDLER_OTHER SPI_SERCOM_HANDLEROTHER_FROM_TOKEN(PERIPH_SPI1)
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !SPI1_IT_HANDLER_0
+SPI_DEFINE_SERCOM_HANDLERS(SPI1, SPI1, PERIPH_SPI1)
+#endif // SPI_INTERFACES_COUNT > 1
+
 #if SPI_INTERFACES_COUNT > 2
-  SPIClass SPI2(&PERIPH_SPI2, PIN_SPI2_MISO, PIN_SPI2_SCK, PIN_SPI2_MOSI, PAD_SPI2_TX, PAD_SPI2_RX);
+SPIClass SPI2(&PERIPH_SPI2, PIN_SPI2_MISO, PIN_SPI2_SCK, PIN_SPI2_MOSI, PAD_SPI2_TX, PAD_SPI2_RX);
 
 #ifndef SPI2_IT_HANDLER
 #define SPI2_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI2)
-#endif
+#endif // !SPI2_IT_HANDLER
 
-#ifdef FAMILY_SAMD5X
 #ifndef SPI2_IT_HANDLER_0
 #define SPI2_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI2)
 #define SPI2_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI2)
 #define SPI2_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI2)
+#ifdef ARDUINO_SAMD51_E51
 #define SPI2_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI2)
-#endif
-  void SPI2_IT_HANDLER_0(void) __attribute__((weak));
-  void SPI2_IT_HANDLER_1(void) __attribute__((weak));
-  void SPI2_IT_HANDLER_2(void) __attribute__((weak));
-  void SPI2_IT_HANDLER_3(void) __attribute__((weak));
-  void SPI2_IT_HANDLER_0(void) { SPI2.onService(); }
-  void SPI2_IT_HANDLER_1(void) { SPI2.onService(); }
-  void SPI2_IT_HANDLER_2(void) { SPI2.onService(); }
-  void SPI2_IT_HANDLER_3(void) { SPI2.onService(); }
-#else
-  void SPI2_IT_HANDLER(void) __attribute__((weak));
-  void SPI2_IT_HANDLER(void) { SPI2.onService(); }
-  #endif
-#endif
+#elif defined(ARDUINO_SAME53_E54)
+#define SPI2_IT_HANDLER_OTHER SPI_SERCOM_HANDLEROTHER_FROM_TOKEN(PERIPH_SPI2)
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !SPI2_IT_HANDLER_0
+SPI_DEFINE_SERCOM_HANDLERS(SPI2, SPI2, PERIPH_SPI2)
+#endif // SPI_INTERFACES_COUNT > 2
+
 #if SPI_INTERFACES_COUNT > 3
-  SPIClass SPI3(&PERIPH_SPI3, PIN_SPI3_MISO, PIN_SPI3_SCK, PIN_SPI3_MOSI, PAD_SPI3_TX, PAD_SPI3_RX);
+SPIClass SPI3(&PERIPH_SPI3, PIN_SPI3_MISO, PIN_SPI3_SCK, PIN_SPI3_MOSI, PAD_SPI3_TX, PAD_SPI3_RX);
 
 #ifndef SPI3_IT_HANDLER
 #define SPI3_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI3)
-#endif
+#endif // !SPI3_IT_HANDLER
 
-#ifdef FAMILY_SAMD5X
 #ifndef SPI3_IT_HANDLER_0
 #define SPI3_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI3)
 #define SPI3_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI3)
 #define SPI3_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI3)
+#ifdef ARDUINO_SAMD51_E51
 #define SPI3_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI3)
-#endif
-  void SPI3_IT_HANDLER_0(void) __attribute__((weak));
-  void SPI3_IT_HANDLER_1(void) __attribute__((weak));
-  void SPI3_IT_HANDLER_2(void) __attribute__((weak));
-  void SPI3_IT_HANDLER_3(void) __attribute__((weak));
-  void SPI3_IT_HANDLER_0(void) { SPI3.onService(); }
-  void SPI3_IT_HANDLER_1(void) { SPI3.onService(); }
-  void SPI3_IT_HANDLER_2(void) { SPI3.onService(); }
-  void SPI3_IT_HANDLER_3(void) { SPI3.onService(); }
-#else
-  void SPI3_IT_HANDLER(void) __attribute__((weak));
-  void SPI3_IT_HANDLER(void) { SPI3.onService(); }
-  #endif
-#endif
+#elif defined(ARDUINO_SAME53_E54)
+#define SPI3_IT_HANDLER_OTHER SPI_SERCOM_HANDLEROTHER_FROM_TOKEN(PERIPH_SPI3)
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !SPI3_IT_HANDLER_0
+SPI_DEFINE_SERCOM_HANDLERS(SPI3, SPI3, PERIPH_SPI3)
+#endif // SPI_INTERFACES_COUNT > 3
+
 #if SPI_INTERFACES_COUNT > 4
-  SPIClass SPI4(&PERIPH_SPI4, PIN_SPI4_MISO, PIN_SPI4_SCK, PIN_SPI4_MOSI, PAD_SPI4_TX, PAD_SPI4_RX);
+SPIClass SPI4(&PERIPH_SPI4, PIN_SPI4_MISO, PIN_SPI4_SCK, PIN_SPI4_MOSI, PAD_SPI4_TX, PAD_SPI4_RX);
 
 #ifndef SPI4_IT_HANDLER
 #define SPI4_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI4)
-#endif
+#endif // !SPI4_IT_HANDLER
 
-#ifdef FAMILY_SAMD5X
 #ifndef SPI4_IT_HANDLER_0
 #define SPI4_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI4)
 #define SPI4_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI4)
 #define SPI4_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI4)
+#ifdef ARDUINO_SAMD51_E51
 #define SPI4_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI4)
-#endif
-  void SPI4_IT_HANDLER_0(void) __attribute__((weak));
-  void SPI4_IT_HANDLER_1(void) __attribute__((weak));
-  void SPI4_IT_HANDLER_2(void) __attribute__((weak));
-  void SPI4_IT_HANDLER_3(void) __attribute__((weak));
-  void SPI4_IT_HANDLER_0(void) { SPI4.onService(); }
-  void SPI4_IT_HANDLER_1(void) { SPI4.onService(); }
-  void SPI4_IT_HANDLER_2(void) { SPI4.onService(); }
-  void SPI4_IT_HANDLER_3(void) { SPI4.onService(); }
-#else
-  void SPI4_IT_HANDLER(void) __attribute__((weak));
-  void SPI4_IT_HANDLER(void) { SPI4.onService(); }
-  #endif
-#endif
+#elif defined(ARDUINO_SAME53_E54)
+#define SPI4_IT_HANDLER_OTHER SPI_SERCOM_HANDLEROTHER_FROM_TOKEN(PERIPH_SPI4)
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !SPI4_IT_HANDLER_0
+SPI_DEFINE_SERCOM_HANDLERS(SPI4, SPI4, PERIPH_SPI4)
+#endif // SPI_INTERFACES_COUNT > 4
+
 #if SPI_INTERFACES_COUNT > 5
-  SPIClass SPI5(&PERIPH_SPI5, PIN_SPI5_MISO, PIN_SPI5_SCK, PIN_SPI5_MOSI, PAD_SPI5_TX, PAD_SPI5_RX);
+SPIClass SPI5(&PERIPH_SPI5, PIN_SPI5_MISO, PIN_SPI5_SCK, PIN_SPI5_MOSI, PAD_SPI5_TX, PAD_SPI5_RX);
 
 #ifndef SPI5_IT_HANDLER
 #define SPI5_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI5)
-#endif
+#endif // !SPI5_IT_HANDLER
 
-#ifdef FAMILY_SAMD5X
 #ifndef SPI5_IT_HANDLER_0
 #define SPI5_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI5)
 #define SPI5_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI5)
 #define SPI5_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI5)
+#ifdef ARDUINO_SAMD51_E51
 #define SPI5_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI5)
-#endif
-  void SPI5_IT_HANDLER_0(void) __attribute__((weak));
-  void SPI5_IT_HANDLER_1(void) __attribute__((weak));
-  void SPI5_IT_HANDLER_2(void) __attribute__((weak));
-  void SPI5_IT_HANDLER_3(void) __attribute__((weak));
-  void SPI5_IT_HANDLER_0(void) { SPI5.onService(); }
-  void SPI5_IT_HANDLER_1(void) { SPI5.onService(); }
-  void SPI5_IT_HANDLER_2(void) { SPI5.onService(); }
-  void SPI5_IT_HANDLER_3(void) { SPI5.onService(); }
-#else
-  void SPI5_IT_HANDLER(void) __attribute__((weak));
-  void SPI5_IT_HANDLER(void) { SPI5.onService(); }
-  #endif
-#endif
+#elif defined(ARDUINO_SAME53_E54)
+#define SPI5_IT_HANDLER_OTHER SPI_SERCOM_HANDLEROTHER_FROM_TOKEN(PERIPH_SPI5)
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !SPI5_IT_HANDLER_0
+SPI_DEFINE_SERCOM_HANDLERS(SPI5, SPI5, PERIPH_SPI5)
+#endif // SPI_INTERFACES_COUNT > 5
+
 #if SPI_INTERFACES_COUNT > 6
-    SPIClass SPI6(&PERIPH_SPI6, PIN_SPI6_MISO, PIN_SPI6_SCK, PIN_SPI6_MOSI,
-                  PAD_SPI6_TX, PAD_SPI6_RX);
+SPIClass SPI6(&PERIPH_SPI6, PIN_SPI6_MISO, PIN_SPI6_SCK, PIN_SPI6_MOSI,
+              PAD_SPI6_TX, PAD_SPI6_RX);
 
 #ifndef SPI6_IT_HANDLER
 #define SPI6_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI6)
-#endif
+#endif // !SPI6_IT_HANDLER
 
-#ifdef FAMILY_SAMD5X
 #ifndef SPI6_IT_HANDLER_0
 #define SPI6_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI6)
 #define SPI6_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI6)
 #define SPI6_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI6)
+#ifdef ARDUINO_SAMD51_E51
 #define SPI6_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI6)
-#endif
-    void SPI6_IT_HANDLER_0(void) __attribute__((weak));
-    void SPI6_IT_HANDLER_1(void) __attribute__((weak));
-    void SPI6_IT_HANDLER_2(void) __attribute__((weak));
-    void SPI6_IT_HANDLER_3(void) __attribute__((weak));
-    void SPI6_IT_HANDLER_0(void) { SPI6.onService(); }
-    void SPI6_IT_HANDLER_1(void) { SPI6.onService(); }
-    void SPI6_IT_HANDLER_2(void) { SPI6.onService(); }
-    void SPI6_IT_HANDLER_3(void) { SPI6.onService(); }
-#else
-    void SPI6_IT_HANDLER(void) __attribute__((weak));
-    void SPI6_IT_HANDLER(void) { SPI6.onService(); }
-#endif
-#endif
+#elif defined(ARDUINO_SAME53_E54)
+#define SPI6_IT_HANDLER_OTHER SPI_SERCOM_HANDLEROTHER_FROM_TOKEN(PERIPH_SPI6)
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !SPI6_IT_HANDLER_0
+SPI_DEFINE_SERCOM_HANDLERS(SPI6, SPI6, PERIPH_SPI6)
+#endif // SPI_INTERFACES_COUNT > 6
+
 #if SPI_INTERFACES_COUNT > 7
-    SPIClass SPI7(&PERIPH_SPI7, PIN_SPI7_MISO, PIN_SPI7_SCK, PIN_SPI7_MOSI,
-                  PAD_SPI7_TX, PAD_SPI7_RX);
+SPIClass SPI7(&PERIPH_SPI7, PIN_SPI7_MISO, PIN_SPI7_SCK, PIN_SPI7_MOSI,
+              PAD_SPI7_TX, PAD_SPI7_RX);
 
 #ifndef SPI7_IT_HANDLER
 #define SPI7_IT_HANDLER SPI_SERCOM_HANDLER_FROM_TOKEN(PERIPH_SPI7)
-#endif
+#endif // !SPI7_IT_HANDLER
 
-#ifdef FAMILY_SAMD5X
 #ifndef SPI7_IT_HANDLER_0
 #define SPI7_IT_HANDLER_0 SPI_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_SPI7)
 #define SPI7_IT_HANDLER_1 SPI_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_SPI7)
 #define SPI7_IT_HANDLER_2 SPI_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_SPI7)
+#ifdef ARDUINO_SAMD51_E51
 #define SPI7_IT_HANDLER_3 SPI_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_SPI7)
-#endif
-    void SPI7_IT_HANDLER_0(void) __attribute__((weak));
-    void SPI7_IT_HANDLER_1(void) __attribute__((weak));
-    void SPI7_IT_HANDLER_2(void) __attribute__((weak));
-    void SPI7_IT_HANDLER_3(void) __attribute__((weak));
-    void SPI7_IT_HANDLER_0(void) { SPI7.onService(); }
-    void SPI7_IT_HANDLER_1(void) { SPI7.onService(); }
-    void SPI7_IT_HANDLER_2(void) { SPI7.onService(); }
-    void SPI7_IT_HANDLER_3(void) { SPI7.onService(); }
-#else
-    void SPI7_IT_HANDLER(void) __attribute__((weak));
-    void SPI7_IT_HANDLER(void) { SPI7.onService(); }
-#endif
-#endif
+#elif defined(ARDUINO_SAME53_E54)
+#define SPI7_IT_HANDLER_OTHER SPI_SERCOM_HANDLEROTHER_FROM_TOKEN(PERIPH_SPI7)
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !SPI7_IT_HANDLER_0
+SPI_DEFINE_SERCOM_HANDLERS(SPI7, SPI7, PERIPH_SPI7)
+#endif // SPI_INTERFACES_COUNT > 7

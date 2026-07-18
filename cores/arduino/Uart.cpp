@@ -61,8 +61,13 @@ void Uart::begin(unsigned long baudrate, uint16_t config)
     pinMode(uc_pinRTS, OUTPUT);
 
     EPortType rtsPort = g_APinDescription[uc_pinRTS].ulPort;
+#if defined(ARDUINO_SAME53_E54)
+    pul_outsetRTS = &PORT_REGS->GROUP[rtsPort].PORT_OUTSET;
+    pul_outclrRTS = &PORT_REGS->GROUP[rtsPort].PORT_OUTCLR;
+#else
     pul_outsetRTS = &PORT->Group[rtsPort].OUTSET.reg;
     pul_outclrRTS = &PORT->Group[rtsPort].OUTCLR.reg;
+#endif // ARDUINO_SAME53_E54
     ul_pinMaskRTS = (1ul << g_APinDescription[uc_pinRTS].ulPin);
 
     *pul_outclrRTS = ul_pinMaskRTS;
@@ -214,7 +219,7 @@ size_t Uart::write(const uint8_t* buffer, size_t size,
       while (!txnDone) ;
       return size;
     }
-#endif
+#endif // USE_ZERODMA
     // Fallback: byte-by-byte
     for (size_t i = 0; i < size; ++i)
       write(buffer[i]);
@@ -241,7 +246,7 @@ size_t Uart::write(const uint8_t* buffer, size_t size,
     for (size_t i = 0; i < size; ++i)
       write(buffer[i]);
     return size;
-#endif
+#endif // USE_ZERODMA
   }
 }
 
@@ -268,7 +273,7 @@ size_t Uart::read(uint8_t* buffer, size_t size, void (*onComplete)(void* user, i
   rxExternalActive = true;
 
   // Disable RXC interrupt; DMA takes over
-  sercom->getSercom()->USART.INTENCLR.reg = SERCOM_USART_INTENCLR_RXC;
+  sercom->disableReceiveCompleteInterruptUART();
 
   SercomTxn* txn = allocateTxn();
   txn->txPtr = nullptr;
@@ -281,7 +286,7 @@ size_t Uart::read(uint8_t* buffer, size_t size, void (*onComplete)(void* user, i
 
   if (!sercom->enqueueUART(txn)) {
     // Enqueue failed; restore RXC interrupt and clear pending state
-    sercom->getSercom()->USART.INTENSET.reg = SERCOM_USART_INTENSET_RXC;
+    sercom->enableReceiveCompleteInterruptUART();
     rxExternalActive = false;
     pendingRxCb = nullptr;
     pendingRxUser = nullptr;
@@ -293,7 +298,7 @@ size_t Uart::read(uint8_t* buffer, size_t size, void (*onComplete)(void* user, i
   (void)onComplete;
   (void)user;
   return 0;
-#endif
+#endif // USE_ZERODMA
 }
 
 SercomTxn* Uart::allocateTxn() {
@@ -312,7 +317,7 @@ void Uart::onTxnComplete(void* user, int status)
   self->txnDone = true;
   if (self->rxExternalActive) {
     self->rxExternalActive = false;
-    self->sercom->getSercom()->USART.INTENSET.reg = SERCOM_USART_INTENSET_RXC;
+    self->sercom->enableReceiveCompleteInterruptUART();
     if (self->pendingRxCb) {
       void (*cb)(void*, int) = self->pendingRxCb;
       void* cbUser = self->pendingRxUser;

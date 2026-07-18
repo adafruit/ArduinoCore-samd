@@ -22,6 +22,67 @@
  extern "C" {
 #endif
 
+#if defined(ARDUINO_SAME53_E54)
+void pinMode(uint32_t ulPin, uint32_t ulMode)
+{
+  if (g_APinDescription[ulPin].ulPinType == PIO_NOT_A_PIN) return;
+
+  port_group_registers_t *group = &PORT_REGS->GROUP[g_APinDescription[ulPin].ulPort];
+  uint32_t pin = g_APinDescription[ulPin].ulPin;
+  uint32_t pinMask = 1UL << pin;
+
+  switch (ulMode)
+  {
+    case INPUT:
+      group->PORT_PINCFG[pin] = PORT_PINCFG_INEN_Msk;
+      group->PORT_DIRCLR = pinMask;
+      break;
+    case INPUT_PULLUP:
+      group->PORT_PINCFG[pin] = PORT_PINCFG_INEN_Msk | PORT_PINCFG_PULLEN_Msk;
+      group->PORT_DIRCLR = pinMask;
+      group->PORT_OUTSET = pinMask;
+      break;
+    case INPUT_PULLDOWN:
+      group->PORT_PINCFG[pin] = PORT_PINCFG_INEN_Msk | PORT_PINCFG_PULLEN_Msk;
+      group->PORT_DIRCLR = pinMask;
+      group->PORT_OUTCLR = pinMask;
+      break;
+    case OUTPUT:
+      group->PORT_PINCFG[pin] = PORT_PINCFG_INEN_Msk | PORT_PINCFG_DRVSTR_Msk;
+      group->PORT_DIRSET = pinMask;
+      break;
+    default:
+      break;
+  }
+}
+
+void digitalWrite(uint32_t ulPin, uint32_t ulVal)
+{
+  if (g_APinDescription[ulPin].ulPinType == PIO_NOT_A_PIN) return;
+
+  port_group_registers_t *group = &PORT_REGS->GROUP[g_APinDescription[ulPin].ulPort];
+  uint32_t pin = g_APinDescription[ulPin].ulPin;
+  uint32_t pinMask = 1UL << pin;
+
+  if ((group->PORT_DIRSET & pinMask) == 0) {
+    if (ulVal == LOW) group->PORT_PINCFG[pin] &= ~PORT_PINCFG_PULLEN_Msk;
+    else group->PORT_PINCFG[pin] |= PORT_PINCFG_PULLEN_Msk;
+  }
+
+  if (ulVal == LOW) group->PORT_OUTCLR = pinMask;
+  else group->PORT_OUTSET = pinMask;
+}
+
+int digitalRead(uint32_t ulPin)
+{
+  if (g_APinDescription[ulPin].ulPinType == PIO_NOT_A_PIN) return LOW;
+
+  port_group_registers_t *group = &PORT_REGS->GROUP[g_APinDescription[ulPin].ulPort];
+  uint32_t pinMask = 1UL << g_APinDescription[ulPin].ulPin;
+  return (group->PORT_IN & pinMask) ? HIGH : LOW;
+}
+
+#else
 void pinMode( uint32_t ulPin, uint32_t ulMode )
 {
   // Handle the case the pin isn't usable as PIO
@@ -121,8 +182,8 @@ int digitalRead( uint32_t ulPin )
 
   return LOW ;
 }
+#endif
 
 #ifdef __cplusplus
 }
 #endif
-

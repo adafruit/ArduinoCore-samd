@@ -2,7 +2,7 @@
 
 /**
  * @file SERCOM_PinMux.h
- * @brief Family-selection flags and SERCOM pin-route validation APIs.
+ * @brief SERCOM pin-route validation APIs.
  *
  * This header exposes small, shared declarations used by SPI/Wire to validate
  * that variant-assigned pins can be routed to the selected SERCOM instance.
@@ -12,13 +12,8 @@
  *       - libraries/Wire/Wire.cpp
  */
 
+#include "sam.h"
 #include <stdint.h>
-
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
-#define FAMILY_SAMD5X ///< Presence flag for SAMD5x/SAME5x family builds.
-#else
-#define FAMILY_SAMD2X ///< Presence flag for SAMD2x family builds.
-#endif
 
 /** @brief Shared helpers for validating SERCOM pin routing. */
 namespace sercomPinMux {

@@ -24,22 +24,26 @@
 
 #ifdef USE_ZERODMA
 #include <Adafruit_ZeroDMA.h>
-#endif
+#endif // USE_ZERODMA
 
 #ifndef WIRE_RISE_TIME_NANOSECONDS
 // Default rise time in nanoseconds, based on 4.7K ohm pull up resistors
 // you can override this value in your variant if needed
 #define WIRE_RISE_TIME_NANOSECONDS 125
-#endif
+#endif // !WIRE_RISE_TIME_NANOSECONDS
 
+#ifdef ARDUINO_SAME53_E54
+SERCOM::SERCOM(sercom_registers_t* s)
+#else
 SERCOM::SERCOM(Sercom* s)
+#endif // ARDUINO_SAME53_E54
 {
   sercom = s;
   int8_t idx = getSercomIndex();
   if (idx >= 0 && idx < (int8_t)kSercomCount)
     s_instances[idx] = this;
 
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
   // A briefly-available but now deprecated feature had the SPI clock source
   // set via a compile-time setting (MAX_SPI)...problem was this affected
   // ALL SERCOMs, whereas some (anything read/write, e.g. SD cards) should
@@ -50,25 +54,32 @@ SERCOM::SERCOM(Sercom* s)
   // might have relied on the compile-time setting.  But please, don't.
 #if SERCOM_SPI_FREQ_REF == F_CPU // F_CPU clock = GCLK0
   clockSource = SERCOM_CLOCK_SOURCE_100M;
- #elif SERCOM_SPI_FREQ_REF == 48000000  // 48 MHz clock = GCLK1 (standard)
+#elif SERCOM_SPI_FREQ_REF == 48000000  // 48 MHz clock = GCLK1 (standard)
   clockSource = SERCOM_CLOCK_SOURCE_48M;
- #elif SERCOM_SPI_FREQ_REF == 100000000 // 100 MHz clock = GCLK2
+#elif SERCOM_SPI_FREQ_REF == 100000000 // 100 MHz clock = GCLK2
   clockSource = SERCOM_CLOCK_SOURCE_100M;
- #endif
-#endif // end __SAMD51__
+#endif // SERCOM_SPI_FREQ_REF == F_CPU
+#endif // ARDUINO_SAMD51_E51 || ARDUINO_SAME53_E54
 }
 
 void SERCOM::resetSERCOM()
 {
   // UART, SPI, I2CS, and I2CM use the same SWRST and DBGCTRL bits, so this works for all modes
-  sercom->USART.CTRLA.bit.SWRST = 1 ;
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_CTRLA = SERCOM_USART_INT_CTRLA_SWRST_Msk;
+#else
+  sercom->USART.CTRLA.bit.SWRST = 1;
+#endif // ARDUINO_SAME53_E54
 
-  while ( sercom->USART.CTRLA.bit.SWRST || sercom->USART.SYNCBUSY.bit.SWRST )
-    ; // Wait for both bits Software Reset from CTRLA and SYNCBUSY coming back to 0
+  waitSyncBusySwrst();
 
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_DBGCTRL &= ~SERCOM_USART_INT_DBGCTRL_DBGSTOP_Msk;
+#else
   // DBGCTRL is not affected by SWRST, so explicitly clear it here to ensure debug behavior is
   // consistent after reset
   sercom->USART.DBGCTRL.bit.DBGSTOP = 0;
+#endif // ARDUINO_SAME53_E54
 }
 
 /* =========================
@@ -82,6 +93,7 @@ void SERCOM::initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint
 
 #ifdef USE_ZERODMA
   int8_t id = getSercomIndex();
+
   if (id >= 0) {
     dmaSetCallbacks(SERCOM::dmaTxCallbackUART, SERCOM::dmaRxCallbackUART);
     dmaInit(id);
@@ -90,56 +102,83 @@ void SERCOM::initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint
 
   registerService(getSercomIndex(), &SERCOM::stopTransmissionUART);
 
-  //Setting the CTRLA register
-  sercom->USART.CTRLA.reg = SERCOM_USART_CTRLA_MODE(mode) |
-                            SERCOM_USART_CTRLA_SAMPR(sampleRate);
-
-  //Setting the Interrupt register
-  sercom->USART.INTENSET.reg = SERCOM_USART_INTENSET_RXC |  //Received complete
-                               SERCOM_USART_INTENSET_ERROR; //All others errors
-
-  if ( mode == UART_INT_CLOCK )
-  {
-    uint16_t sampleRateValue;
-
-    if (sampleRate == SAMPLE_RATE_x16) {
-      sampleRateValue = 16;
-    } else {
-      sampleRateValue = 8;
-    }
+  uint32_t baudTimes8 = 0;
+  if (mode == UART_INT_CLOCK) {
+    const uint16_t sampleRateValue = (sampleRate == SAMPLE_RATE_x16) ? 16 : 8;
 
     // Asynchronous fractional mode (Table 24-2 in datasheet)
     //   BAUD = fref / (sampleRateValue * fbaud)
     // (multiply by 8, to calculate fractional piece)
-    uint32_t baudTimes8 = (freqRef * 8) / (sampleRateValue * baudrate);
+    baudTimes8 = (freqRef * 8) / (sampleRateValue * baudrate);
+  }
 
-    sercom->USART.BAUD.FRAC.FP   = (baudTimes8 % 8);
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_CTRLA = SERCOM_USART_INT_CTRLA_MODE(mode) |
+                                    SERCOM_USART_INT_CTRLA_SAMPR(sampleRate);
+  sercom->USART_INT.SERCOM_INTENSET = SERCOM_USART_INT_INTENSET_RXC_Msk |
+                                      SERCOM_USART_INT_INTENSET_ERROR_Msk;
+
+  if (mode == UART_INT_CLOCK) {
+    sercom->USART_INT.SERCOM_BAUD =
+        SERCOM_USART_INT_BAUD_FRAC_FP(baudTimes8 % 8) |
+        SERCOM_USART_INT_BAUD_FRAC_BAUD(baudTimes8 / 8);
+  }
+#else
+  // Setting the CTRLA register
+  sercom->USART.CTRLA.reg = SERCOM_USART_CTRLA_MODE(mode) |
+                            SERCOM_USART_CTRLA_SAMPR(sampleRate);
+
+  // Setting the Interrupt register
+  sercom->USART.INTENSET.reg = SERCOM_USART_INTENSET_RXC |  // Received complete
+                               SERCOM_USART_INTENSET_ERROR; // All others errors
+
+  if (mode == UART_INT_CLOCK) {
+    sercom->USART.BAUD.FRAC.FP = (baudTimes8 % 8);
     sercom->USART.BAUD.FRAC.BAUD = (baudTimes8 / 8);
   }
+#endif // ARDUINO_SAME53_E54
 }
 
-void SERCOM::initFrame(SercomUartCharSize charSize, SercomDataOrder dataOrder, SercomParityMode parityMode, SercomNumberStopBit nbStopBits)
+void SERCOM::initFrame(SercomUartCharSize charSize, SercomDataOrder dataOrder,
+                       SercomParityMode parityMode, SercomNumberStopBit nbStopBits)
 {
-  //Setting the CTRLA register
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_CTRLA |=
+      SERCOM_USART_INT_CTRLA_FORM(parityMode == SERCOM_NO_PARITY ? 0 : 1) |
+      SERCOM_USART_INT_CTRLA_DORD(dataOrder);
+  sercom->USART_INT.SERCOM_CTRLB |=
+      SERCOM_USART_INT_CTRLB_CHSIZE(charSize)   |
+      SERCOM_USART_INT_CTRLB_SBMODE(nbStopBits) |
+      SERCOM_USART_INT_CTRLB_PMODE(parityMode == SERCOM_NO_PARITY ? 0 : parityMode);
+#else
+  // Setting the CTRLA register
   sercom->USART.CTRLA.reg |=
-    SERCOM_USART_CTRLA_FORM((parityMode == SERCOM_NO_PARITY ? 0 : 1) ) |
-    dataOrder << SERCOM_USART_CTRLA_DORD_Pos;
+      SERCOM_USART_CTRLA_FORM((parityMode == SERCOM_NO_PARITY ? 0 : 1)) |
+      (dataOrder << SERCOM_USART_CTRLA_DORD_Pos);
 
-  //Setting the CTRLB register
-  sercom->USART.CTRLB.reg |= SERCOM_USART_CTRLB_CHSIZE(charSize) |
-    nbStopBits << SERCOM_USART_CTRLB_SBMODE_Pos |
-    (parityMode == SERCOM_NO_PARITY ? 0 : parityMode) <<
-      SERCOM_USART_CTRLB_PMODE_Pos; //If no parity use default value
+  // Setting the CTRLB register
+  sercom->USART.CTRLB.reg |=
+      SERCOM_USART_CTRLB_CHSIZE(charSize)           |
+      (nbStopBits << SERCOM_USART_CTRLB_SBMODE_Pos) |
+      ((parityMode == SERCOM_NO_PARITY ? 0 : parityMode) << SERCOM_USART_CTRLB_PMODE_Pos);
+#endif // ARDUINO_SAME53_E54
 }
 
 void SERCOM::initPads(SercomUartTXPad txPad, SercomRXPad rxPad)
 {
-  //Setting the CTRLA register
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_CTRLA |= SERCOM_USART_INT_CTRLA_TXPO(txPad) |
+                                    SERCOM_USART_INT_CTRLA_RXPO(rxPad);
+  sercom->USART_INT.SERCOM_CTRLB |= SERCOM_USART_INT_CTRLB_TXEN_Msk |
+                                    SERCOM_USART_INT_CTRLB_RXEN_Msk;
+#else
+  // Setting the CTRLA register
   sercom->USART.CTRLA.reg |= SERCOM_USART_CTRLA_TXPO(txPad) |
                              SERCOM_USART_CTRLA_RXPO(rxPad);
 
   // Enable Transceiver and Receiver
-  sercom->USART.CTRLB.reg |= SERCOM_USART_CTRLB_TXEN | SERCOM_USART_CTRLB_RXEN ;
+  sercom->USART.CTRLB.reg |= SERCOM_USART_CTRLB_TXEN | SERCOM_USART_CTRLB_RXEN;
+#endif // ARDUINO_SAME53_E54
 }
 
 void SERCOM::resetUART()
@@ -158,7 +197,7 @@ void SERCOM::resetUART()
   _uart.dmaRxDone = false;
   dmaAbortTx();
   dmaAbortRx();
-#endif
+#endif // USE_ZERODMA
 
   resetSERCOM();
 }
@@ -166,88 +205,162 @@ void SERCOM::resetUART()
 void SERCOM::flushUART()
 {
   // Skip checking transmission completion if data register is empty
-  if(isDataRegisterEmptyUART())
+  if (isDataRegisterEmptyUART())
     return;
 
   // Wait for transmission to complete
-  while(!sercom->USART.INTFLAG.bit.TXC);
+#ifdef ARDUINO_SAME53_E54
+  while ((sercom->USART_INT.SERCOM_INTFLAG & SERCOM_USART_INT_INTFLAG_TXC_Msk) == 0) ;
+#else
+  while (!sercom->USART.INTFLAG.bit.TXC) ;
+#endif // ARDUINO_SAME53_E54
 }
 
 void SERCOM::clearStatusUART()
 {
-  //Reset (with 0) the STATUS register
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_STATUS = SERCOM_USART_INT_STATUS_RESETVALUE;
+#else
+  // Reset (with 0) the STATUS register
   sercom->USART.STATUS.reg = SERCOM_USART_STATUS_RESETVALUE;
+#endif // ARDUINO_SAME53_E54
 }
 
 bool SERCOM::availableDataUART()
 {
-  //RXC : Receive Complete
+  // RXC: Receive Complete
+#ifdef ARDUINO_SAME53_E54
+  return (sercom->USART_INT.SERCOM_INTFLAG & SERCOM_USART_INT_INTFLAG_RXC_Msk) != 0;
+#else
   return sercom->USART.INTFLAG.bit.RXC;
+#endif // ARDUINO_SAME53_E54
 }
 
 bool SERCOM::isUARTError()
 {
+#ifdef ARDUINO_SAME53_E54
+  return (sercom->USART_INT.SERCOM_INTFLAG & SERCOM_USART_INT_INTFLAG_ERROR_Msk) != 0;
+#else
   return sercom->USART.INTFLAG.bit.ERROR;
+#endif // ARDUINO_SAME53_E54
 }
 
 void SERCOM::acknowledgeUARTError()
 {
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_INTFLAG = SERCOM_USART_INT_INTFLAG_ERROR_Msk;
+#else
   sercom->USART.INTFLAG.bit.ERROR = 1;
+#endif // ARDUINO_SAME53_E54
+}
+
+void SERCOM::enableReceiveCompleteInterruptUART()
+{
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_INTENSET = SERCOM_USART_INT_INTENSET_RXC_Msk;
+#else
+  sercom->USART.INTENSET.reg = SERCOM_USART_INTENSET_RXC;
+#endif // ARDUINO_SAME53_E54
+}
+
+void SERCOM::disableReceiveCompleteInterruptUART()
+{
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_INTENCLR = SERCOM_USART_INT_INTENCLR_RXC_Msk;
+#else
+  sercom->USART.INTENCLR.reg = SERCOM_USART_INTENCLR_RXC;
+#endif // ARDUINO_SAME53_E54
 }
 
 bool SERCOM::isBufferOverflowErrorUART()
 {
-  //BUFOVF : Buffer Overflow
+  // BUFOVF: Buffer Overflow
+#ifdef ARDUINO_SAME53_E54
+  return (sercom->USART_INT.SERCOM_STATUS & SERCOM_USART_INT_STATUS_BUFOVF_Msk) != 0;
+#else
   return sercom->USART.STATUS.bit.BUFOVF;
+#endif // ARDUINO_SAME53_E54
 }
 
 bool SERCOM::isFrameErrorUART()
 {
-  //FERR : Frame Error
+  // FERR: Frame Error
+#ifdef ARDUINO_SAME53_E54
+  return (sercom->USART_INT.SERCOM_STATUS & SERCOM_USART_INT_STATUS_FERR_Msk) != 0;
+#else
   return sercom->USART.STATUS.bit.FERR;
+#endif // ARDUINO_SAME53_E54
 }
 
 void SERCOM::clearFrameErrorUART()
 {
-  // clear FERR bit writing 1 status bit
+  // Clear FERR bit writing 1 status bit
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_STATUS = SERCOM_USART_INT_STATUS_FERR_Msk;
+#else
   sercom->USART.STATUS.bit.FERR = 1;
+#endif // ARDUINO_SAME53_E54
 }
 
 bool SERCOM::isParityErrorUART()
 {
-  //PERR : Parity Error
+  // PERR: Parity Error
+#ifdef ARDUINO_SAME53_E54
+  return (sercom->USART_INT.SERCOM_STATUS & SERCOM_USART_INT_STATUS_PERR_Msk) != 0;
+#else
   return sercom->USART.STATUS.bit.PERR;
+#endif // ARDUINO_SAME53_E54
 }
 
 bool SERCOM::isDataRegisterEmptyUART()
 {
-  //DRE : Data Register Empty
+  // DRE: Data Register Empty
+#ifdef ARDUINO_SAME53_E54
+  return (sercom->USART_INT.SERCOM_INTFLAG & SERCOM_USART_INT_INTFLAG_DRE_Msk) != 0;
+#else
   return sercom->USART.INTFLAG.bit.DRE;
+#endif // ARDUINO_SAME53_E54
 }
 
 uint8_t SERCOM::readDataUART()
 {
+#ifdef ARDUINO_SAME53_E54
+  return (uint8_t)sercom->USART_INT.SERCOM_DATA;
+#else
   return sercom->USART.DATA.bit.DATA;
+#endif // ARDUINO_SAME53_E54
 }
 
 int SERCOM::writeDataUART(uint8_t data)
 {
   // Wait for data register to be empty
-  while(!isDataRegisterEmptyUART());
+  while (!isDataRegisterEmptyUART());
 
-  //Put data into DATA register
+  // Put data into DATA register
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_DATA = data;
+#else
   sercom->USART.DATA.reg = (uint16_t)data;
+#endif // ARDUINO_SAME53_E54
   return 1;
 }
 
 void SERCOM::enableDataRegisterEmptyInterruptUART()
 {
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_INTENSET = SERCOM_USART_INT_INTENSET_DRE_Msk;
+#else
   sercom->USART.INTENSET.reg = SERCOM_USART_INTENSET_DRE;
+#endif // ARDUINO_SAME53_E54
 }
 
 void SERCOM::disableDataRegisterEmptyInterruptUART()
 {
+#ifdef ARDUINO_SAME53_E54
+  sercom->USART_INT.SERCOM_INTENCLR = SERCOM_USART_INT_INTENCLR_DRE_Msk;
+#else
   sercom->USART.INTENCLR.reg = SERCOM_USART_INTENCLR_DRE;
+#endif // ARDUINO_SAME53_E54
 }
 
 bool SERCOM::startTransmissionUART(void)
@@ -266,7 +379,7 @@ bool SERCOM::startTransmissionUART(void)
   _uart.useDma = _dmaConfigured;
 #else
   _uart.useDma = false;
-#endif
+#endif // USE_ZERODMA
 
   if (!_uart.useDma)
   {
@@ -277,7 +390,11 @@ bool SERCOM::startTransmissionUART(void)
   }
 
 #ifdef USE_ZERODMA
+#ifdef ARDUINO_SAME53_E54
+  void* dataReg = (void*)&sercom->USART_INT.SERCOM_DATA;
+#else
   void* dataReg = (void*)&sercom->USART.DATA.reg;
+#endif // ARDUINO_SAME53_E54
   _uart.dmaNeedTx = (txn->txPtr != nullptr);
   _uart.dmaNeedRx = (txn->rxPtr != nullptr);
   _uart.dmaTxDone = !_uart.dmaNeedTx;
@@ -298,7 +415,7 @@ bool SERCOM::startTransmissionUART(void)
   return true;
 #else
   return false;
-#endif
+#endif // USE_ZERODMA
 }
 
 bool SERCOM::enqueueUART(SercomTxn* txn)
@@ -308,7 +425,7 @@ bool SERCOM::enqueueUART(SercomTxn* txn)
 #ifdef USE_ZERODMA
   if (!_dmaConfigured)
     return false;
-#endif
+#endif // USE_ZERODMA
   if (_txnQueue.isFull())
     return false;  // Queue full; caller must retry at runtime
   if (!_txnQueue.store(txn))
@@ -390,24 +507,23 @@ void SERCOM::initSPI(SercomSpiTXPad mosi, SercomRXPad miso, SercomSpiCharSize ch
 
   registerService(getSercomIndex(), &SERCOM::stopTransmissionSPI);
 
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
-  sercom->SPI.CTRLA.reg = SERCOM_SPI_CTRLA_MODE(0x3) | // master mode
-                          SERCOM_SPI_CTRLA_DOPO(mosi) |
-                          SERCOM_SPI_CTRLA_DIPO(miso) |
-                          dataOrder << SERCOM_SPI_CTRLA_DORD_Pos;
+#ifdef ARDUINO_SAME53_E54
+  sercom->SPIM.SERCOM_CTRLA = SERCOM_SPIM_CTRLA_MODE_SPI_MASTER |
+                               SERCOM_SPIM_CTRLA_DOPO(mosi) |
+                               SERCOM_SPIM_CTRLA_DIPO(miso) |
+                               SERCOM_SPIM_CTRLA_DORD(dataOrder);
+  sercom->SPIM.SERCOM_CTRLB = SERCOM_SPIM_CTRLB_CHSIZE(charSize) |
+                               SERCOM_SPIM_CTRLB_RXEN_Msk;
 #else
-  //Setting the CTRLA register
-  sercom->SPI.CTRLA.reg = SERCOM_SPI_CTRLA_MODE_SPI_MASTER |
+  // Setting the CTRLA register
+  sercom->SPI.CTRLA.reg = SERCOM_SPI_CTRLA_MODE(0x3) |
                           SERCOM_SPI_CTRLA_DOPO(mosi) |
                           SERCOM_SPI_CTRLA_DIPO(miso) |
-                          dataOrder << SERCOM_SPI_CTRLA_DORD_Pos;
-#endif
-
-  //Setting the CTRLB register
+                          (dataOrder << SERCOM_SPI_CTRLA_DORD_Pos);
   sercom->SPI.CTRLB.reg = SERCOM_SPI_CTRLB_CHSIZE(charSize) |
-                          SERCOM_SPI_CTRLB_RXEN; //Active the SPI receiver.
-
-  while( sercom->SPI.SYNCBUSY.bit.CTRLB == 1 );
+                          SERCOM_SPI_CTRLB_RXEN; // Active the SPI receiver.
+#endif // ARDUINO_SAME53_E54
+  waitSyncBusyCtrlB();
 }
 
 bool SERCOM::startTransmissionSPI(void)
@@ -423,13 +539,13 @@ bool SERCOM::startTransmissionSPI(void)
 
 #ifdef USE_ZERODMA
   _spi.useDma = _dmaConfigured;
-#else
-  _spi.useDma = false;
-#endif
 
   if (_spi.useDma) {
-#ifdef USE_ZERODMA
+#ifdef ARDUINO_SAME53_E54
+    void* dataReg = (void*)&sercom->SPIM.SERCOM_DATA;
+#else
     void* dataReg = (void*)&sercom->SPI.DATA.reg;
+#endif // ARDUINO_SAME53_E54
     _spi.dmaNeedTx = (txn->txPtr != nullptr);
     _spi.dmaNeedRx = (txn->rxPtr != nullptr);
     _spi.dmaTxDone = !_spi.dmaNeedTx;
@@ -449,12 +565,20 @@ bool SERCOM::startTransmissionSPI(void)
       return false;
     }
     return true;
-#endif
   }
+#else
+  _spi.useDma = false;
+#endif // USE_ZERODMA
 
+#ifdef ARDUINO_SAME53_E54
+  sercom->SPIM.SERCOM_INTENSET = SERCOM_SPIM_INTENSET_DRE_Msk |
+                                 SERCOM_SPIM_INTENSET_RXC_Msk |
+                                 SERCOM_SPIM_INTENSET_ERROR_Msk;
+#else
   sercom->SPI.INTENSET.reg = SERCOM_SPI_INTENSET_DRE |
                              SERCOM_SPI_INTENSET_RXC |
                              SERCOM_SPI_INTENSET_ERROR;
+#endif // ARDUINO_SAME53_E54
   return true;
 }
 
@@ -462,13 +586,16 @@ bool SERCOM::enqueueSPI(SercomTxn* txn)
 {
   if (txn == nullptr)
     return false;
+
   if (_txnQueue.isFull())
     return false;  // Queue full; caller must retry at runtime
+
   if (!_txnQueue.store(txn))
     return false;
-  if (!_spi.active) {
+
+  if (!_spi.active)
     startTransmissionSPI();
-  }
+
   return true;
 }
 
@@ -514,25 +641,31 @@ SercomTxn* SERCOM::stopTransmissionSPI(SercomSpiError error)
 
 void SERCOM::initSPIClock(SercomSpiClockMode clockMode, uint32_t baudrate)
 {
-  //Extract data from clockMode
+  // Extract data from clockMode
   int cpha, cpol;
 
-  if((clockMode & (0x1ul)) == 0 )
+  if ((clockMode & (0x1ul)) == 0)
     cpha = 0;
   else
     cpha = 1;
 
-  if((clockMode & (0x2ul)) == 0)
+  if ((clockMode & (0x2ul)) == 0)
     cpol = 0;
   else
     cpol = 1;
 
-  //Setting the CTRLA register
-  sercom->SPI.CTRLA.reg |= ( cpha << SERCOM_SPI_CTRLA_CPHA_Pos ) |
-                           ( cpol << SERCOM_SPI_CTRLA_CPOL_Pos );
+  // Setting the CTRLA register
+#ifdef ARDUINO_SAME53_E54
+  sercom->SPIM.SERCOM_CTRLA |= SERCOM_SPIM_CTRLA_CPHA(cpha) |
+                               SERCOM_SPIM_CTRLA_CPOL(cpol);
+  sercom->SPIM.SERCOM_BAUD = SERCOM_SPIM_BAUD_BAUD(calculateBaudrateSynchronous(baudrate));
+#else
+  sercom->SPI.CTRLA.reg |= (cpha << SERCOM_SPI_CTRLA_CPHA_Pos) |
+                           (cpol << SERCOM_SPI_CTRLA_CPOL_Pos);
 
-  //Synchronous arithmetic
+  // Synchronous arithmetic
   sercom->SPI.BAUD.reg = calculateBaudrateSynchronous(baudrate);
+#endif // ARDUINO_SAME53_E54
 }
 
 void SERCOM::resetSPI()
@@ -542,69 +675,111 @@ void SERCOM::resetSPI()
 
 void SERCOM::setDataOrderSPI(SercomDataOrder dataOrder)
 {
-  //Register enable-protected
+  // Register enable-protected
   disableSPI();
 
+#ifdef ARDUINO_SAME53_E54
+  sercom->SPIM.SERCOM_CTRLA =
+      (sercom->SPIM.SERCOM_CTRLA & ~SERCOM_SPIM_CTRLA_DORD_Msk) |
+      SERCOM_SPIM_CTRLA_DORD(dataOrder);
+#else
   sercom->SPI.CTRLA.bit.DORD = dataOrder;
+#endif // ARDUINO_SAME53_E54
 
   enableSPI();
 }
 
 SercomDataOrder SERCOM::getDataOrderSPI()
 {
+#ifdef ARDUINO_SAME53_E54
+  return (sercom->SPIM.SERCOM_CTRLA & SERCOM_SPIM_CTRLA_DORD_Msk) ? LSB_FIRST : MSB_FIRST;
+#else
   return (sercom->SPI.CTRLA.bit.DORD ? LSB_FIRST : MSB_FIRST);
+#endif // ARDUINO_SAME53_E54
 }
 
 void SERCOM::setBaudrateSPI(uint8_t divider)
 {
   disableSPI(); // Register is enable-protected
+#ifdef ARDUINO_SAME53_E54
+  sercom->SPIM.SERCOM_BAUD = SERCOM_SPIM_BAUD_BAUD(calculateBaudrateSynchronous(freqRef / divider));
+#else
   sercom->SPI.BAUD.reg = calculateBaudrateSynchronous(freqRef / divider);
+#endif // ARDUINO_SAME53_E54
   enableSPI();
 }
 
 void SERCOM::setClockModeSPI(SercomSpiClockMode clockMode)
 {
   int cpha, cpol;
-  if((clockMode & (0x1ul)) == 0)
+  if ((clockMode & (0x1ul)) == 0)
     cpha = 0;
   else
     cpha = 1;
 
-  if((clockMode & (0x2ul)) == 0)
+  if ((clockMode & (0x2ul)) == 0)
     cpol = 0;
   else
     cpol = 1;
 
-  //Register enable-protected
+  // Register enable-protected
   disableSPI();
 
+#ifdef ARDUINO_SAME53_E54
+  sercom->SPIM.SERCOM_CTRLA =
+      (sercom->SPIM.SERCOM_CTRLA & ~(SERCOM_SPIM_CTRLA_CPOL_Msk | SERCOM_SPIM_CTRLA_CPHA_Msk)) |
+      SERCOM_SPIM_CTRLA_CPOL(cpol) | SERCOM_SPIM_CTRLA_CPHA(cpha);
+#else
   sercom->SPI.CTRLA.bit.CPOL = cpol;
   sercom->SPI.CTRLA.bit.CPHA = cpha;
+#endif // ARDUINO_SAME53_E54
 
   enableSPI();
 }
 
 uint8_t SERCOM::transferDataSPI(uint8_t data)
 {
+#ifdef ARDUINO_SAME53_E54
+  sercom->SPIM.SERCOM_DATA = data;
+  while ((sercom->SPIM.SERCOM_INTFLAG & SERCOM_SPIM_INTFLAG_RXC_Msk) == 0);
+  return (uint8_t)sercom->SPIM.SERCOM_DATA;
+#else
   sercom->SPI.DATA.bit.DATA = data; // Writing data into Data register
 
-  while(sercom->SPI.INTFLAG.bit.RXC == 0); // Waiting Complete Reception
+  while (sercom->SPI.INTFLAG.bit.RXC == 0); // Waiting Complete Reception
 
-  return sercom->SPI.DATA.bit.DATA;  // Reading data
+  return sercom->SPI.DATA.bit.DATA; // Reading data
+#endif // ARDUINO_SAME53_E54
 }
 
-bool SERCOM::isBufferOverflowErrorSPI() { return sercom->SPI.STATUS.bit.BUFOVF; }
-bool SERCOM::isDataRegisterEmptySPI() { return sercom->SPI.INTFLAG.bit.DRE; }
+bool SERCOM::isBufferOverflowErrorSPI()
+{
+#ifdef ARDUINO_SAME53_E54
+  return sercom->SPIM.SERCOM_STATUS & SERCOM_SPIM_STATUS_BUFOVF_Msk;
+#else
+  return sercom->SPI.STATUS.bit.BUFOVF;
+#endif // ARDUINO_SAME53_E54
+}
+
+bool SERCOM::isDataRegisterEmptySPI()
+{
+  // DRE: Data Register Empty
+#ifdef ARDUINO_SAME53_E54
+  return sercom->SPIM.SERCOM_INTFLAG & SERCOM_SPIM_INTFLAG_DRE_Msk;
+#else
+  return sercom->SPI.INTFLAG.bit.DRE;
+#endif // ARDUINO_SAME53_E54
+}
 
 //bool SERCOM::isTransmitCompleteSPI()
 //{
-//  //TXC : Transmit complete
+//  // TXC: Transmit complete
 //  return sercom->SPI.INTFLAG.bit.TXC;
 //}
 //
 //bool SERCOM::isReceiveCompleteSPI()
 //{
-//  //RXC : Receive complete
+//  // RXC: Receive complete
 //  return sercom->SPI.INTFLAG.bit.RXC;
 //}
 
@@ -682,13 +857,29 @@ void SERCOM::initSlaveWIRE( uint16_t ucAddress, bool enableGeneralCall, uint8_t 
   initWIRE();
 
   uint16_t mask = enable10Bit ? 0x03FFul : 0x007Ful;
+  uint32_t generalCall = 0;
+  uint32_t tenBit = 0;
+#ifdef ARDUINO_SAME53_E54
+  generalCall = enableGeneralCall ? SERCOM_I2CS_ADDR_GENCEN(1) : 0u;
+  tenBit = enable10Bit ? SERCOM_I2CS_ADDR_TENBITEN(1) : 0u;
+#else
+  generalCall = enableGeneralCall ? SERCOM_I2CS_ADDR_GENCEN : 0u;
+  tenBit = enable10Bit ? SERCOM_I2CS_ADDR_TENBITEN : 0u;
+#endif // ARDUINO_SAME53_E54
+
   _wire.slaveSpeed = speed;
-  _wire.addr = SERCOM_I2CS_ADDR_ADDR(ucAddress & mask) |       // select either 7 or 10-bits
-               SERCOM_I2CS_ADDR_ADDRMASK(0x00ul) |             // 0x00, only match exact address
-               (enable10Bit ? SERCOM_I2CS_ADDR_TENBITEN : 0) | // 10-bit addressing
-               enableGeneralCall;                              // enable general call (address 0x00)
+  _wire.addr = SERCOM_I2CS_ADDR_ADDR(ucAddress & mask) |
+               SERCOM_I2CS_ADDR_ADDRMASK(0x00ul)      |
+               tenBit                                  |
+               generalCall;
   _wire.slaveConfigured = true;
   setSlaveWIRE();
+}
+
+void SERCOM::registerReceiveWIRE(void (*cb)(void* user, int length), void* user)
+{
+  _wireDeferredCb = cb;
+  _wireDeferredUser = user;
 }
 
 void SERCOM::initMasterWIRE( uint32_t baudrate )
@@ -698,12 +889,6 @@ void SERCOM::initMasterWIRE( uint32_t baudrate )
   setBaudrateWIRE(baudrate);
   _wire.slaveConfigured = false;
   setMasterWIRE();
-}
-
-void SERCOM::registerReceiveWIRE(void (*cb)(void* user, int length), void* user)
-{
-  _wireDeferredCb = cb;
-  _wireDeferredUser = user;
 }
 
 void SERCOM::deferReceiveWIRE(int length)
@@ -719,6 +904,19 @@ void SERCOM::setMasterWIRE(void)
   // so master Hs-mode must be DMA-only and STOP-only (no repeated starts).
   disableWIRE();
   bool sclsm = (_wire.masterSpeed == 0x2);
+#ifdef ARDUINO_SAME53_E54
+  sercom->I2CM.SERCOM_CTRLA = _wire.ctrla                                  |
+                              SERCOM_I2CM_CTRLA_MODE(I2C_MASTER_OPERATION) |
+                              SERCOM_I2CM_CTRLA_SPEED(_wire.masterSpeed)   |
+                              (sclsm ? SERCOM_I2CM_CTRLA_SCLSM(1) : 0);
+  sercom->I2CM.SERCOM_CTRLB = _wire.ctrlb;
+  sercom->I2CM.SERCOM_BAUD = _wire.baud;
+  enableWIRE();
+  sercom->I2CS.SERCOM_INTENCLR = SERCOM_I2CS_INTENCLR_ERROR_Msk  |
+                                 SERCOM_I2CS_INTENCLR_AMATCH_Msk |
+                                 SERCOM_I2CS_INTENCLR_DRDY_Msk   |
+                                 SERCOM_I2CS_INTENCLR_PREC_Msk;
+#else
   sercom->I2CM.CTRLA.reg = _wire.ctrla                                  |
                            SERCOM_I2CM_CTRLA_MODE(I2C_MASTER_OPERATION) |
                            SERCOM_I2CM_CTRLA_SPEED(_wire.masterSpeed)   |
@@ -733,12 +931,26 @@ void SERCOM::setMasterWIRE(void)
                               SERCOM_I2CS_INTENSET_AMATCH |
                               SERCOM_I2CS_INTENSET_DRDY   |
                               SERCOM_I2CS_INTENSET_PREC;
+#endif // ARDUINO_SAME53_E54
 }
 
 void SERCOM::setSlaveWIRE(void)
 {
   disableWIRE();
   bool sclsm = (_wire.slaveSpeed == 0x2);
+#ifdef ARDUINO_SAME53_E54
+  sercom->I2CS.SERCOM_CTRLA = _wire.ctrla                                 |
+                              SERCOM_I2CS_CTRLA_MODE(I2C_SLAVE_OPERATION) |
+                              SERCOM_I2CS_CTRLA_SPEED(_wire.slaveSpeed)   |
+                              (sclsm ? SERCOM_I2CS_CTRLA_SCLSM(1) : 0);
+  sercom->I2CS.SERCOM_CTRLB = _wire.ctrlb | SERCOM_I2CS_CTRLB_AACKEN(1);
+  sercom->I2CS.SERCOM_ADDR = _wire.addr;
+  enableWIRE();
+  sercom->I2CS.SERCOM_INTENSET = SERCOM_I2CS_INTENSET_ERROR_Msk  |
+                                 SERCOM_I2CS_INTENSET_PREC_Msk   |
+                                 SERCOM_I2CS_INTENSET_AMATCH_Msk |
+                                 SERCOM_I2CS_INTENSET_DRDY_Msk;
+#else
   sercom->I2CS.CTRLA.reg = SERCOM_I2CS_CTRLA_MODE(I2C_SLAVE_OPERATION) |
                            SERCOM_I2CS_CTRLA_SPEED(_wire.slaveSpeed)   |
                            (sclsm ? SERCOM_I2CS_CTRLA_SCLSM : 0 );
@@ -750,6 +962,7 @@ void SERCOM::setSlaveWIRE(void)
                               SERCOM_I2CS_INTENSET_PREC   | // Stop
                               SERCOM_I2CS_INTENSET_AMATCH | // Address Match
                               SERCOM_I2CS_INTENSET_DRDY;    // Data Ready
+#endif // ARDUINO_SAME53_E54
 }
 
 void SERCOM::setBaudrateWIRE(uint32_t baudrate)
@@ -816,22 +1029,52 @@ SercomTxn* SERCOM::startTransmissionWIRE( void )
   const bool read = (txn->config & I2C_CFG_READ) != 0;
   uint16_t addr = (txn->config & I2C_CFG_10BIT) ? I2C_ADDR(txn->address) : I2C_ADDR7(txn->address);
   addr = (uint16_t)((addr << 1) | (read ? 1u : 0u));
+
+  if (!isBusOwnerWIRE()) {
+    if (isArbLostWIRE() && !isBusIdleWIRE()) {
+      stopTransmissionWIRE(SercomWireError::ARBITRATION_LOST);
+      return nullptr;
+    }
+    if (isBusUnknownWIRE()) {
+      stopTransmissionWIRE(SercomWireError::BUS_STATE_UNKNOWN);
+      return nullptr;
+    }
+  }
+
   bool hsMode = (_wire.masterSpeed == 0x2);
-  uint32_t addrReg = SERCOM_I2CM_ADDR_ADDR(addr) |
+#ifdef ARDUINO_SAME53_E54
+  uint32_t addrReg = SERCOM_I2CM_ADDR_ADDR(addr)                                         |
+                     ((txn->config & I2C_CFG_10BIT) ? SERCOM_I2CM_ADDR_TENBITEN_Msk : 0) |
+                     (hsMode ? SERCOM_I2CM_ADDR_HS(1) : 0);
+#else
+  uint32_t addrReg = SERCOM_I2CM_ADDR_ADDR(addr)                                     |
                      ((txn->config & I2C_CFG_10BIT) ? SERCOM_I2CM_ADDR_TENBITEN : 0) |
                      (hsMode ? SERCOM_I2CM_ADDR_HS : 0);
+#endif // ARDUINO_SAME53_E54
 
-  if (hsMode || sercom->I2CM.CTRLA.bit.SCLSM) {
+  if (hsMode ||
+#ifdef ARDUINO_SAME53_E54
+      (sercom->I2CM.SERCOM_CTRLA & SERCOM_I2CM_CTRLA_SCLSM_Msk)
+#else
+      sercom->I2CM.CTRLA.bit.SCLSM
+#endif // ARDUINO_SAME53_E54
+  ) {
 #ifndef USE_ZERODMA
     stopTransmissionWIRE(SercomWireError::OTHER);
     return nullptr;
-#endif
+#endif // !USE_ZERODMA
     if (txn->length >255) {
       stopTransmissionWIRE(SercomWireError::DATA_TOO_LONG);
       return nullptr;
     }
 
-    if (sercom->I2CM.CTRLB.bit.QCEN) {
+    if (
+#ifdef ARDUINO_SAME53_E54
+        sercom->I2CM.SERCOM_CTRLB & SERCOM_I2CM_CTRLB_QCEN_Msk
+#else
+        sercom->I2CM.CTRLB.bit.QCEN
+#endif // ARDUINO_SAME53_E54
+    ) {
       stopTransmissionWIRE(SercomWireError::OTHER);
       return nullptr;
     }
@@ -856,14 +1099,25 @@ SercomTxn* SERCOM::startTransmissionWIRE( void )
       return nullptr;
     }
 
+#ifdef ARDUINO_SAME53_E54
+    addrReg |= SERCOM_I2CM_ADDR_LENEN_Msk | SERCOM_I2CM_ADDR_LEN((uint8_t)txn->length);
+#else
     addrReg |= SERCOM_I2CM_ADDR_LENEN | SERCOM_I2CM_ADDR_LEN((uint8_t)txn->length);
+#endif // ARDUINO_SAME53_E54
   }
-#endif
+#endif // USE_ZERODMA
 
   // Send address (non-blocking; ISR handles ERROR/MB/SB)
   _wire.active = true;
+#ifdef ARDUINO_SAME53_E54
+  sercom->I2CM.SERCOM_INTENSET = SERCOM_I2CM_INTENSET_ERROR_Msk |
+                                 SERCOM_I2CM_INTENSET_SB_Msk |
+                                 SERCOM_I2CM_INTENSET_MB_Msk;
+  sercom->I2CM.SERCOM_ADDR = addrReg;
+#else
   sercom->I2CM.INTENSET.reg = SERCOM_I2CM_INTENSET_ERROR | SERCOM_I2CM_INTENSET_SB | SERCOM_I2CM_INTENSET_MB;
   sercom->I2CM.ADDR.reg = addrReg; // ADDR is write synchronized so just wait for the MB/SB to know when synced
+#endif // ARDUINO_SAME53_E54
 
   return txn;
 }
@@ -872,18 +1126,23 @@ bool SERCOM::enqueueWIRE(SercomTxn* txn)
 {
   if (txn == nullptr)
     return false;
+
   if (_txnQueue.isFull())
     return false;  // Queue full; caller must retry at runtime
+
   if (!_txnQueue.store(txn))
     return false;
+
   if (!_wire.active) {
     // dI2C uses a single SERCOM as both an addressed client and a host. A
     // queued host operation is the role-transition point; callers must not
     // tear down and re-begin Wire around every transaction.
     if (!isMasterWIRE())
       setMasterWIRE();
+
     return startTransmissionWIRE() != nullptr;
   }
+
   return true;
 }
 
@@ -908,8 +1167,14 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
     if (_wire.retryCount < kMaxWireRetries) {
       ++_wire.retryCount;
 
+#ifdef ARDUINO_SAME53_E54
+      sercom->I2CM.SERCOM_STATUS =
+          (sercom->I2CM.SERCOM_STATUS & ~SERCOM_I2CM_STATUS_BUSSTATE_Msk) |
+          SERCOM_I2CM_STATUS_BUSSTATE(WIRE_IDLE_STATE);
+#else
       sercom->I2CM.STATUS.bit.BUSSTATE = 1;
-      while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ;
+#endif // ARDUINO_SAME53_E54
+      waitSyncBusySysOp();
       startTransmissionWIRE();
 
       return txn;
@@ -920,8 +1185,13 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
     if (_wire.retryCount < kMaxWireRetries) {
       ++_wire.retryCount;
 
+#ifdef ARDUINO_SAME53_E54
+      sercom->I2CM.SERCOM_STATUS = SERCOM_I2CM_STATUS_ARBLOST_Msk;
+      sercom->I2CM.SERCOM_INTFLAG = SERCOM_I2CM_INTFLAG_ERROR_Msk;
+#else
       sercom->I2CM.STATUS.bit.ARBLOST = 1; // Clear arbitration lost flag
       sercom->I2CM.INTFLAG.reg = SERCOM_I2CM_INTFLAG_ERROR;
+#endif // ARDUINO_SAME53_E54
       startTransmissionWIRE();
 
       return txn;
@@ -935,7 +1205,7 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
   }
 
   if(isMasterWIRE())
-		while (sercom->I2CM.SYNCBUSY.bit.SYSOP) ; // Wait for DATA to sync from last transaction
+    waitSyncBusySysOp();
 
   // Undocumented HW limitation: DMA transfers must terminate with STOP and bus release.
   // After a DMA write, the host holds the bus ~7.33 us before the next transfer (Sr window).
@@ -946,7 +1216,12 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
   // at 100 MHz. This wait must occur BEFORE the callback to ensure the bus is stable
   // before user code can enqueue the next transaction.
   if (isMasterWIRE() && txn && (txn->config & I2C_CFG_STOP)) {
+#ifdef ARDUINO_SAME53_E54
+    while (((sercom->I2CM.SERCOM_STATUS & SERCOM_I2CM_STATUS_BUSSTATE_Msk) >>
+            SERCOM_I2CM_STATUS_BUSSTATE_Pos) > WIRE_IDLE_STATE) ;
+#else
     while (sercom->I2CM.STATUS.bit.BUSSTATE > 0x1) ;
+#endif // ARDUINO_SAME53_E54
   }
 
   // Callbacks are expected to run in non-ISR context (main loop/PendSV).
@@ -983,9 +1258,15 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
   if (_txnQueue.peek(next) && isMaster)
     startTransmissionWIRE();
   else if (isMaster) {
+#ifdef ARDUINO_SAME53_E54
+    sercom->I2CM.SERCOM_INTENCLR = SERCOM_I2CM_INTENCLR_ERROR_Msk |
+                                   SERCOM_I2CM_INTENCLR_MB_Msk    |
+                                   SERCOM_I2CM_INTENCLR_SB_Msk;
+#else
     sercom->I2CM.INTENCLR.reg = SERCOM_I2CM_INTENCLR_ERROR |
                                 SERCOM_I2CM_INTENCLR_MB    |
                                 SERCOM_I2CM_INTENCLR_SB;
+#endif // ARDUINO_SAME53_E54
     if (_wire.slaveConfigured)
       setSlaveWIRE();
   }
@@ -994,19 +1275,27 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
 }
 
 // Hardware metadata structure for SERCOM peripherals - private to this file
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
-// SAMD51 has separate core and slow clocks, and extended interrupt array
 struct SercomData {
+#ifdef ARDUINO_SAME53_E54
+  sercom_registers_t *sercomPtr;
+#else
   Sercom   *sercomPtr;
+#endif // ARDUINO_SAME53_E54
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
   uint8_t   id_core;
   uint8_t   id_slow;
   IRQn_Type irq[4];
+#else
+  uint8_t   clock;
+  IRQn_Type irqn;
+#endif // ARDUINO_SAMD51_E51 || ARDUINO_SAME53_E54
   uint8_t   dmaTxTrigger;
   uint8_t   dmaRxTrigger;
   void     *dataReg;  // Pointer to DATA register
 };
 
 static const SercomData sercomData[] = {
+#ifdef ARDUINO_SAMD51_E51
   { SERCOM0, SERCOM0_GCLK_ID_CORE, SERCOM0_GCLK_ID_SLOW,
     SERCOM0_0_IRQn, SERCOM0_1_IRQn, SERCOM0_2_IRQn, SERCOM0_3_IRQn,
     SERCOM0_DMAC_ID_TX, SERCOM0_DMAC_ID_RX, (void*)&SERCOM0->I2CM.DATA.reg },
@@ -1029,42 +1318,59 @@ static const SercomData sercomData[] = {
   { SERCOM6, SERCOM6_GCLK_ID_CORE, SERCOM6_GCLK_ID_SLOW,
     SERCOM6_0_IRQn, SERCOM6_1_IRQn, SERCOM6_2_IRQn, SERCOM6_3_IRQn,
     SERCOM6_DMAC_ID_TX, SERCOM6_DMAC_ID_RX, (void*)&SERCOM6->I2CM.DATA.reg },
-#endif
+#endif // SERCOM6
 #if defined(SERCOM7)
   { SERCOM7, SERCOM7_GCLK_ID_CORE, SERCOM7_GCLK_ID_SLOW,
     SERCOM7_0_IRQn, SERCOM7_1_IRQn, SERCOM7_2_IRQn, SERCOM7_3_IRQn,
     SERCOM7_DMAC_ID_TX, SERCOM7_DMAC_ID_RX, (void*)&SERCOM7->I2CM.DATA.reg },
-#endif
-};
-
-#else // end if SAMD51 (prob SAMD21)
+#endif // SERCOM7
+#elif defined(ARDUINO_SAME53_E54)
+  { SERCOM0_REGS, SERCOM0_GCLK_ID_CORE, SERCOM0_GCLK_ID_SLOW,
+    SERCOM0_0_IRQn, SERCOM0_1_IRQn, SERCOM0_2_IRQn, SERCOM0_OTHER_IRQn,
+    SERCOM0_DMAC_ID_TX, SERCOM0_DMAC_ID_RX, (void*)&SERCOM0_REGS->I2CM.SERCOM_DATA },
+  { SERCOM1_REGS, SERCOM1_GCLK_ID_CORE, SERCOM1_GCLK_ID_SLOW,
+    SERCOM1_0_IRQn, SERCOM1_1_IRQn, SERCOM1_2_IRQn, SERCOM1_OTHER_IRQn,
+    SERCOM1_DMAC_ID_TX, SERCOM1_DMAC_ID_RX, (void*)&SERCOM1_REGS->I2CM.SERCOM_DATA },
+  { SERCOM2_REGS, SERCOM2_GCLK_ID_CORE, SERCOM2_GCLK_ID_SLOW,
+    SERCOM2_0_IRQn, SERCOM2_1_IRQn, SERCOM2_2_IRQn, SERCOM2_OTHER_IRQn,
+    SERCOM2_DMAC_ID_TX, SERCOM2_DMAC_ID_RX, (void*)&SERCOM2_REGS->I2CM.SERCOM_DATA },
+  { SERCOM3_REGS, SERCOM3_GCLK_ID_CORE, SERCOM3_GCLK_ID_SLOW,
+    SERCOM3_0_IRQn, SERCOM3_1_IRQn, SERCOM3_2_IRQn, SERCOM3_OTHER_IRQn,
+    SERCOM3_DMAC_ID_TX, SERCOM3_DMAC_ID_RX, (void*)&SERCOM3_REGS->I2CM.SERCOM_DATA },
+  { SERCOM4_REGS, SERCOM4_GCLK_ID_CORE, SERCOM4_GCLK_ID_SLOW,
+    SERCOM4_0_IRQn, SERCOM4_1_IRQn, SERCOM4_2_IRQn, SERCOM4_OTHER_IRQn,
+    SERCOM4_DMAC_ID_TX, SERCOM4_DMAC_ID_RX, (void*)&SERCOM4_REGS->I2CM.SERCOM_DATA },
+  { SERCOM5_REGS, SERCOM5_GCLK_ID_CORE, SERCOM5_GCLK_ID_SLOW,
+    SERCOM5_0_IRQn, SERCOM5_1_IRQn, SERCOM5_2_IRQn, SERCOM5_OTHER_IRQn,
+    SERCOM5_DMAC_ID_TX, SERCOM5_DMAC_ID_RX, (void*)&SERCOM5_REGS->I2CM.SERCOM_DATA },
+#if defined(SERCOM6_REGS)
+  { SERCOM6_REGS, SERCOM6_GCLK_ID_CORE, SERCOM6_GCLK_ID_SLOW,
+    SERCOM6_0_IRQn, SERCOM6_1_IRQn, SERCOM6_2_IRQn, SERCOM6_OTHER_IRQn,
+    SERCOM6_DMAC_ID_TX, SERCOM6_DMAC_ID_RX, (void*)&SERCOM6_REGS->I2CM.SERCOM_DATA },
+#endif // SERCOM6_REGS
+#if defined(SERCOM7_REGS)
+  { SERCOM7_REGS, SERCOM7_GCLK_ID_CORE, SERCOM7_GCLK_ID_SLOW,
+    SERCOM7_0_IRQn, SERCOM7_1_IRQn, SERCOM7_2_IRQn, SERCOM7_OTHER_IRQn,
+    SERCOM7_DMAC_ID_TX, SERCOM7_DMAC_ID_RX, (void*)&SERCOM7_REGS->I2CM.SERCOM_DATA },
+#endif // SERCOM7_REGS
+#else // SAMD21
 // SAMD21 has unified clock and single interrupt
-struct SercomData {
-  Sercom   *sercomPtr;
-  uint8_t   clock;
-  IRQn_Type irqn;
-  uint8_t   dmaTxTrigger;
-  uint8_t   dmaRxTrigger;
-  void     *dataReg;  // Pointer to DATA register
-};
-
-static const SercomData sercomData[] = {
   { SERCOM0, GCM_SERCOM0_CORE, SERCOM0_IRQn, SERCOM0_DMAC_ID_TX, SERCOM0_DMAC_ID_RX, (void*)&SERCOM0->I2CM.DATA.reg },
   { SERCOM1, GCM_SERCOM1_CORE, SERCOM1_IRQn, SERCOM1_DMAC_ID_TX, SERCOM1_DMAC_ID_RX, (void*)&SERCOM1->I2CM.DATA.reg },
   { SERCOM2, GCM_SERCOM2_CORE, SERCOM2_IRQn, SERCOM2_DMAC_ID_TX, SERCOM2_DMAC_ID_RX, (void*)&SERCOM2->I2CM.DATA.reg },
   { SERCOM3, GCM_SERCOM3_CORE, SERCOM3_IRQn, SERCOM3_DMAC_ID_TX, SERCOM3_DMAC_ID_RX, (void*)&SERCOM3->I2CM.DATA.reg },
 #if defined(SERCOM4)
   { SERCOM4, GCM_SERCOM4_CORE, SERCOM4_IRQn, SERCOM4_DMAC_ID_TX, SERCOM4_DMAC_ID_RX, (void*)&SERCOM4->I2CM.DATA.reg },
-#endif
+#endif // SERCOM4
 #if defined(SERCOM5)
   { SERCOM5, GCM_SERCOM5_CORE, SERCOM5_IRQn, SERCOM5_DMAC_ID_TX, SERCOM5_DMAC_ID_RX, (void*)&SERCOM5->I2CM.DATA.reg },
-#endif
+#endif // SERCOM5
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54 / SAMD21
 };
-
-#endif // end !SAMD51
 
 std::array<SERCOM::SercomState, SERCOM::kSercomCount> SERCOM::s_states = {};
 std::array<SERCOM*, SERCOM::kSercomCount> SERCOM::s_instances = {};
+volatile uint32_t SERCOM::s_pendingMask = 0;
 
 bool SERCOM::claim(uint8_t sercomId, Role role)
 {
@@ -1126,7 +1432,7 @@ SERCOM::DmaStatus SERCOM::dmaInit(int8_t sercomId, uint8_t beatSize)
     _dmaRxTrigger = sercomData[sercomId].dmaRxTrigger;
   }
   else
-#endif
+#endif // SERCOM0_DMAC_ID_TX
   {
     // Fallback: calculate triggers if table lookup unavailable
     _dmaTxTrigger = SERCOM0_DMAC_ID_TX + (sercomId * 2);
@@ -1135,7 +1441,11 @@ SERCOM::DmaStatus SERCOM::dmaInit(int8_t sercomId, uint8_t beatSize)
 
   // DATA register is at the same offset (0x28) for all protocols (I2C, SPI, UART).
   // Access via any union member is transparent—just use I2CM as the canonical reference.
+#ifdef ARDUINO_SAME53_E54
+  void* dataReg = (void*)&sercom->I2CM.SERCOM_DATA;
+#else
   void* dataReg = (void*)&sercom->I2CM.DATA.reg;
+#endif // ARDUINO_SAME53_E54
 
   if (!_dmaTx)
     _dmaTx = new Adafruit_ZeroDMA();
@@ -1367,7 +1677,7 @@ SERCOM::DmaStatus SERCOM::dmaLastError() const
 {
   return _dmaLastError;
 }
-#endif
+#endif // USE_ZERODMA
 
 #ifdef SERCOM_STRICT_PADS
 bool SERCOM::registerPads(uint8_t sercomId, const PadFunc (&pads)[4], bool muxFunctionD)
@@ -1454,14 +1764,19 @@ int8_t SERCOM::getSercomIndex(void) {
 
 uint32_t SERCOM::getSercomFreqRef(void)
 {
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
   int8_t idx = getSercomIndex();
   uint8_t gen = 1; // default to GCLK1 (48 MHz) if we can't resolve
 
   if (idx >= 0)
   {
     uint8_t pch = sercomData[idx].id_core;
+#ifdef ARDUINO_SAME53_E54
+    gen = (GCLK_REGS->GCLK_PCHCTRL[pch] & GCLK_PCHCTRL_GEN_Msk) >>
+          GCLK_PCHCTRL_GEN_Pos;
+#else
     gen = GCLK->PCHCTRL[pch].bit.GEN;
+#endif // ARDUINO_SAME53_E54
   }
 
   switch (gen)
@@ -1487,12 +1802,12 @@ uint32_t SERCOM::getSercomFreqRef(void)
   }
 #else
   freqRef = SystemCoreClock;
-#endif
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
 
   return freqRef;
 }
 
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 // This is currently for overriding an SPI SERCOM's clock source only --
 // NOT for UART or WIRE SERCOMs, where it will have unintended consequences.
 // It does not check.
@@ -1505,8 +1820,13 @@ void SERCOM::setClockSource(int8_t idx, SercomClockSource src, bool core) {
 
   uint8_t clk_id = core ? sercomData[idx].id_core : sercomData[idx].id_slow;
 
+#ifdef ARDUINO_SAME53_E54
+  GCLK_REGS->GCLK_PCHCTRL[clk_id] &= ~GCLK_PCHCTRL_CHEN_Msk;
+  while (GCLK_REGS->GCLK_PCHCTRL[clk_id] & GCLK_PCHCTRL_CHEN_Msk);
+#else
   GCLK->PCHCTRL[clk_id].bit.CHEN = 0;     // Disable timer
   while(GCLK->PCHCTRL[clk_id].bit.CHEN);  // Wait for disable
+#endif // ARDUINO_SAME53_E54
 
   if(core) clockSource = src; // Save SercomClockSource value
 
@@ -1517,40 +1837,69 @@ void SERCOM::setClockSource(int8_t idx, SercomClockSource src, bool core) {
   // GCLK3 = XOSC32K
   // GCLK4 = 12 MHz
   if(src == SERCOM_CLOCK_SOURCE_FCPU) {
+#ifdef ARDUINO_SAME53_E54
+    GCLK_REGS->GCLK_PCHCTRL[clk_id] = GCLK_PCHCTRL_GEN_GCLK2 |
+                                       GCLK_PCHCTRL_CHEN_Msk;
+#else
     GCLK->PCHCTRL[clk_id].reg =
         GCLK_PCHCTRL_GEN_GCLK2_Val | (1 << GCLK_PCHCTRL_CHEN_Pos); // Guard Sercom from exceeding 100 MHz maximum
+#endif // ARDUINO_SAME53_E54
     if (core)
       freqRef = 100000000; // Save clock frequency value
   }
   else if (src == SERCOM_CLOCK_SOURCE_48M)
   {
+#ifdef ARDUINO_SAME53_E54
+    GCLK_REGS->GCLK_PCHCTRL[clk_id] = GCLK_PCHCTRL_GEN_GCLK1 |
+                                       GCLK_PCHCTRL_CHEN_Msk;
+#else
     GCLK->PCHCTRL[clk_id].reg =
       GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+#endif // ARDUINO_SAME53_E54
     if(core) freqRef = 48000000;
   } else if(src == SERCOM_CLOCK_SOURCE_100M) {
+#ifdef ARDUINO_SAME53_E54
+    GCLK_REGS->GCLK_PCHCTRL[clk_id] = GCLK_PCHCTRL_GEN_GCLK2 |
+                                       GCLK_PCHCTRL_CHEN_Msk;
+#else
     GCLK->PCHCTRL[clk_id].reg =
       GCLK_PCHCTRL_GEN_GCLK2_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+#endif // ARDUINO_SAME53_E54
     if(core) freqRef = 100000000;
   } else if(src == SERCOM_CLOCK_SOURCE_32K) {
+#ifdef ARDUINO_SAME53_E54
+    GCLK_REGS->GCLK_PCHCTRL[clk_id] = GCLK_PCHCTRL_GEN_GCLK3 |
+                                       GCLK_PCHCTRL_CHEN_Msk;
+#else
     GCLK->PCHCTRL[clk_id].reg =
       GCLK_PCHCTRL_GEN_GCLK3_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+#endif // ARDUINO_SAME53_E54
     if(core) freqRef = 32768;
   } else if(src == SERCOM_CLOCK_SOURCE_12M) {
+#ifdef ARDUINO_SAME53_E54
+    GCLK_REGS->GCLK_PCHCTRL[clk_id] = GCLK_PCHCTRL_GEN_GCLK4 |
+                                       GCLK_PCHCTRL_CHEN_Msk;
+#else
     GCLK->PCHCTRL[clk_id].reg =
       GCLK_PCHCTRL_GEN_GCLK4_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+#endif // ARDUINO_SAME53_E54
     if(core) freqRef = 12000000;
   }
 
+#ifdef ARDUINO_SAME53_E54
+  while ((GCLK_REGS->GCLK_PCHCTRL[clk_id] & GCLK_PCHCTRL_CHEN_Msk) == 0);
+#else
   while(!GCLK->PCHCTRL[clk_id].bit.CHEN); // Wait for clock enable
+#endif // ARDUINO_SAME53_E54
 }
-#endif
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
 
 void SERCOM::initClockNVIC( void )
 {
   int8_t idx = getSercomIndex();
   if(idx < 0) return; // We got a problem here
 
-#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
 
   for(uint8_t i=0; i<4; i++) {
     NVIC_ClearPendingIRQ(sercomData[idx].irq[i]);
@@ -1560,7 +1909,7 @@ void SERCOM::initClockNVIC( void )
 
   setClockSource(idx, clockSource, true); // true  = core clock
 
-#else // end if SAMD51 (prob SAMD21)
+#else // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
 
   uint8_t   clockId = sercomData[idx].clock;
   IRQn_Type IdNvic  = sercomData[idx].irqn;
@@ -1578,7 +1927,7 @@ void SERCOM::initClockNVIC( void )
 
   while(GCLK->STATUS.reg & GCLK_STATUS_SYNCBUSY); // Wait for synchronization
 
-#endif // end !SAMD51
+#endif // ARDUINO_SAMD51_E51 || ARDUINO_SAME53_E54
 
   getSercomFreqRef();
 }
