@@ -103,12 +103,12 @@ static const uint8_t A6  = PIN_A6;
  */
 #define SPI_INTERFACES_COUNT 1
 
-#define PIN_SPI_MISO         (4ul) // off 3-pin JST, broken out
-#define PIN_SPI_MOSI         (2ul)
-#define PIN_SPI_SCK          (3ul)
-#define PERIPH_SPI           sercom0
-#define PAD_SPI_TX           SPI_PAD_0_SCK_1
-#define PAD_SPI_RX           SERCOM_RX_PAD_2
+#define PIN_SPI_MISO             (4ul) // off 3-pin JST, broken out
+#define PIN_SPI_MOSI             (2ul)
+#define PIN_SPI_SCK              (3ul)
+#define PERIPH_SPI               sercom0
+#define PAD_SPI_TX               SPI_PAD_0_SCK_1
+#define PAD_SPI_RX               SERCOM_RX_PAD_2
 
 static const uint8_t SS	  = (5ul); // not actually broken out
 static const uint8_t MOSI = PIN_SPI_MOSI;
@@ -120,10 +120,9 @@ static const uint8_t SCK  = PIN_SPI_SCK;
  */
 #define WIRE_INTERFACES_COUNT 1
 
-#define PIN_WIRE_SDA         (2u)
-#define PIN_WIRE_SCL         (3u)
-#define PERIPH_WIRE          sercom0
-#define WIRE_IT_HANDLER      SERCOM0_Handler
+#define PIN_WIRE_SDA             (2u)
+#define PIN_WIRE_SCL             (3u)
+#define PERIPH_WIRE              sercom0
 
 static const uint8_t SDA = PIN_WIRE_SDA;
 static const uint8_t SCL = PIN_WIRE_SCL;

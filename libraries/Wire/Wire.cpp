@@ -31,6 +31,90 @@ extern "C" {
 
 #include "Wire.h"
 
+// Default SERCOM ISR symbols are derived from PERIPH_WIRE* routing.
+// Variants may override WIRE*_IT_HANDLER* macros when split vectors need
+// custom ownership.
+#define WIRE_SERCOM_INDEX_sercom0 0
+#define WIRE_SERCOM_INDEX_sercom1 1
+#define WIRE_SERCOM_INDEX_sercom2 2
+#define WIRE_SERCOM_INDEX_sercom3 3
+#define WIRE_SERCOM_INDEX_sercom4 4
+#define WIRE_SERCOM_INDEX_sercom5 5
+#if defined(SERCOM6) || defined(SERCOM6_REGS)
+#define WIRE_SERCOM_INDEX_sercom6 6
+#endif // SERCOM6 || SERCOM6_REGS
+#if defined(SERCOM7) || defined(SERCOM7_REGS)
+#define WIRE_SERCOM_INDEX_sercom7 7
+#endif // SERCOM7 || SERCOM7_REGS
+
+#define WIRE_SERCOM_INDEX(token) WIRE_SERCOM_INDEX_##token
+#define WIRE_SERCOM_HANDLER_FROM_INDEX(idx)                                    \
+  WIRE_SERCOM_HANDLER_FROM_INDEX_2(idx)
+#define WIRE_SERCOM_HANDLER_FROM_INDEX_2(idx) SERCOM##idx##_Handler
+#define WIRE_SERCOM_HANDLER_FROM_TOKEN(token)                                  \
+  WIRE_SERCOM_HANDLER_FROM_INDEX(WIRE_SERCOM_INDEX(token))
+
+#define WIRE_SERCOM_HANDLER0_FROM_INDEX(idx)                                   \
+  WIRE_SERCOM_HANDLER0_FROM_INDEX_2(idx)
+#define WIRE_SERCOM_HANDLER0_FROM_INDEX_2(idx) SERCOM##idx##_0_Handler
+#define WIRE_SERCOM_HANDLER1_FROM_INDEX(idx)                                   \
+  WIRE_SERCOM_HANDLER1_FROM_INDEX_2(idx)
+#define WIRE_SERCOM_HANDLER1_FROM_INDEX_2(idx) SERCOM##idx##_1_Handler
+#define WIRE_SERCOM_HANDLER2_FROM_INDEX(idx)                                   \
+  WIRE_SERCOM_HANDLER2_FROM_INDEX_2(idx)
+#define WIRE_SERCOM_HANDLER2_FROM_INDEX_2(idx) SERCOM##idx##_2_Handler
+#define WIRE_SERCOM_HANDLER3_FROM_INDEX(idx)                                   \
+  WIRE_SERCOM_HANDLER3_FROM_INDEX_2(idx)
+#define WIRE_SERCOM_HANDLER3_FROM_INDEX_2(idx) SERCOM##idx##_3_Handler
+#define WIRE_SERCOM_HANDLER_OTHER_FROM_INDEX(idx)                              \
+  WIRE_SERCOM_HANDLER_OTHER_FROM_INDEX_2(idx)
+#define WIRE_SERCOM_HANDLER_OTHER_FROM_INDEX_2(idx) SERCOM##idx##_OTHER_Handler
+
+#define WIRE_SERCOM_HANDLER0_FROM_TOKEN(token)                                 \
+  WIRE_SERCOM_HANDLER0_FROM_INDEX(WIRE_SERCOM_INDEX(token))
+#define WIRE_SERCOM_HANDLER1_FROM_TOKEN(token)                                 \
+  WIRE_SERCOM_HANDLER1_FROM_INDEX(WIRE_SERCOM_INDEX(token))
+#define WIRE_SERCOM_HANDLER2_FROM_TOKEN(token)                                 \
+  WIRE_SERCOM_HANDLER2_FROM_INDEX(WIRE_SERCOM_INDEX(token))
+#define WIRE_SERCOM_HANDLER3_FROM_TOKEN(token)                                 \
+  WIRE_SERCOM_HANDLER3_FROM_INDEX(WIRE_SERCOM_INDEX(token))
+#define WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(token)                            \
+  WIRE_SERCOM_HANDLER_OTHER_FROM_INDEX(WIRE_SERCOM_INDEX(token))
+
+#define WIRE_DEFINE_SINGLE_HANDLER(handler, instance)                          \
+  void handler(void) { instance.onService(); }
+
+#define WIRE_DEFINE_SAMD51_E51_HANDLERS(handler0, handler1, handler2,          \
+                                        handler3, instance)                    \
+  void handler0(void) { instance.onService(); }                                \
+  void handler1(void) { instance.onService(); }                                \
+  void handler2(void) { instance.onService(); }                                \
+  void handler3(void) { instance.onService(); }
+
+#define WIRE_DEFINE_SAME53_E54_HANDLERS(handler0, handler1, handler2,          \
+                                        handlerOther, instance)                \
+  void handler0(void) { instance.onService(); }                                \
+  void handler1(void) { instance.onService(); }                                \
+  void handler2(void) { instance.onService(); }                                \
+  void handlerOther(void) { instance.onService(); }
+
+#ifdef ARDUINO_SAMD51_E51
+#define WIRE_DEFINE_SERCOM_HANDLERS(prefix, instance)                          \
+  WIRE_DEFINE_SAMD51_E51_HANDLERS(prefix##_IT_HANDLER_0,                       \
+                                  prefix##_IT_HANDLER_1,                       \
+                                  prefix##_IT_HANDLER_2,                       \
+                                  prefix##_IT_HANDLER_3, instance)
+#elif defined(ARDUINO_SAME53_E54)
+#define WIRE_DEFINE_SERCOM_HANDLERS(prefix, instance)                          \
+  WIRE_DEFINE_SAME53_E54_HANDLERS(prefix##_IT_HANDLER_0,                       \
+                                  prefix##_IT_HANDLER_1,                       \
+                                  prefix##_IT_HANDLER_2,                       \
+                                  prefix##_IT_HANDLER_OTHER, instance)
+#else
+#define WIRE_DEFINE_SERCOM_HANDLERS(prefix, instance)                          \
+  WIRE_DEFINE_SINGLE_HANDLER(prefix##_IT_HANDLER, instance)
+#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+
 namespace sercomPinMux {
 bool wirePinValidForSercom(uint8_t arduinoPin, uint8_t sercomIndex) {
   if (arduinoPin >= PINS_COUNT)
@@ -452,109 +536,109 @@ void TwoWire::onDeferredReceive(void* user, int length)
     #define PERIPH_WIRE          sercom3
     #define WIRE_IT_HANDLER      SERCOM3_Handler
   #endif // PERIPH_WIRE
-  TwoWire Wire(&PERIPH_WIRE, PIN_WIRE_SDA, PIN_WIRE_SCL);
-
+TwoWire Wire(&PERIPH_WIRE, PIN_WIRE_SDA, PIN_WIRE_SCL);
+#ifndef WIRE_IT_HANDLER
+#define WIRE_IT_HANDLER WIRE_SERCOM_HANDLER_FROM_TOKEN(PERIPH_WIRE)
+#endif // !WIRE_IT_HANDLER
+#ifndef WIRE_IT_HANDLER_0
+#define WIRE_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE)
+#define WIRE_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE)
+#define WIRE_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE)
 #ifdef ARDUINO_SAMD51_E51
-  void WIRE_IT_HANDLER_0(void) { Wire.onService(); }
-  void WIRE_IT_HANDLER_1(void) { Wire.onService(); }
-  void WIRE_IT_HANDLER_2(void) { Wire.onService(); }
-  void WIRE_IT_HANDLER_3(void) { Wire.onService(); }
+#define WIRE_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE)
 #elif defined(ARDUINO_SAME53_E54)
-  void WIRE_IT_HANDLER_0(void) { Wire.onService(); }
-  void WIRE_IT_HANDLER_1(void) { Wire.onService(); }
-  void WIRE_IT_HANDLER_2(void) { Wire.onService(); }
-  void WIRE_IT_HANDLER_OTHER(void) { Wire.onService(); }
-#else
-  void WIRE_IT_HANDLER(void) { Wire.onService(); }
+#define WIRE_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE)
 #endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !WIRE_IT_HANDLER_0
+WIRE_DEFINE_SERCOM_HANDLERS(WIRE, Wire)
 #endif // WIRE_INTERFACES_COUNT > 0
 
 #if WIRE_INTERFACES_COUNT > 1
-    TwoWire Wire1(&PERIPH_WIRE1, PIN_WIRE1_SDA, PIN_WIRE1_SCL);
-
+  TwoWire Wire1(&PERIPH_WIRE1, PIN_WIRE1_SDA, PIN_WIRE1_SCL);
+  #ifndef WIRE1_IT_HANDLER
+#define WIRE1_IT_HANDLER WIRE_SERCOM_HANDLER_FROM_TOKEN(PERIPH_WIRE1)
+#endif // !WIRE1_IT_HANDLER
+#ifndef WIRE1_IT_HANDLER_0
+#define WIRE1_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE1)
+#define WIRE1_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE1)
+#define WIRE1_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE1)
 #ifdef ARDUINO_SAMD51_E51
-    void WIRE1_IT_HANDLER_0(void) { Wire1.onService(); }
-    void WIRE1_IT_HANDLER_1(void) { Wire1.onService(); }
-    void WIRE1_IT_HANDLER_2(void) { Wire1.onService(); }
-    void WIRE1_IT_HANDLER_3(void) { Wire1.onService(); }
+#define WIRE1_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE1)
 #elif defined(ARDUINO_SAME53_E54)
-    void WIRE1_IT_HANDLER_0(void) { Wire1.onService(); }
-    void WIRE1_IT_HANDLER_1(void) { Wire1.onService(); }
-    void WIRE1_IT_HANDLER_2(void) { Wire1.onService(); }
-    void WIRE1_IT_HANDLER_OTHER(void) { Wire1.onService(); }
-#else
-    void WIRE1_IT_HANDLER(void) { Wire1.onService(); }
+#define WIRE1_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE1)
 #endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !WIRE1_IT_HANDLER_0
+WIRE_DEFINE_SERCOM_HANDLERS(WIRE1, Wire1)
 #endif // WIRE_INTERFACES_COUNT > 1
 
 #if WIRE_INTERFACES_COUNT > 2
-    TwoWire Wire2(&PERIPH_WIRE2, PIN_WIRE2_SDA, PIN_WIRE2_SCL);
-
+  TwoWire Wire2(&PERIPH_WIRE2, PIN_WIRE2_SDA, PIN_WIRE2_SCL);
+  #ifndef WIRE2_IT_HANDLER
+#define WIRE2_IT_HANDLER WIRE_SERCOM_HANDLER_FROM_TOKEN(PERIPH_WIRE2)
+#endif // !WIRE2_IT_HANDLER
+#ifndef WIRE2_IT_HANDLER_0
+#define WIRE2_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE2)
+#define WIRE2_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE2)
+#define WIRE2_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE2)
 #ifdef ARDUINO_SAMD51_E51
-    void WIRE2_IT_HANDLER_0(void) { Wire2.onService(); }
-    void WIRE2_IT_HANDLER_1(void) { Wire2.onService(); }
-    void WIRE2_IT_HANDLER_2(void) { Wire2.onService(); }
-    void WIRE2_IT_HANDLER_3(void) { Wire2.onService(); }
+#define WIRE2_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE2)
 #elif defined(ARDUINO_SAME53_E54)
-    void WIRE2_IT_HANDLER_0(void) { Wire2.onService(); }
-    void WIRE2_IT_HANDLER_1(void) { Wire2.onService(); }
-    void WIRE2_IT_HANDLER_2(void) { Wire2.onService(); }
-    void WIRE2_IT_HANDLER_OTHER(void) { Wire2.onService(); }
-#else
-    void WIRE2_IT_HANDLER(void) { Wire2.onService(); }
+#define WIRE2_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE2)
 #endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !WIRE2_IT_HANDLER_0
+WIRE_DEFINE_SERCOM_HANDLERS(WIRE2, Wire2)
 #endif // WIRE_INTERFACES_COUNT > 2
 
 #if WIRE_INTERFACES_COUNT > 3
-    TwoWire Wire3(&PERIPH_WIRE3, PIN_WIRE3_SDA, PIN_WIRE3_SCL);
-
+  TwoWire Wire3(&PERIPH_WIRE3, PIN_WIRE3_SDA, PIN_WIRE3_SCL);
+  #ifndef WIRE3_IT_HANDLER
+#define WIRE3_IT_HANDLER WIRE_SERCOM_HANDLER_FROM_TOKEN(PERIPH_WIRE3)
+#endif // !WIRE3_IT_HANDLER
+#ifndef WIRE3_IT_HANDLER_0
+#define WIRE3_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE3)
+#define WIRE3_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE3)
+#define WIRE3_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE3)
 #ifdef ARDUINO_SAMD51_E51
-    void WIRE3_IT_HANDLER_0(void) { Wire3.onService(); }
-    void WIRE3_IT_HANDLER_1(void) { Wire3.onService(); }
-    void WIRE3_IT_HANDLER_2(void) { Wire3.onService(); }
-    void WIRE3_IT_HANDLER_3(void) { Wire3.onService(); }
+#define WIRE3_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE3)
 #elif defined(ARDUINO_SAME53_E54)
-    void WIRE3_IT_HANDLER_0(void) { Wire3.onService(); }
-    void WIRE3_IT_HANDLER_1(void) { Wire3.onService(); }
-    void WIRE3_IT_HANDLER_2(void) { Wire3.onService(); }
-    void WIRE3_IT_HANDLER_OTHER(void) { Wire3.onService(); }
-#else
-    void WIRE3_IT_HANDLER(void) { Wire3.onService(); }
+#define WIRE3_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE3)
 #endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !WIRE3_IT_HANDLER_0
+WIRE_DEFINE_SERCOM_HANDLERS(WIRE3, Wire3)
 #endif // WIRE_INTERFACES_COUNT > 3
 
 #if WIRE_INTERFACES_COUNT > 4
-    TwoWire Wire4(&PERIPH_WIRE4, PIN_WIRE4_SDA, PIN_WIRE4_SCL);
-
+  TwoWire Wire4(&PERIPH_WIRE4, PIN_WIRE4_SDA, PIN_WIRE4_SCL);
+  #ifndef WIRE4_IT_HANDLER
+#define WIRE4_IT_HANDLER WIRE_SERCOM_HANDLER_FROM_TOKEN(PERIPH_WIRE4)
+#endif // !WIRE4_IT_HANDLER
+#ifndef WIRE4_IT_HANDLER_0
+#define WIRE4_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE4)
+#define WIRE4_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE4)
+#define WIRE4_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE4)
 #ifdef ARDUINO_SAMD51_E51
-    void WIRE4_IT_HANDLER_0(void) { Wire4.onService(); }
-    void WIRE4_IT_HANDLER_1(void) { Wire4.onService(); }
-    void WIRE4_IT_HANDLER_2(void) { Wire4.onService(); }
-    void WIRE4_IT_HANDLER_3(void) { Wire4.onService(); }
+#define WIRE4_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE4)
 #elif defined(ARDUINO_SAME53_E54)
-    void WIRE4_IT_HANDLER_0(void) { Wire4.onService(); }
-    void WIRE4_IT_HANDLER_1(void) { Wire4.onService(); }
-    void WIRE4_IT_HANDLER_2(void) { Wire4.onService(); }
-    void WIRE4_IT_HANDLER_OTHER(void) { Wire4.onService(); }
-#else
-    void WIRE4_IT_HANDLER(void) { Wire4.onService(); }
+#define WIRE4_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE4)
 #endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !WIRE4_IT_HANDLER_0
+WIRE_DEFINE_SERCOM_HANDLERS(WIRE4, Wire4)
 #endif // WIRE_INTERFACES_COUNT > 4
 
 #if WIRE_INTERFACES_COUNT > 5
-    TwoWire Wire5(&PERIPH_WIRE5, PIN_WIRE5_SDA, PIN_WIRE5_SCL);
-
+  TwoWire Wire5(&PERIPH_WIRE5, PIN_WIRE5_SDA, PIN_WIRE5_SCL);
+  #ifndef WIRE5_IT_HANDLER
+#define WIRE5_IT_HANDLER WIRE_SERCOM_HANDLER_FROM_TOKEN(PERIPH_WIRE5)
+#endif // !WIRE5_IT_HANDLER
+#ifndef WIRE5_IT_HANDLER_0
+#define WIRE5_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE5)
+#define WIRE5_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE5)
+#define WIRE5_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE5)
 #ifdef ARDUINO_SAMD51_E51
-    void WIRE5_IT_HANDLER_0(void) { Wire5.onService(); }
-    void WIRE5_IT_HANDLER_1(void) { Wire5.onService(); }
-    void WIRE5_IT_HANDLER_2(void) { Wire5.onService(); }
-    void WIRE5_IT_HANDLER_3(void) { Wire5.onService(); }
+#define WIRE5_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE5)
 #elif defined(ARDUINO_SAME53_E54)
-    void WIRE5_IT_HANDLER_0(void) { Wire5.onService(); }
-    void WIRE5_IT_HANDLER_1(void) { Wire5.onService(); }
-    void WIRE5_IT_HANDLER_2(void) { Wire5.onService(); }
-    void WIRE5_IT_HANDLER_OTHER(void) { Wire5.onService(); }
-#else
-    void WIRE5_IT_HANDLER(void) { Wire5.onService(); }
+#define WIRE5_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE5)
 #endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // !WIRE5_IT_HANDLER_0
+WIRE_DEFINE_SERCOM_HANDLERS(WIRE5, Wire5)
 #endif // WIRE_INTERFACES_COUNT > 5

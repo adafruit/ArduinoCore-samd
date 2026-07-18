@@ -143,59 +143,75 @@ extern const uint8_t g_AAnalogPinMap[NUM_ANALOG_INPUTS];
  */
 
 // Numbered Arduino UARTs: EXT1, EXT2, EXT3, then the EDBG virtual COM port.
-#define PIN_SERIAL1_RX (0u)
-#define PIN_SERIAL1_TX (1u)
-#define PAD_SERIAL1_RX SERCOM_RX_PAD_1
-#define PAD_SERIAL1_TX UART_TX_PAD_0
+#define PIN_SERIAL1_RX           (0u)
+#define PIN_SERIAL1_TX           (1u)
+#define PAD_SERIAL1_RX           SERCOM_RX_PAD_1
+#define PAD_SERIAL1_TX           UART_TX_PAD_0
+#define PERIPH_SERIAL1           sercom0
+#define SERIAL1_IT_HANDLER_0     SERCOM0_0_Handler
+#define SERIAL1_IT_HANDLER_1     SERCOM0_1_Handler
+#define SERIAL1_IT_HANDLER_2     SERCOM0_2_Handler
+#define SERIAL1_IT_HANDLER_OTHER SERCOM0_OTHER_Handler
+#define UART_VARIANT_OWNS_SERIAL1
 
-#define PIN_SERIAL2_RX (16u)
-#define PIN_SERIAL2_TX (17u)
-#define PAD_SERIAL2_RX SERCOM_RX_PAD_1
-#define PAD_SERIAL2_TX UART_TX_PAD_0
+#define PIN_SERIAL2_RX           (16u)
+#define PIN_SERIAL2_TX           (17u)
+#define PAD_SERIAL2_RX           SERCOM_RX_PAD_1
+#define PAD_SERIAL2_TX           UART_TX_PAD_0
+#define PERIPH_SERIAL2           sercom5
+#define SERIAL2_IT_HANDLER_0     SERCOM5_0_Handler
+#define SERIAL2_IT_HANDLER_1     SERCOM5_1_Handler
+#define SERIAL2_IT_HANDLER_2     SERCOM5_2_Handler
+#define SERIAL2_IT_HANDLER_OTHER SERCOM5_OTHER_Handler
+#define UART_VARIANT_OWNS_SERIAL2
 
-#define PIN_SERIAL3_RX (32u)
-#define PIN_SERIAL3_TX (33u)
-#define PAD_SERIAL3_RX SERCOM_RX_PAD_1
-#define PAD_SERIAL3_TX UART_TX_PAD_0
+#define PIN_SERIAL3_RX           (32u)
+#define PIN_SERIAL3_TX           (33u)
+#define PAD_SERIAL3_RX           SERCOM_RX_PAD_1
+#define PAD_SERIAL3_TX           UART_TX_PAD_0
+#define PERIPH_SERIAL3           sercom1
+#define SERIAL3_IT_HANDLER_0     SERCOM1_0_Handler
+#define SERIAL3_IT_HANDLER_1     SERCOM1_1_Handler
+#define SERIAL3_IT_HANDLER_2     SERCOM1_2_Handler
+#define SERIAL3_IT_HANDLER_OTHER SERCOM1_OTHER_Handler
+#define UART_VARIANT_OWNS_SERIAL3
 
-#define PIN_SERIAL4_RX (47u)
-#define PIN_SERIAL4_TX (48u)
-#define PAD_SERIAL4_RX SERCOM_RX_PAD_1
-#define PAD_SERIAL4_TX UART_TX_PAD_0
+#define PIN_SERIAL4_RX           (47u)
+#define PIN_SERIAL4_TX           (48u)
+#define PAD_SERIAL4_RX           SERCOM_RX_PAD_1
+#define PAD_SERIAL4_TX           UART_TX_PAD_0
+#define PERIPH_SERIAL4           sercom2
+#define SERIAL4_IT_HANDLER_0     SERCOM2_0_Handler
+#define SERIAL4_IT_HANDLER_1     SERCOM2_1_Handler
+#define SERIAL4_IT_HANDLER_2     SERCOM2_2_Handler
+#define SERIAL4_IT_HANDLER_OTHER SERCOM2_OTHER_Handler
+#define UART_VARIANT_OWNS_SERIAL4
 
 /*
  * SPI Interfaces
  */
 #define SPI_INTERFACES_COUNT 2
 
-#define PIN_SPI_MISO (10u)
-#define PIN_SPI_MOSI (9u)
-#define PIN_SPI_SCK (11u)
-#define PIN_SPI_SS (8u)
-#define PERIPH_SPI sercom4
-#define PAD_SPI_TX SPI_PAD_0_SCK_1
-#define PAD_SPI_RX SERCOM_RX_PAD_3
-#define SPI_IT_HANDLER_0 SERCOM4_0_Handler
-#define SPI_IT_HANDLER_1 SERCOM4_1_Handler
-#define SPI_IT_HANDLER_2 SERCOM4_2_Handler
-#define SPI_IT_HANDLER_OTHER SERCOM4_OTHER_Handler
+#define PIN_SPI_MISO             (10u)
+#define PIN_SPI_MOSI             (9u)
+#define PIN_SPI_SCK              (11u)
+#define PIN_SPI_SS               (8u)
+#define PERIPH_SPI               sercom4
+#define PAD_SPI_TX               SPI_PAD_0_SCK_1
+#define PAD_SPI_RX               SERCOM_RX_PAD_3
 
   static const uint8_t SS = PIN_SPI_SS;
   static const uint8_t MOSI = PIN_SPI_MOSI;
   static const uint8_t MISO = PIN_SPI_MISO;
   static const uint8_t SCK = PIN_SPI_SCK;
 
-#define PIN_SPI1_MISO (26u)
-#define PIN_SPI1_MOSI (25u)
-#define PIN_SPI1_SCK (27u)
-#define PIN_SPI1_SS (24u)
-#define PERIPH_SPI1 sercom6
-#define PAD_SPI1_TX SPI_PAD_0_SCK_1
-#define PAD_SPI1_RX SERCOM_RX_PAD_3
-#define SPI1_IT_HANDLER_0 SERCOM6_0_Handler
-#define SPI1_IT_HANDLER_1 SERCOM6_1_Handler
-#define SPI1_IT_HANDLER_2 SERCOM6_2_Handler
-#define SPI1_IT_HANDLER_OTHER SERCOM6_OTHER_Handler
+#define PIN_SPI1_MISO            (26u)
+#define PIN_SPI1_MOSI            (25u)
+#define PIN_SPI1_SCK             (27u)
+#define PIN_SPI1_SS              (24u)
+#define PERIPH_SPI1              sercom6
+#define PAD_SPI1_TX              SPI_PAD_0_SCK_1
+#define PAD_SPI1_RX              SERCOM_RX_PAD_3
 
   static const uint8_t SS1 = PIN_SPI1_SS;
 
@@ -204,26 +220,16 @@ extern const uint8_t g_AAnalogPinMap[NUM_ANALOG_INPUTS];
  */
 #define WIRE_INTERFACES_COUNT 2
 
-#define PIN_WIRE_SDA PIN_EXT1_SDA
-#define PIN_WIRE_SCL PIN_EXT1_SCL
-#define PERIPH_WIRE sercom3
-#define WIRE_IT_HANDLER SERCOM3_Handler
-#define WIRE_IT_HANDLER_0 SERCOM3_0_Handler
-#define WIRE_IT_HANDLER_1 SERCOM3_1_Handler
-#define WIRE_IT_HANDLER_2 SERCOM3_2_Handler
-#define WIRE_IT_HANDLER_OTHER SERCOM3_OTHER_Handler
+#define PIN_WIRE_SDA             PIN_EXT1_SDA
+#define PIN_WIRE_SCL             PIN_EXT1_SCL
+#define PERIPH_WIRE              sercom3
 
   static const uint8_t SDA = PIN_WIRE_SDA;
   static const uint8_t SCL = PIN_WIRE_SCL;
 
-#define PIN_WIRE1_SDA PIN_EXT2_SDA
-#define PIN_WIRE1_SCL PIN_EXT2_SCL
-#define PERIPH_WIRE1 sercom7
-#define WIRE1_IT_HANDLER SERCOM7_Handler
-#define WIRE1_IT_HANDLER_0 SERCOM7_0_Handler
-#define WIRE1_IT_HANDLER_1 SERCOM7_1_Handler
-#define WIRE1_IT_HANDLER_2 SERCOM7_2_Handler
-#define WIRE1_IT_HANDLER_OTHER SERCOM7_OTHER_Handler
+#define PIN_WIRE1_SDA            PIN_EXT2_SDA
+#define PIN_WIRE1_SCL            PIN_EXT2_SCL
+#define PERIPH_WIRE1             sercom7
 
   static const uint8_t SDA1 = PIN_WIRE1_SDA;
   static const uint8_t SCL1 = PIN_WIRE1_SCL;

@@ -122,18 +122,18 @@ SERCOM sercom5(SERCOM5_REGS);
 SERCOM sercom6(SERCOM6_REGS);
 SERCOM sercom7(SERCOM7_REGS);
 
-Uart Serial1(&sercom0, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX);
-Uart Serial2(&sercom5, PIN_SERIAL2_RX, PIN_SERIAL2_TX, PAD_SERIAL2_RX, PAD_SERIAL2_TX);
-Uart Serial3(&sercom1, PIN_SERIAL3_RX, PIN_SERIAL3_TX, PAD_SERIAL3_RX, PAD_SERIAL3_TX);
-Uart Serial4(&sercom2, PIN_SERIAL4_RX, PIN_SERIAL4_TX, PAD_SERIAL4_RX, PAD_SERIAL4_TX);
+Uart Serial1(&PERIPH_SERIAL1, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX);
+Uart Serial2(&PERIPH_SERIAL2, PIN_SERIAL2_RX, PIN_SERIAL2_TX, PAD_SERIAL2_RX, PAD_SERIAL2_TX);
+Uart Serial3(&PERIPH_SERIAL3, PIN_SERIAL3_RX, PIN_SERIAL3_TX, PAD_SERIAL3_RX, PAD_SERIAL3_TX);
+Uart Serial4(&PERIPH_SERIAL4, PIN_SERIAL4_RX, PIN_SERIAL4_TX, PAD_SERIAL4_RX, PAD_SERIAL4_TX);
 
-#define UART_HANDLERS(n, serial)                                                                         \
-    void SERCOM##n##_0_Handler() { serial.IrqHandler(); }                                                 \
-    void SERCOM##n##_1_Handler() { serial.IrqHandler(); }                                                 \
-    void SERCOM##n##_2_Handler() { serial.IrqHandler(); }                                                 \
-    void SERCOM##n##_OTHER_Handler() { serial.IrqHandler(); }
+#define UART_HANDLERS(prefix, serial)                                \
+    void prefix##_IT_HANDLER_0(void) { serial.IrqHandler(); }         \
+    void prefix##_IT_HANDLER_1(void) { serial.IrqHandler(); }         \
+    void prefix##_IT_HANDLER_2(void) { serial.IrqHandler(); }         \
+    void prefix##_IT_HANDLER_OTHER(void) { serial.IrqHandler(); }
 
-UART_HANDLERS(0, Serial1)
-UART_HANDLERS(5, Serial2)
-UART_HANDLERS(1, Serial3)
-UART_HANDLERS(2, Serial4)
+UART_HANDLERS(SERIAL1, Serial1)
+UART_HANDLERS(SERIAL2, Serial2)
+UART_HANDLERS(SERIAL3, Serial3)
+UART_HANDLERS(SERIAL4, Serial4)

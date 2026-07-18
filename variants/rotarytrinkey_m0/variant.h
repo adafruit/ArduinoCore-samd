@@ -108,12 +108,12 @@ static const uint8_t A2  = PIN_A2;
  */
 #define SPI_INTERFACES_COUNT 1
 
-#define PIN_SPI_MISO         PIN_A0
-#define PIN_SPI_MOSI         PIN_A0
-#define PIN_SPI_SCK          PIN_A0
-#define PERIPH_SPI           sercom0
-#define PAD_SPI_TX           SPI_PAD_0_SCK_1
-#define PAD_SPI_RX           SERCOM_RX_PAD_0
+#define PIN_SPI_MISO             PIN_A0
+#define PIN_SPI_MOSI             PIN_A0
+#define PIN_SPI_SCK              PIN_A0
+#define PERIPH_SPI               sercom0
+#define PAD_SPI_TX               SPI_PAD_0_SCK_1
+#define PAD_SPI_RX               SERCOM_RX_PAD_0
 
 static const uint8_t SS	  = PIN_A0;
 static const uint8_t MOSI = PIN_SPI_MOSI;
@@ -142,10 +142,10 @@ static const uint8_t SCK  = PIN_SPI_SCK;
  */
 
 // Serial1
-#define PIN_SERIAL1_TX       (2ul)  // D2 / PA04 / SERCOM 0.0
-#define PIN_SERIAL1_RX       (4ul)  // D2 / PA06 / SERCOM 0.2
-#define PAD_SERIAL1_TX       (UART_TX_PAD_0)
-#define PAD_SERIAL1_RX       (SERCOM_RX_PAD_2)
+#define PIN_SERIAL1_TX           (2ul)  // D2 / PA04 / SERCOM 0.0
+#define PIN_SERIAL1_RX           (4ul)  // D2 / PA06 / SERCOM 0.2
+#define PAD_SERIAL1_TX           (UART_TX_PAD_0)
+#define PAD_SERIAL1_RX           (SERCOM_RX_PAD_2)
 
 
 #ifdef __cplusplus

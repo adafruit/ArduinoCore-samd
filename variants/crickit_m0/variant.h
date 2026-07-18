@@ -157,10 +157,11 @@ static const uint8_t ATN = PIN_ATN;
  */
 
 // Serial1
-#define PIN_SERIAL1_TX       (35ul)
-#define PIN_SERIAL1_RX       (36ul)
-#define PAD_SERIAL1_TX       (UART_TX_PAD_0)
-#define PAD_SERIAL1_RX       (SERCOM_RX_PAD_3)
+#define PIN_SERIAL1_TX           (35ul)
+#define PIN_SERIAL1_RX           (36ul)
+#define PAD_SERIAL1_TX           (UART_TX_PAD_0)
+#define PAD_SERIAL1_RX           (SERCOM_RX_PAD_3)
+#define PERIPH_SERIAL1           sercom5
 
 /*
  * SPI Interfaces
@@ -172,10 +173,9 @@ static const uint8_t ATN = PIN_ATN;
  */
 #define WIRE_INTERFACES_COUNT 1
 
-#define PIN_WIRE_SDA         (0u)
-#define PIN_WIRE_SCL         (1u)
-#define PERIPH_WIRE          sercom1
-#define WIRE_IT_HANDLER      SERCOM1_Handler
+#define PIN_WIRE_SDA             (0u)
+#define PIN_WIRE_SCL             (1u)
+#define PERIPH_WIRE              sercom1
 
 static const uint8_t SDA = PIN_WIRE_SDA;
 static const uint8_t SCL = PIN_WIRE_SCL;

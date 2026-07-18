@@ -251,19 +251,3 @@ void initVariant() {
   pinMode(SARA_RTS, OUTPUT);
   digitalWrite(SARA_RTS, LOW);
 }
-
-// Serial1
-Uart Serial1(&sercom5, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX);
-
-void SERCOM5_Handler()
-{
-  Serial1.IrqHandler();
-}
-
-// SerialSARA
-Uart Serial2(&sercom4, PIN_SERIAL2_RX, PIN_SERIAL2_TX, PAD_SERIAL2_RX, PAD_SERIAL2_TX);
-
-void SERCOM4_Handler()
-{
-  Serial2.IrqHandler();
-}
