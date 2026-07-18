@@ -104,6 +104,7 @@ class PendSV {
                   "PendSV channel allocation exceeds dispatcher capacity");
 
     static PendSV &instance();
+    static bool initializeCoreServices();
 
     bool registerService(uint8_t serviceId, ServiceFn fn, void *context = nullptr);
     // Cancels queued work that has not started dispatching. If a callback was
@@ -111,6 +112,7 @@ class PendSV {
     void clearService(uint8_t serviceId);
     void dispatchPending();
     void setPending(uint8_t serviceId);
+    void setPendingOnce(uint8_t serviceId);
 
   private:
     static uint32_t enterCritical();
