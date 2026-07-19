@@ -63,12 +63,22 @@ extern "C"
 #define NUM_ANALOG_OUTPUTS   (2u)
 #define analogInputToDigitalPin(p)  ((p < NUM_ANALOG_INPUTS) ? (p) + PIN_A0 : -1)
 
+#ifdef ARDUINO_SAME53_E54
+#ifdef ARDUINO_SAME53_E54
+#define digitalPinToPort(P)        ( &(PORT_REGS->GROUP[g_APinDescription[P].ulPort]) )
+#define digitalPinToBitMask(P)     ( 1 << g_APinDescription[P].ulPin )
+// #define analogInPinToBit(P)        ( )
+#define portOutputRegister(port)   ( &((port)->PORT_OUT) )
+#define portInputRegister(port)    ( &((port)->PORT_IN) )
+#define portModeRegister(port)     ( &((port)->PORT_DIR) )
+#else
 #define digitalPinToPort(P)        ( &(PORT->Group[g_APinDescription[P].ulPort]) )
 #define digitalPinToBitMask(P)     ( 1 << g_APinDescription[P].ulPin )
-//#define analogInPinToBit(P)        ( )
-#define portOutputRegister(port)   ( &(port->OUT.reg) )
-#define portInputRegister(port)    ( &(port->IN.reg) )
-#define portModeRegister(port)     ( &(port->DIR.reg) )
+// #define analogInPinToBit(P)        ( )
+#define portOutputRegister(port)   ( &((port)->OUT.reg) )
+#define portInputRegister(port)    ( &((port)->IN.reg) )
+#define portModeRegister(port)     ( &((port)->DIR.reg) )
+#endif // ARDUINO_SAME53_E54
 #define digitalPinHasPWM(P)        ( g_APinDescription[P].ulPWMChannel != NOT_ON_PWM || g_APinDescription[P].ulTCChannel != NOT_ON_TIMER )
 
 /*
