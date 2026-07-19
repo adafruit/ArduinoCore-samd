@@ -121,14 +121,32 @@ void SystemInit( void )
     /* Wait for synchronization */
   }
 
-  /* DFLL Configuration in Open Loop mode */
+  /* DFLL Configuration */
   
   OSCCTRL->DFLLCTRLA.reg = 0;
-  //GCLK->PCHCTRL[OSCCTRL_GCLK_ID_DFLL48].reg = (1 << GCLK_PCHCTRL_CHEN_Pos) | GCLK_PCHCTRL_GEN(GCLK_PCHCTRL_GEN_GCLK3_Val);
+
+#ifndef CRYSTALLESS
+  /*
+   * D5x/E5x USB clock: XOSC32K -> GCLK3 -> DFLL48M closed loop.
+   * 32768 Hz * 1465 = 48.00512 MHz (+106.7 ppm), within the USB
+   * full-speed device requirement of 48 MHz +/-0.25%.
+   */
+  GCLK->PCHCTRL[OSCCTRL_GCLK_ID_DFLL48].reg =
+    (1 << GCLK_PCHCTRL_CHEN_Pos) |
+    GCLK_PCHCTRL_GEN(GCLK_PCHCTRL_GEN_GCLK3_Val);
+  while ((GCLK->PCHCTRL[OSCCTRL_GCLK_ID_DFLL48].reg &
+          GCLK_PCHCTRL_CHEN) == 0) {
+    /* Wait for the DFLL reference channel to become active. */
+  }
+#endif // !CRYSTALLESS
   
   OSCCTRL->DFLLMUL.reg = OSCCTRL_DFLLMUL_CSTEP( 0x1 ) |
     OSCCTRL_DFLLMUL_FSTEP( 0x1 ) |
+#ifndef CRYSTALLESS
+    OSCCTRL_DFLLMUL_MUL( 1465 );
+#else
     OSCCTRL_DFLLMUL_MUL( 0 );
+#endif // !CRYSTALLESS
   
   while ( OSCCTRL->DFLLSYNC.reg & OSCCTRL_DFLLSYNC_DFLLMUL )
     {
@@ -150,8 +168,13 @@ void SystemInit( void )
   OSCCTRL->DFLLVAL.reg = OSCCTRL->DFLLVAL.reg;
   while( OSCCTRL->DFLLSYNC.bit.DFLLVAL );
   
+#ifndef CRYSTALLESS
   OSCCTRL->DFLLCTRLB.reg = OSCCTRL_DFLLCTRLB_WAITLOCK |
-  OSCCTRL_DFLLCTRLB_CCDIS | OSCCTRL_DFLLCTRLB_USBCRM ;
+    OSCCTRL_DFLLCTRLB_CCDIS | OSCCTRL_DFLLCTRLB_MODE;
+#else
+  OSCCTRL->DFLLCTRLB.reg = OSCCTRL_DFLLCTRLB_WAITLOCK |
+    OSCCTRL_DFLLCTRLB_CCDIS | OSCCTRL_DFLLCTRLB_USBCRM;
+#endif // !CRYSTALLESS
   
   while ( !OSCCTRL->STATUS.bit.DFLLRDY )
     {
@@ -344,9 +367,25 @@ void SystemInit( void )
   while (GCLK_REGS->GCLK_SYNCBUSY & GCLK_SYNCBUSY_GENCTRL_Msk);
 
   OSCCTRL_REGS->OSCCTRL_DFLLCTRLA = 0;
+#ifndef CRYSTALLESS
+  /*
+   * D5x/E5x USB clock: XOSC32K -> GCLK3 -> DFLL48M closed loop.
+   * 32768 Hz * 1465 = 48.00512 MHz (+106.7 ppm), within the USB
+   * full-speed device requirement of 48 MHz +/-0.25%.
+   */
+  GCLK_REGS->GCLK_PCHCTRL[OSCCTRL_GCLK_ID_DFLL48] =
+      GCLK_PCHCTRL_GEN_GCLK3 | GCLK_PCHCTRL_CHEN_Msk;
+  while ((GCLK_REGS->GCLK_PCHCTRL[OSCCTRL_GCLK_ID_DFLL48] &
+          GCLK_PCHCTRL_CHEN_Msk) == 0);
+#endif // !CRYSTALLESS
+
   OSCCTRL_REGS->OSCCTRL_DFLLMUL = OSCCTRL_DFLLMUL_CSTEP(1) |
                                   OSCCTRL_DFLLMUL_FSTEP(1) |
+#ifndef CRYSTALLESS
+                                  OSCCTRL_DFLLMUL_MUL(1465);
+#else
                                   OSCCTRL_DFLLMUL_MUL(0);
+#endif // !CRYSTALLESS
   while (OSCCTRL_REGS->OSCCTRL_DFLLSYNC & OSCCTRL_DFLLSYNC_DFLLMUL_Msk);
 
   OSCCTRL_REGS->OSCCTRL_DFLLCTRLB = 0;
@@ -358,9 +397,15 @@ void SystemInit( void )
   OSCCTRL_REGS->OSCCTRL_DFLLVAL = OSCCTRL_REGS->OSCCTRL_DFLLVAL;
   while (OSCCTRL_REGS->OSCCTRL_DFLLSYNC & OSCCTRL_DFLLSYNC_DFLLVAL_Msk);
 
+#ifndef CRYSTALLESS
+  OSCCTRL_REGS->OSCCTRL_DFLLCTRLB = OSCCTRL_DFLLCTRLB_WAITLOCK_Msk |
+                                    OSCCTRL_DFLLCTRLB_CCDIS_Msk |
+                                    OSCCTRL_DFLLCTRLB_MODE_Msk;
+#else
   OSCCTRL_REGS->OSCCTRL_DFLLCTRLB = OSCCTRL_DFLLCTRLB_WAITLOCK_Msk |
                                     OSCCTRL_DFLLCTRLB_CCDIS_Msk |
                                     OSCCTRL_DFLLCTRLB_USBCRM_Msk;
+#endif // !CRYSTALLESS
   while ((OSCCTRL_REGS->OSCCTRL_STATUS & OSCCTRL_STATUS_DFLLRDY_Msk) == 0);
 
   GCLK_REGS->GCLK_GENCTRL[GENERIC_CLOCK_GENERATOR_1M] =
