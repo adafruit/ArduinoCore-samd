@@ -21,6 +21,40 @@ static inline float decToFrac(uint8_t val) {
 
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
 float analogReadTemperatureC(uint16_t tp, uint16_t tc) {
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+    const uint32_t tempLog0 = *(uint32_t *)(TEMP_LOG_ADDR + 0u);
+    const uint32_t tempLog1 = *(uint32_t *)(TEMP_LOG_ADDR + 4u);
+    const uint32_t tempLog2 = *(uint32_t *)(TEMP_LOG_ADDR + 8u);
+
+    const uint32_t roomInt =
+        (tempLog0 & FUSES_TEMP_LOG_WORD_0_ROOM_TEMP_VAL_INT_Msk) >>
+        FUSES_TEMP_LOG_WORD_0_ROOM_TEMP_VAL_INT_Pos;
+    const uint8_t roomDec = static_cast<uint8_t>(
+        (tempLog0 & FUSES_TEMP_LOG_WORD_0_ROOM_TEMP_VAL_DEC_Msk) >>
+        FUSES_TEMP_LOG_WORD_0_ROOM_TEMP_VAL_DEC_Pos);
+    const float roomTemp = static_cast<float>(roomInt) + decToFrac(roomDec);
+
+    const uint32_t hotInt =
+        (tempLog0 & FUSES_TEMP_LOG_WORD_0_HOT_TEMP_VAL_INT_Msk) >>
+        FUSES_TEMP_LOG_WORD_0_HOT_TEMP_VAL_INT_Pos;
+    const uint8_t hotDec = static_cast<uint8_t>(
+        (tempLog0 & FUSES_TEMP_LOG_WORD_0_HOT_TEMP_VAL_DEC_Msk) >>
+        FUSES_TEMP_LOG_WORD_0_HOT_TEMP_VAL_DEC_Pos);
+    const float hotTemp = static_cast<float>(hotInt) + decToFrac(hotDec);
+
+    const uint16_t vpl =
+        (tempLog1 & FUSES_TEMP_LOG_WORD_1_ROOM_ADC_VAL_PTAT_Msk) >>
+        FUSES_TEMP_LOG_WORD_1_ROOM_ADC_VAL_PTAT_Pos;
+    const uint16_t vph =
+        (tempLog1 & FUSES_TEMP_LOG_WORD_1_HOT_ADC_VAL_PTAT_Msk) >>
+        FUSES_TEMP_LOG_WORD_1_HOT_ADC_VAL_PTAT_Pos;
+    const uint16_t vcl =
+        (tempLog2 & FUSES_TEMP_LOG_WORD_2_ROOM_ADC_VAL_CTAT_Msk) >>
+        FUSES_TEMP_LOG_WORD_2_ROOM_ADC_VAL_CTAT_Pos;
+    const uint16_t vch =
+        (tempLog2 & FUSES_TEMP_LOG_WORD_2_HOT_ADC_VAL_CTAT_Msk) >>
+        FUSES_TEMP_LOG_WORD_2_HOT_ADC_VAL_CTAT_Pos;
+#else
     const uint32_t roomInt = (*(uint32_t *)FUSES_ROOM_TEMP_VAL_INT_ADDR & FUSES_ROOM_TEMP_VAL_INT_Msk) >>
                              FUSES_ROOM_TEMP_VAL_INT_Pos;
     const uint8_t roomDec = static_cast<uint8_t>((*(uint32_t *)FUSES_ROOM_TEMP_VAL_DEC_ADDR & FUSES_ROOM_TEMP_VAL_DEC_Msk) >>
@@ -41,6 +75,7 @@ float analogReadTemperatureC(uint16_t tp, uint16_t tc) {
                          FUSES_ROOM_ADC_VAL_CTAT_Pos;
     const uint16_t vch = (*(uint32_t *)FUSES_HOT_ADC_VAL_CTAT_ADDR & FUSES_HOT_ADC_VAL_CTAT_Msk) >>
                          FUSES_HOT_ADC_VAL_CTAT_Pos;
+#endif // ADC_HAS_SAME53_E54_REGISTERS
 
     return (roomTemp * vph * tc - vpl * hotTemp * tc - roomTemp * vch * tp + hotTemp * vcl * tp) /
            (vcl * tp - vch * tp - vpl * tc + vph * tc);
@@ -133,6 +168,8 @@ constexpr uint32_t kAdcNvicPriority = (1u << __NVIC_PRIO_BITS) - 1u;
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
 #ifdef ADC_EVCTRL_SYNCEI
 constexpr uint8_t kAdcEvctrlSynceiBit = ADC_EVCTRL_SYNCEI;
+#elif defined(ADC_EVCTRL_FLUSHEI_Msk)
+constexpr uint8_t kAdcEvctrlSynceiBit = ADC_EVCTRL_FLUSHEI_Msk;
 #elif defined(ADC_EVCTRL_FLUSHEI)
 constexpr uint8_t kAdcEvctrlSynceiBit = ADC_EVCTRL_FLUSHEI;
 #else
@@ -377,8 +414,15 @@ void configureInternalReference(uint8_t refSel) {
     if (refSel != ADC_REFCTRL_REFSEL_INTREF_Val)
         return;
 
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+    SUPC_REGS->SUPC_VREF =
+        (SUPC_REGS->SUPC_VREF & ~SUPC_VREF_SEL_Msk) |
+        SUPC_VREF_SEL_1V0 |
+        SUPC_VREF_VREFOE_Msk;
+#else
     SUPC->VREF.bit.SEL = SUPC_VREF_SEL_1V0_Val;
     SUPC->VREF.bit.VREFOE = 1;
+#endif // ADC_HAS_SAME53_E54_REGISTERS
 }
 
 void configureTemperatureSensor(uint8_t muxPos) {
@@ -386,10 +430,19 @@ void configureTemperatureSensor(uint8_t muxPos) {
         muxPos != ADC_INPUTCTRL_MUXPOS_CTAT_Val)
         return;
 
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+    uint32_t vref = SUPC_REGS->SUPC_VREF;
+    vref &= ~(SUPC_VREF_ONDEMAND_Msk | SUPC_VREF_VREFOE_Msk | SUPC_VREF_TSSEL_Msk);
+    if (muxPos == ADC_INPUTCTRL_MUXPOS_CTAT_Val)
+        vref |= SUPC_VREF_TSSEL_Msk;
+    vref |= SUPC_VREF_TSEN_Msk;
+    SUPC_REGS->SUPC_VREF = vref;
+#else
     SUPC->VREF.bit.ONDEMAND = 0;
     SUPC->VREF.bit.VREFOE = 0;
     SUPC->VREF.bit.TSSEL = (muxPos == ADC_INPUTCTRL_MUXPOS_CTAT_Val) ? 1 : 0;
     SUPC->VREF.bit.TSEN = 1;
+#endif // ADC_HAS_SAME53_E54_REGISTERS
 }
 
 uint8_t sampleTimeForMux(uint8_t muxPos) {
@@ -810,7 +863,7 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
 
     const uint16_t inputCtrlReg = static_cast<uint16_t>(
         ADC_INPUTCTRL_MUXPOS(channel->muxPos_) | ADC_INPUTCTRL_MUXNEG(channel->muxNeg_) |
-        (channel->differentialMode_ ? ADC_INPUTCTRL_DIFFMODE : 0u));
+        (channel->differentialMode_ ? ADC_INPUTCTRL_DIFFMODE_Msk : 0u));
     adcWriteInputctrl(adc, inputCtrlReg);
 
     const uint8_t avgCtrlReg =
