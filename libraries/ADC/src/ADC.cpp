@@ -97,6 +97,15 @@ float analogReadTemperatureC(uint16_t adcReading) {
 #endif
 
 void analogReadCorrection(int offset, uint16_t gain) {
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+    adc_registers_t *adc = ADC0_REGS;
+
+    adc->ADC_OFFSETCORR = static_cast<uint16_t>(offset);
+    adc->ADC_GAINCORR = gain;
+    adc->ADC_CTRLB |= ADC_CTRLB_CORREN_Msk;
+
+    while (adc->ADC_SYNCBUSY);
+#else
     Adc *adc;
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
     adc = ADC0;
@@ -113,6 +122,7 @@ void analogReadCorrection(int offset, uint16_t gain) {
 #else
     while (adc->STATUS.bit.SYNCBUSY);
 #endif
+#endif // ADC_HAS_SAME53_E54_REGISTERS
 }
 
 namespace {
@@ -140,6 +150,114 @@ uint8_t adcDmacResrdyTrigger() {
 #endif
 }
 
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+inline adc_registers_t *adcInstance() {
+    return ADC0_REGS;
+}
+
+inline void *adcResultRegister(adc_registers_t *adc) {
+    return (void *)&adc->ADC_RESULT;
+}
+
+inline uint16_t adcReadResult(adc_registers_t *adc) {
+    return adc->ADC_RESULT;
+}
+
+inline void adcSetEnable(adc_registers_t *adc, bool enabled) {
+    if (enabled)
+        adc->ADC_CTRLA |= ADC_CTRLA_ENABLE_Msk;
+    else
+        adc->ADC_CTRLA &= ~ADC_CTRLA_ENABLE_Msk;
+}
+
+inline void adcSoftwareReset(adc_registers_t *adc) {
+    adc->ADC_CTRLA |= ADC_CTRLA_SWRST_Msk;
+}
+
+inline bool adcSoftwareResetBusy(adc_registers_t *adc) {
+    return (adc->ADC_SYNCBUSY & ADC_SYNCBUSY_SWRST_Msk) != 0;
+}
+
+inline void adcDisableResultReady(adc_registers_t *adc) {
+    adc->ADC_INTENCLR = ADC_INTENCLR_RESRDY_Msk;
+}
+
+inline uint8_t adcReadFlags(adc_registers_t *adc) {
+    return static_cast<uint8_t>(adc->ADC_INTFLAG & ADC_INTFLAG_Msk);
+}
+
+inline void adcClearFlags(adc_registers_t *adc, uint8_t flags) {
+    adc->ADC_INTFLAG = flags;
+}
+
+inline bool adcFlagWinmon(uint8_t flags) {
+    return (flags & ADC_INTFLAG_WINMON_Msk) != 0u;
+}
+
+inline bool adcFlagResrdy(uint8_t flags) {
+    return (flags & ADC_INTFLAG_RESRDY_Msk) != 0u;
+}
+
+inline void adcDisableInterrupts(adc_registers_t *adc, uint8_t mask) {
+    adc->ADC_INTENCLR = mask;
+}
+
+inline void adcEnableInterrupts(adc_registers_t *adc, uint8_t mask) {
+    adc->ADC_INTENSET = mask;
+}
+
+inline void adcWriteRefctrl(adc_registers_t *adc, uint8_t value) {
+    adc->ADC_REFCTRL = value;
+}
+
+inline void adcWriteInputctrl(adc_registers_t *adc, uint16_t value) {
+    adc->ADC_INPUTCTRL = value;
+}
+
+inline void adcWriteAvgctrl(adc_registers_t *adc, uint8_t value) {
+    adc->ADC_AVGCTRL = value;
+}
+
+inline void adcWriteSampctrl(adc_registers_t *adc, uint8_t value) {
+    adc->ADC_SAMPCTRL = value;
+}
+
+inline uint16_t adcReadCtrla(adc_registers_t *adc) {
+    return adc->ADC_CTRLA;
+}
+
+inline void adcWriteCtrla(adc_registers_t *adc, uint16_t value) {
+    adc->ADC_CTRLA = value;
+}
+
+inline void adcWriteCtrlb(adc_registers_t *adc, uint16_t value) {
+    adc->ADC_CTRLB = value;
+}
+
+inline void adcWriteEvctrl(adc_registers_t *adc, uint8_t value) {
+    adc->ADC_EVCTRL = value;
+}
+
+inline void adcWriteWinlt(adc_registers_t *adc, uint16_t value) {
+    adc->ADC_WINLT = value;
+}
+
+inline void adcWriteWinut(adc_registers_t *adc, uint16_t value) {
+    adc->ADC_WINUT = value;
+}
+
+inline void adcWriteOffsetcorr(adc_registers_t *adc, uint16_t value) {
+    adc->ADC_OFFSETCORR = value;
+}
+
+inline void adcWriteGaincorr(adc_registers_t *adc, uint16_t value) {
+    adc->ADC_GAINCORR = value;
+}
+
+inline void adcStartConversion(adc_registers_t *adc) {
+    adc->ADC_SWTRIG = ADC_SWTRIG_START_Msk;
+}
+#else
 inline Adc *adcInstance() {
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
   return ADC0;
@@ -147,6 +265,112 @@ inline Adc *adcInstance() {
   return ADC;
 #endif
 }
+
+inline void *adcResultRegister(Adc *adc) {
+    return (void *)&adc->RESULT.reg;
+}
+
+inline uint16_t adcReadResult(Adc *adc) {
+    return adc->RESULT.reg;
+}
+
+inline void adcSetEnable(Adc *adc, bool enabled) {
+    adc->CTRLA.bit.ENABLE = enabled ? 1 : 0;
+}
+
+inline void adcSoftwareReset(Adc *adc) {
+    adc->CTRLA.bit.SWRST = 1;
+}
+
+inline bool adcSoftwareResetBusy(Adc *adc) {
+    return adc->CTRLA.bit.SWRST;
+}
+
+inline void adcDisableResultReady(Adc *adc) {
+    adc->INTENCLR.bit.RESRDY = 1;
+}
+
+inline uint8_t adcReadFlags(Adc *adc) {
+    return static_cast<uint8_t>(adc->INTFLAG.reg & 0x0F);
+}
+
+inline void adcClearFlags(Adc *adc, uint8_t flags) {
+    adc->INTFLAG.reg = flags;
+}
+
+inline bool adcFlagWinmon(uint8_t flags) {
+    return (flags & ADC_INTFLAG_WINMON) != 0u;
+}
+
+inline bool adcFlagResrdy(uint8_t flags) {
+    return (flags & ADC_INTFLAG_RESRDY) != 0u;
+}
+
+inline void adcDisableInterrupts(Adc *adc, uint8_t mask) {
+    adc->INTENCLR.reg = mask;
+}
+
+inline void adcEnableInterrupts(Adc *adc, uint8_t mask) {
+    adc->INTENSET.reg = mask;
+}
+
+inline void adcWriteRefctrl(Adc *adc, uint8_t value) {
+    adc->REFCTRL.reg = value;
+}
+
+inline void adcWriteInputctrl(Adc *adc, uint32_t value) {
+    adc->INPUTCTRL.reg = value;
+}
+
+inline void adcWriteAvgctrl(Adc *adc, uint8_t value) {
+    adc->AVGCTRL.reg = value;
+}
+
+inline void adcWriteSampctrl(Adc *adc, uint8_t value) {
+#ifdef ADC_HAS_D5X_E5X_REGISTERS
+    adc->SAMPCTRL.reg = value;
+#else
+    (void)adc;
+    (void)value;
+#endif
+}
+
+inline uint16_t adcReadCtrla(Adc *adc) {
+    return adc->CTRLA.reg;
+}
+
+inline void adcWriteCtrla(Adc *adc, uint16_t value) {
+    adc->CTRLA.reg = value;
+}
+
+inline void adcWriteCtrlb(Adc *adc, uint16_t value) {
+    adc->CTRLB.reg = value;
+}
+
+inline void adcWriteEvctrl(Adc *adc, uint8_t value) {
+    adc->EVCTRL.reg = value;
+}
+
+inline void adcWriteWinlt(Adc *adc, uint16_t value) {
+    adc->WINLT.reg = value;
+}
+
+inline void adcWriteWinut(Adc *adc, uint16_t value) {
+    adc->WINUT.reg = value;
+}
+
+inline void adcWriteOffsetcorr(Adc *adc, uint16_t value) {
+    adc->OFFSETCORR.reg = value;
+}
+
+inline void adcWriteGaincorr(Adc *adc, uint16_t value) {
+    adc->GAINCORR.reg = value;
+}
+
+inline void adcStartConversion(Adc *adc) {
+    adc->SWTRIG.bit.START = 1;
+}
+#endif // ADC_HAS_SAME53_E54_REGISTERS
 
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
 void configureInternalReference(uint8_t refSel) {
@@ -179,8 +403,8 @@ uint8_t sampleTimeForMux(uint8_t muxPos) {
 
 // ADC IRQ routing mirrors SERCOM family handling:
 // - SAMD2x exposes a single ADC_IRQn vector.
-// - SAME/SAMD5x splits ADC0 interrupts across two NVIC lines:
-//   ADC0_0 = OVERRUN/WINMON, ADC0_1 = RESRDY.
+// - SAMD51/E51 splits ADC0 interrupts across ADC0_0/ADC0_1.
+// - SAME53/E54 splits ADC0 interrupts across ADC0_OTHER/ADC0_RESRDY.
 // Enabling/servicing both split lines ensures window-monitor and data-ready
 // callbacks continue to work together on 5x devices.
 
@@ -193,7 +417,9 @@ uint8_t adcIrqCount() {
 }
 
 IRQn_Type adcIrqAt(uint8_t index) {
-#ifdef ADC_HAS_D5X_E5X_REGISTERS
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+    return (index == 0) ? ADC0_OTHER_IRQn : ADC0_RESRDY_IRQn;
+#elif defined(ADC_HAS_D5X_E5X_REGISTERS)
     return (index == 0) ? ADC0_0_IRQn : ADC0_1_IRQn;
 #else
     (void)index;
@@ -304,11 +530,11 @@ bool AdcEngine::begin() {
     dma_.setTrigger(adcDmacResrdyTrigger());
     dma_.setAction(DMA_TRIGGER_ACTON_BEAT);
     dma_.setCallback(AdcEngine::dmaDoneCallback, DMA_CALLBACK_TRANSFER_DONE);
-    Adc *const adc = adcInstance();
+    auto *const adc = adcInstance();
 
     dmaDescriptor_ =
-        dma_.addDescriptor((void *)&adc->RESULT.reg, (void *)&dmaLatestResult_,
-                           1, DMA_BEAT_SIZE_HWORD, false, false);
+        dma_.addDescriptor(adcResultRegister(adc), (void *)&dmaLatestResult_, 1,
+                           DMA_BEAT_SIZE_HWORD, false, false);
     if (dmaDescriptor_ == nullptr) {
         dma_.free();
         PendSV::instance().clearService(kAdcPendSvServiceId);
@@ -323,8 +549,12 @@ bool AdcEngine::begin() {
         NVIC_EnableIRQ(irq);
     }
 
-    adc->INTENCLR.reg = 0x0F;
-    adc->INTFLAG.reg = ADC_INTFLAG_RESRDY | ADC_INTFLAG_WINMON;
+    adcDisableInterrupts(adc, 0x0F);
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+    adcClearFlags(adc, ADC_INTFLAG_RESRDY_Msk | ADC_INTFLAG_WINMON_Msk);
+#else
+    adcClearFlags(adc, ADC_INTFLAG_RESRDY | ADC_INTFLAG_WINMON);
+#endif // ADC_HAS_SAME53_E54_REGISTERS
     initialized_ = true;
     return true;
 }
@@ -338,9 +568,9 @@ void AdcEngine::end() {
         NVIC_DisableIRQ(irq);
         NVIC_ClearPendingIRQ(irq);
     }
-    Adc *const adc = adcInstance();
+    auto *const adc = adcInstance();
 
-    adc->INTENCLR.bit.RESRDY = 1;
+    adcDisableResultReady(adc);
 
     if (dmaActive_)
         dma_.abort();
@@ -348,8 +578,8 @@ void AdcEngine::end() {
     dma_.free();
     dmaDescriptor_ = nullptr;
 
-    adc->CTRLA.bit.SWRST = 1;
-    while (adc->CTRLA.bit.SWRST)
+    adcSoftwareReset(adc);
+    while (adcSoftwareResetBusy(adc))
       ;
     waitAdcSync();
 
@@ -468,31 +698,35 @@ uint32_t AdcEngine::enabledMask() const {
 }
 
 void AdcEngine::onResrdyIsr() {
-  Adc *const adc = adcInstance();
-  const uint8_t flags = static_cast<uint8_t>(adc->INTFLAG.reg & 0x0F);
+  auto *const adc = adcInstance();
+  const uint8_t flags = adcReadFlags(adc);
 
-  if ((flags & ADC_INTFLAG_WINMON) != 0u) {
+  if (adcFlagWinmon(flags)) {
     ChannelADC *channel = activeChannel_;
     if (channel != nullptr && channel->windowEnabled_ &&
         channel->onWindowMonitor_ != nullptr) {
-      const uint16_t result = adc->RESULT.reg;
+      const uint16_t result = adcReadResult(adc);
       channel->onWindowMonitor_(channel, result, channel->windowUserData_);
     }
   }
 
-    if ((flags & ADC_INTFLAG_RESRDY) != 0u) {
+    if (adcFlagResrdy(flags)) {
       if (conversionState_ == ConversionState::Discarding) {
-        (void)adc->RESULT.reg;
-        adc->INTENCLR.bit.RESRDY = 1;
+        (void)adcReadResult(adc);
+        adcDisableResultReady(adc);
         pendingStartConversion_ = true;
         pendSvPending_ = true;
         PendSV::instance().setPending(kAdcPendSvServiceId);
       } else {
-        adc->INTFLAG.reg = ADC_INTFLAG_RESRDY;
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+        adcClearFlags(adc, ADC_INTFLAG_RESRDY_Msk);
+#else
+        adcClearFlags(adc, ADC_INTFLAG_RESRDY);
+#endif // ADC_HAS_SAME53_E54_REGISTERS
       }
     }
 
-    adc->INTFLAG.reg = 0x0F;
+    adcClearFlags(adc, 0x0F);
 }
 
 void AdcEngine::onPendSv() {
@@ -562,13 +796,13 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     if (channel == nullptr)
         return false;
 
-    Adc *const adc = adcInstance();
+    auto *const adc = adcInstance();
 
-    adc->CTRLA.bit.ENABLE = 0;
+    adcSetEnable(adc, false);
     waitAdcSync();
 
     const uint8_t refctrlReg = static_cast<uint8_t>(ADC_REFCTRL_REFSEL(channel->refSel_));
-    adc->REFCTRL.reg = refctrlReg;
+    adcWriteRefctrl(adc, refctrlReg);
 
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
     configureInternalReference(channel->refSel_);
@@ -577,52 +811,52 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     const uint16_t inputCtrlReg = static_cast<uint16_t>(
         ADC_INPUTCTRL_MUXPOS(channel->muxPos_) | ADC_INPUTCTRL_MUXNEG(channel->muxNeg_) |
         (channel->differentialMode_ ? ADC_INPUTCTRL_DIFFMODE : 0u));
-    adc->INPUTCTRL.reg = inputCtrlReg;
+    adcWriteInputctrl(adc, inputCtrlReg);
 
     const uint8_t avgCtrlReg =
         static_cast<uint8_t>(ADC_AVGCTRL_SAMPLENUM(sampleNumToCode(channel->sampleNum_)) |
                              ADC_AVGCTRL_ADJRES(channel->adjres_));
-    adc->AVGCTRL.reg = avgCtrlReg;
-    adc->SAMPCTRL.reg = sampleTimeForMux(channel->muxPos_);
+    adcWriteAvgctrl(adc, avgCtrlReg);
+    adcWriteSampctrl(adc, sampleTimeForMux(channel->muxPos_));
 
-    uint16_t ctrlaReg = adc->CTRLA.reg;
+    uint16_t ctrlaReg = adcReadCtrla(adc);
     ctrlaReg =
         static_cast<uint16_t>((ctrlaReg & ~ADC_CTRLA_PRESCALER_Msk) |
                               ADC_CTRLA_PRESCALER(static_cast<uint8_t>(channel->prescaler_)));
-    adc->CTRLA.reg = ctrlaReg;
+    adcWriteCtrla(adc, ctrlaReg);
 
     const uint16_t ctrlbReg = static_cast<uint16_t>(
-        (channel->leftAdjust_ ? ADC_CTRLB_LEFTADJ : 0u) |
-        (channel->freeRun_ ? ADC_CTRLB_FREERUN : 0u) |
-        (channel->corrEnabled_ ? ADC_CTRLB_CORREN : 0u) |
+        (channel->leftAdjust_ ? ADC_CTRLB_LEFTADJ_Msk : 0u) |
+        (channel->freeRun_ ? ADC_CTRLB_FREERUN_Msk : 0u) |
+        (channel->corrEnabled_ ? ADC_CTRLB_CORREN_Msk : 0u) |
         ADC_CTRLB_RESSEL(static_cast<uint8_t>(channel->ressel_)) |
         ADC_CTRLB_WINMODE(channel->windowEnabled_
                               ? static_cast<uint8_t>(channel->winMode_)
                               : static_cast<uint8_t>(AdcWinMode::ADC_WINMODE_DISABLE)));
-    adc->CTRLB.reg = ctrlbReg;
+    adcWriteCtrlb(adc, ctrlbReg);
 
     const uint8_t evctrlReg =
-        static_cast<uint8_t>((channel->evWinmonEo_ ? ADC_EVCTRL_WINMONEO : 0u) |
-                             (channel->evResrdyEo_ ? ADC_EVCTRL_RESRDYEO : 0u) |
+        static_cast<uint8_t>((channel->evWinmonEo_ ? ADC_EVCTRL_WINMONEO_Msk : 0u) |
+                             (channel->evResrdyEo_ ? ADC_EVCTRL_RESRDYEO_Msk : 0u) |
                              (channel->evSyncei_ ? kAdcEvctrlSynceiBit : 0u) |
-                             (channel->evStartei_ ? ADC_EVCTRL_STARTEI : 0u));
-    adc->EVCTRL.reg = evctrlReg;
+                             (channel->evStartei_ ? ADC_EVCTRL_STARTEI_Msk : 0u));
+    adcWriteEvctrl(adc, evctrlReg);
 
-    adc->WINLT.reg = channel->windowLower_;
-    adc->WINUT.reg = channel->windowUpper_;
+    adcWriteWinlt(adc, channel->windowLower_);
+    adcWriteWinut(adc, channel->windowUpper_);
 
-    adc->OFFSETCORR.reg = static_cast<uint16_t>(channel->offsetCorr_);
-    adc->GAINCORR.reg = channel->gainCorr_;
+    adcWriteOffsetcorr(adc, static_cast<uint16_t>(channel->offsetCorr_));
+    adcWriteGaincorr(adc, channel->gainCorr_);
 #else
     const uint32_t inputCtrlReg = static_cast<uint32_t>(
         ADC_INPUTCTRL_MUXPOS(channel->muxPos_) | ADC_INPUTCTRL_MUXNEG(channel->muxNeg_) |
         ADC_INPUTCTRL_GAIN(static_cast<uint8_t>(channel->gain_)));
-    adc->INPUTCTRL.reg = inputCtrlReg;
+    adcWriteInputctrl(adc, inputCtrlReg);
 
     const uint8_t avgCtrlReg =
         static_cast<uint8_t>(ADC_AVGCTRL_SAMPLENUM(sampleNumToCode(channel->sampleNum_)) |
                              ADC_AVGCTRL_ADJRES(channel->adjres_));
-    adc->AVGCTRL.reg = avgCtrlReg;
+    adcWriteAvgctrl(adc, avgCtrlReg);
 
     const uint16_t ctrlbReg =
         static_cast<uint16_t>((channel->differentialMode_ ? ADC_CTRLB_DIFFMODE : 0u) |
@@ -631,40 +865,46 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
                               (channel->corrEnabled_ ? ADC_CTRLB_CORREN : 0u) |
                               ADC_CTRLB_RESSEL(static_cast<uint8_t>(channel->ressel_)) |
                               ADC_CTRLB_PRESCALER(static_cast<uint8_t>(channel->prescaler_)));
-    adc->CTRLB.reg = ctrlbReg;
+    adcWriteCtrlb(adc, ctrlbReg);
 
     const uint8_t evctrlReg =
         static_cast<uint8_t>((channel->evWinmonEo_ ? ADC_EVCTRL_WINMONEO : 0u) |
                              (channel->evResrdyEo_ ? ADC_EVCTRL_RESRDYEO : 0u) |
                              (channel->evSyncei_ ? kAdcEvctrlSynceiBit : 0u) |
                              (channel->evStartei_ ? ADC_EVCTRL_STARTEI : 0u));
-    adc->EVCTRL.reg = evctrlReg;
+    adcWriteEvctrl(adc, evctrlReg);
 
-    adc->WINLT.reg = channel->windowLower_;
-    adc->WINUT.reg = channel->windowUpper_;
+    adcWriteWinlt(adc, channel->windowLower_);
+    adcWriteWinut(adc, channel->windowUpper_);
 
     const uint8_t winctrlReg = static_cast<uint8_t>(
         ADC_WINCTRL_WINMODE(channel->windowEnabled_ ? static_cast<uint8_t>(channel->winMode_) : 0));
     adc->WINCTRL.reg = winctrlReg;
 
-    adc->OFFSETCORR.reg = static_cast<uint16_t>(channel->offsetCorr_);
-    adc->GAINCORR.reg = channel->gainCorr_;
+    adcWriteOffsetcorr(adc, static_cast<uint16_t>(channel->offsetCorr_));
+    adcWriteGaincorr(adc, channel->gainCorr_);
 #endif
 
     waitAdcSync();
 
-    adc->CTRLA.bit.ENABLE = 1;
+    adcSetEnable(adc, true);
     waitAdcSync();
 
-    adc->INTENCLR.reg = 0x0F;
-    adc->INTFLAG.reg = 0x0F;
+    adcDisableInterrupts(adc, 0x0F);
+    adcClearFlags(adc, 0x0F);
 
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+    const uint8_t intensetReg =
+        static_cast<uint8_t>(ADC_INTENSET_RESRDY_Msk |
+                             ((monitorMode && channel->windowEnabled_) ? ADC_INTENSET_WINMON_Msk : 0u));
+#else
     const uint8_t intensetReg =
         static_cast<uint8_t>(ADC_INTENSET_RESRDY |
                              ((monitorMode && channel->windowEnabled_) ? ADC_INTENSET_WINMON : 0u));
-    adc->INTENSET.reg = intensetReg;
+#endif // ADC_HAS_SAME53_E54_REGISTERS
+    adcEnableInterrupts(adc, intensetReg);
 
-    adc->INTFLAG.reg = 0x0F;
+    adcClearFlags(adc, 0x0F);
 
     activeChannel_ = channel;
     activeMonitorMode_ = monitorMode;
@@ -679,14 +919,14 @@ bool AdcEngine::startActiveDmaConversion() {
     if (channel == nullptr)
         return false;
 
-    Adc *const adc = adcInstance();
-    adc->INTENCLR.bit.RESRDY = 1;
-    adc->INTFLAG.reg = 0x0F;
+    auto *const adc = adcInstance();
+    adcDisableResultReady(adc);
+    adcClearFlags(adc, 0x0F);
 
     if (dmaDescriptor_ == nullptr)
         return false;
 
-    dma_.changeDescriptor(dmaDescriptor_, (void *)&adc->RESULT.reg,
+    dma_.changeDescriptor(dmaDescriptor_, adcResultRegister(adc),
                           (void *)&dmaLatestResult_, 1);
     if (dma_.startJob() != DMA_STATUS_OK)
         return false;
@@ -716,9 +956,15 @@ bool AdcEngine::startMonitorIfIdle() {
 }
 
 void AdcEngine::waitAdcSync() const {
-  Adc *const adc = adcInstance();
+  auto *const adc = adcInstance();
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
-    while (adc->SYNCBUSY.reg)
+    while (
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+        adc->ADC_SYNCBUSY
+#else
+        adc->SYNCBUSY.reg
+#endif // ADC_HAS_SAME53_E54_REGISTERS
+    )
       ;
 #else
     while (adc->STATUS.bit.SYNCBUSY)
@@ -967,7 +1213,15 @@ void ChannelADC::end() {
     AdcEngine::instance().unregisterChannel(this);
 }
 
-#ifdef ADC_HAS_D5X_E5X_REGISTERS
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+extern "C" void ADC0_OTHER_Handler(void) {
+    AdcEngine::instance().onResrdyIsr();
+}
+
+extern "C" void ADC0_RESRDY_Handler(void) {
+    AdcEngine::instance().onResrdyIsr();
+}
+#elif defined(ADC_HAS_D5X_E5X_REGISTERS)
 extern "C" void ADC0_0_Handler(void) {
     AdcEngine::instance().onResrdyIsr();
 }
@@ -979,4 +1233,4 @@ extern "C" void ADC0_1_Handler(void) {
 extern "C" void ADC_Handler(void) {
     AdcEngine::instance().onResrdyIsr();
 }
-#endif
+#endif // ADC_HAS_SAME53_E54_REGISTERS / ADC_HAS_D5X_E5X_REGISTERS

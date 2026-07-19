@@ -9,6 +9,10 @@
 #define ADC_HAS_D5X_E5X_REGISTERS
 #endif
 
+#if defined(__SAME53__) || defined(__SAME54__) || defined(ARDUINO_SAME53_E54)
+#define ADC_HAS_SAME53_E54_REGISTERS
+#endif
+
 static constexpr uint8_t ADC_MUX_SOURCE_INVALID = 0xFF;
 
 void analogReadCorrection(int offset, uint16_t gain);
@@ -224,11 +228,13 @@ class AdcEngine {
     bool startActiveDmaConversion();
     void waitAdcSync() const;
     inline void startConversion() const {
-#ifdef ADC_HAS_D5X_E5X_REGISTERS
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+        ADC0_REGS->ADC_SWTRIG = ADC_SWTRIG_START_Msk;
+#elif defined(ADC_HAS_D5X_E5X_REGISTERS)
         ADC0->SWTRIG.bit.START = 1;
 #else
         ADC->SWTRIG.bit.START = 1;
-#endif
+#endif // ADC_HAS_SAME53_E54_REGISTERS / ADC_HAS_D5X_E5X_REGISTERS
     }
     static void dmaDoneCallback(Adafruit_ZeroDMA *dma);
 
