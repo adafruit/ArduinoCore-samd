@@ -63,8 +63,7 @@ extern "C"
 #define NUM_ANALOG_OUTPUTS   (2)
 #define analogInputToDigitalPin(p) ((p < 8) ? 67 + (p) : (p < 16) ? 54 + (p) - 8 : (p < 18) ? 12 + (p) - 16 : (p == 18) ? 9 : -1)
 
-#ifdef ARDUINO_SAME53_E54
-#ifdef ARDUINO_SAME53_E54
+#if defined(__SAME53__) || defined(__SAME54__)
 #define digitalPinToPort(P)        ( &(PORT_REGS->GROUP[g_APinDescription[P].ulPort]) )
 #define digitalPinToBitMask(P)     ( 1 << g_APinDescription[P].ulPin )
 // #define analogInPinToBit(P)        ( )
@@ -78,7 +77,7 @@ extern "C"
 #define portOutputRegister(port)   ( &((port)->OUT.reg) )
 #define portInputRegister(port)    ( &((port)->IN.reg) )
 #define portModeRegister(port)     ( &((port)->DIR.reg) )
-#endif // ARDUINO_SAME53_E54
+#endif // __SAME53__ / __SAME54__
 #define digitalPinHasPWM(P)        ( g_APinDescription[P].ulPWMChannel != NOT_ON_PWM || g_APinDescription[P].ulTCChannel != NOT_ON_TIMER )
 
 /*
