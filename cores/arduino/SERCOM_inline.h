@@ -374,10 +374,18 @@ inline void SERCOM::dmaTxCallbackWIRE(Adafruit_ZeroDMA* dma)
 
 	inst->_wire.txnIndex = inst->_wire.txnLength;
 	inst->_dmaTxActive = false;
-	if (inst->isSlaveWIRE())
+	if (inst->isSlaveWIRE()) {
+		// DMA has written the final DATA byte, but the master's ACK/NACK is
+		// reported at the following DRDY boundary. Restore that one interrupt
+		// so onService() can release the slave transaction physically.
+#if defined(__SAME53__) || defined(__SAME54__)
+		inst->enableInterrupts(SERCOM_I2CS_INTENSET_DRDY_Msk);
+#else
+		inst->enableInterrupts(SERCOM_I2CS_INTENSET_DRDY);
+#endif
+	} else {
 		inst->deferStopWIRE(SercomWireError::SUCCESS);
-	else
-		inst->deferStopWIRE(SercomWireError::SUCCESS);
+	}
 }
 
 inline void SERCOM::dmaRxCallbackWIRE(Adafruit_ZeroDMA* dma)
