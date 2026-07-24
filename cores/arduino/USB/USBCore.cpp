@@ -247,7 +247,7 @@ bool USBDeviceClass::sendDescriptor(USBSetup &setup)
 		}
 		else if (setup.wValueL == ISERIAL) {
 #ifdef PLUGGABLE_USB_ENABLED
-	#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+	#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 			#define SERIAL_NUMBER_WORD_0	*(volatile uint32_t*)(0x008061FC)
 			#define SERIAL_NUMBER_WORD_1	*(volatile uint32_t*)(0x00806010)
 			#define SERIAL_NUMBER_WORD_2	*(volatile uint32_t*)(0x00806014)
@@ -334,7 +334,7 @@ void USBDeviceClass::init()
 #endif
 
 	/* Enable USB clock */
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	MCLK->APBBMASK.reg |= MCLK_APBBMASK_USB;
 	MCLK->AHBMASK.reg |= MCLK_AHBMASK_USB;
 	
@@ -348,7 +348,7 @@ void USBDeviceClass::init()
 	
 	
 	GCLK->PCHCTRL[USB_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
 	MCLK_REGS->MCLK_APBBMASK |= MCLK_APBBMASK_USB_Msk;
 	MCLK_REGS->MCLK_AHBMASK |= MCLK_AHBMASK_USB_Msk;
 
@@ -395,7 +395,7 @@ void USBDeviceClass::init()
 	usbd.setFullSpeed();
 
 	// Configure interrupts
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	/* Attach to the USB host */
 	NVIC_SetPriority(USB_0_IRQn, 0UL);
 	NVIC_SetPriority(USB_1_IRQn, 0UL);
@@ -405,7 +405,7 @@ void USBDeviceClass::init()
 	NVIC_EnableIRQ(USB_1_IRQn);
 	NVIC_EnableIRQ(USB_2_IRQn);
 	NVIC_EnableIRQ(USB_3_IRQn);
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
 	NVIC_SetPriority(USB_OTHER_IRQn, 0UL);
 	NVIC_SetPriority(USB_SOF_HSOF_IRQn, 0UL);
 	NVIC_SetPriority(USB_TRCPT0_IRQn, 0UL);

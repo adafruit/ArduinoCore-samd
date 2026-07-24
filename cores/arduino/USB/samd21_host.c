@@ -17,7 +17,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "../sam.h"
+#include <sam.h>
 
 #ifndef USE_TINYUSB
 
@@ -41,15 +41,15 @@
 // Handle UOTGHS Host driver state
 static uhd_vbus_state_t uhd_state = UHD_STATE_NO_VBUS;
 
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 __attribute__((__aligned__(4))) volatile usb_descriptor_host_registers_t usb_pipe_table[USB_EPT_NUM];
-#else
+#else // __SAME53__ / __SAME54__
 __attribute__((__aligned__(4))) volatile UsbHostDescriptor usb_pipe_table[USB_EPT_NUM];
-#endif
+#endif // __SAME53__ / __SAME54__
 
 extern void (*gpf_isr)(void);
 
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 
 void UHD_Init(void)
 {
@@ -231,7 +231,7 @@ uint32_t UHD_Pipe_Is_Transfer_Complete(uint32_t ul_pipe, uint32_t ul_token_type)
 	return 1;
 }
 
-#else
+#else // __SAME53__ / __SAME54__
 
 
 // NVM Software Calibration Area Mapping
@@ -257,11 +257,11 @@ void UHD_Init(void)
 	USB_SetHandler(&UHD_Handler);
 
 	/* Enable USB clock */
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	MCLK->APBBMASK.reg |= MCLK_APBBMASK_USB;
 #else
 	PM->APBBMASK.reg |= PM_APBBMASK_USB;
-#endif
+#endif // __SAMD51__ / __SAME51__
 
 	/* Set up the USB DP/DM pins */
 	pinPeripheral( PIN_USB_DM, PIO_COM );
@@ -278,7 +278,7 @@ void UHD_Init(void)
 	* Put Generic Clock Generator 0 as source for Generic Clock Multiplexer 6 (USB reference)
 	*/
 	
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	GCLK->PCHCTRL[USB_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
 #else
 	GCLK->CLKCTRL.reg = GCLK_CLKCTRL_ID(6) |        // Generic Clock Multiplexer 6
@@ -289,7 +289,7 @@ void UHD_Init(void)
 	{
 		/* Wait for synchronization */
 	}
-#endif
+#endif // __SAMD51__ / __SAME51__
 
 	/* Reset */
 	USB->HOST.CTRLA.bit.SWRST = 1;
@@ -305,11 +305,11 @@ void UHD_Init(void)
 
 
 	/* Load Pad Calibration */
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	pad_transn = (*((uint32_t *)(NVMCTRL_SW0)       // Non-Volatile Memory Controller
 #else
 	pad_transn = (*((uint32_t *)(NVMCTRL_OTP4)       // Non-Volatile Memory Controller
-#endif
+#endif // __SAMD51__ / __SAME51__
 
 					+ (NVM_USB_PAD_TRANSN_POS / 32))
 					>> (NVM_USB_PAD_TRANSN_POS % 32))
@@ -322,11 +322,11 @@ void UHD_Init(void)
 
 	USB->HOST.PADCAL.bit.TRANSN = pad_transn;
 
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	pad_transp = (*((uint32_t *)(NVMCTRL_SW0)
 #else
 	pad_transp = (*((uint32_t *)(NVMCTRL_OTP4)
-#endif
+#endif // __SAMD51__ / __SAME51__
 					+ (NVM_USB_PAD_TRANSP_POS / 32))
 					>> (NVM_USB_PAD_TRANSP_POS % 32))
 				& ((1 << NVM_USB_PAD_TRANSP_SIZE) - 1);
@@ -338,11 +338,11 @@ void UHD_Init(void)
 
 	USB->HOST.PADCAL.bit.TRANSP = pad_transp;
 
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	pad_trim = (*((uint32_t *)(NVMCTRL_SW0)
 #else
 	pad_trim = (*((uint32_t *)(NVMCTRL_OTP4)
-#endif
+#endif // __SAMD51__ / __SAME51__
 					+ (NVM_USB_PAD_TRIM_POS / 32))
 				>> (NVM_USB_PAD_TRIM_POS % 32))
 				& ((1 << NVM_USB_PAD_TRIM_SIZE) - 1);
@@ -378,7 +378,7 @@ void UHD_Init(void)
 	USB->HOST.CTRLB.bit.VBUSOK = 1;
 
 	// Configure interrupts
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	NVIC_SetPriority((IRQn_Type)USB_0_IRQn, 0UL);
 	NVIC_SetPriority((IRQn_Type)USB_1_IRQn, 0UL);
 	NVIC_SetPriority((IRQn_Type)USB_2_IRQn, 0UL);
@@ -391,7 +391,7 @@ void UHD_Init(void)
 #else
 	NVIC_SetPriority((IRQn_Type)USB_IRQn, 0UL);
 	NVIC_EnableIRQ((IRQn_Type)USB_IRQn);
-#endif
+#endif // __SAMD51__ / __SAME51__
 }
 
 
@@ -734,7 +734,7 @@ uint32_t UHD_Pipe_Is_Transfer_Complete(uint32_t ul_pipe, uint32_t ul_token_type)
    return 0;
 }
 
-#endif
+#endif // __SAME53__ / __SAME54__
 
 
 

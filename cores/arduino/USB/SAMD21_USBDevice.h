@@ -29,7 +29,7 @@ typedef uint8_t ep_t;
 
 class USBDevice_SAMD21G18x {
 public:
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 	USBDevice_SAMD21G18x() : usb(USB_REGS->DEVICE) {
 		// Empty
 	}
@@ -100,13 +100,13 @@ public:
 	// Enable
 	inline void enable() {
 		usb.CTRLA.bit.ENABLE = 1;
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 		while (usb.SYNCBUSY.reg & USB_SYNCBUSY_ENABLE); // Wait for sync
 #endif
 	}
 	inline void disable() {
 		usb.CTRLA.bit.ENABLE = 0;
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 		while (usb.SYNCBUSY.reg & USB_SYNCBUSY_ENABLE); // Wait for sync
 #endif
 	}
@@ -154,7 +154,7 @@ public:
 	// USB Device Endpoints function mapping
 	// -------------------------------------
 
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 	// Config
 	inline void epBank0SetType(ep_t ep, uint8_t type) {
 		usb.DEVICE_ENDPOINT[ep].USB_EPCFG =
@@ -301,7 +301,7 @@ public:
 	inline void epBank1EnableAutoZLP(ep_t ep)  { EP[ep].DeviceDescBank[1].PCKSIZE.bit.AUTO_ZLP = 1; }
 #endif
 private:
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 	inline void setSpeedConfiguration(uint8_t speed) {
 		usb.USB_CTRLB = (usb.USB_CTRLB & ~USB_DEVICE_CTRLB_SPDCONF_Msk) |
 		                  USB_DEVICE_CTRLB_SPDCONF(speed);

@@ -23,7 +23,7 @@
 extern "C" {
 #endif
 
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 extern __attribute__((__aligned__(4))) volatile usb_descriptor_host_registers_t usb_pipe_table[USB_EPT_NUM];
 #else
 extern __attribute__((__aligned__(4))) volatile UsbHostDescriptor usb_pipe_table[USB_EPT_NUM];
@@ -45,7 +45,7 @@ extern __attribute__((__aligned__(4))) volatile UsbHostDescriptor usb_pipe_table
 #define USB_HOST_PCFG_PTOKEN_IN     USB_HOST_PCFG_PTOKEN(0x1)
 #define USB_HOST_PCFG_PTOKEN_OUT    USB_HOST_PCFG_PTOKEN(0x2)
 
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 #define USB_ERRORFLOW         USB_HOST_STATUS_BK_ERRORFLOW_Msk
 #define USB_ERRORTIMEOUT      USB_HOST_STATUS_PIPE_TOUTER_Msk
 #define USB_ERROR_DATATOGGLE  USB_HOST_STATUS_PIPE_DTGLER_Msk
@@ -65,7 +65,7 @@ extern __attribute__((__aligned__(4))) volatile UsbHostDescriptor usb_pipe_table
 #define USB_PCKSIZE_SIZE_1023_BYTES_FS  7   
 #define USB_PCKSIZE_SIZE_1024_BYTES_HS  7  
 
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 // SAME53/E54 host operations use the native register structures directly in samd21_host.c.
 #else
 #define USB_HOST_DTGL(p)               (USB->HOST.HostPipe[p].PSTATUS.reg & USB_HOST_PSTATUS_DTGL)>>USB_HOST_PSTATUS_DTGL_Pos

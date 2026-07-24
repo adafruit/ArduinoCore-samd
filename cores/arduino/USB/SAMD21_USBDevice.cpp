@@ -10,7 +10,7 @@
 #include "SAMD21_USBDevice.h"
 
 void USBDevice_SAMD21G18x::reset() {
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
     usb.USB_CTRLA |= USB_CTRLA_SWRST_Msk;
     memset(EP, 0, sizeof(EP));
     while (usb.USB_SYNCBUSY & (USB_SYNCBUSY_SWRST_Msk | USB_SYNCBUSY_ENABLE_Msk)) {}
@@ -25,7 +25,7 @@ void USBDevice_SAMD21G18x::reset() {
 
 void USBDevice_SAMD21G18x::calibrate() {
     // Load Pad Calibration data from non-volatile memory
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
     const uint32_t calibration = *(const uint32_t *)(SW0_ADDR + 4u);
     uint32_t pad_transn = (calibration & FUSES_SW0_WORD_1_USB_TRANSN_Msk) >>
                           FUSES_SW0_WORD_1_USB_TRANSN_Pos;
@@ -50,7 +50,7 @@ void USBDevice_SAMD21G18x::calibrate() {
     if (pad_trim == 0x7)     // maximum value (7)
         pad_trim = 3;
 
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
     usb.USB_PADCAL = USB_PADCAL_TRANSN(pad_transn) |
                      USB_PADCAL_TRANSP(pad_transp) |
                      USB_PADCAL_TRIM(pad_trim);
