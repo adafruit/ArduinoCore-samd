@@ -17,7 +17,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "sam.h"
+#include <sam.h>
 #include "variant.h"
 
 #include <stdio.h>
@@ -27,7 +27,7 @@ extern uint32_t SystemCoreClock;
 // Constants for Clock generators
 #define GENERIC_CLOCK_GENERATOR_MAIN      (0u)
 
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 #define GENERIC_CLOCK_GENERATOR_XOSC32K   (3u)
 #define GENERIC_CLOCK_GENERATOR_48M		  (1u)
 #define GENERIC_CLOCK_GENERATOR_48M_SYNC	GCLK_SYNCBUSY_GENCTRL1
@@ -42,7 +42,7 @@ extern uint32_t SystemCoreClock;
 #define GENERIC_CLOCK_GENERATOR_1M		  (5u)
 //#define CRYSTALLESS
 
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
 #define GENERIC_CLOCK_GENERATOR_XOSC32K   (3u)
 #define GENERIC_CLOCK_GENERATOR_48M       (1u)
 #define GENERIC_CLOCK_GENERATOR_48M_SYNC  GCLK_SYNCBUSY_GENCTRL_Msk
@@ -67,7 +67,7 @@ void SystemInit( void )
 {
 
 //***************** SAMD51 ************************//
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
   NVMCTRL->CTRLA.reg |= NVMCTRL_CTRLA_RWS(0);
   
   #ifndef CRYSTALLESS
@@ -339,7 +339,7 @@ void SystemInit( void )
 
 //*************** END SAMD51 *************************//
 
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
   NVMCTRL_REGS->NVMCTRL_CTRLA |= NVMCTRL_CTRLA_RWS(0);
 
 #ifndef CRYSTALLESS
