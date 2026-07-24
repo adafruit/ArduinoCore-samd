@@ -24,7 +24,7 @@ extern "C" {
 #endif
 
 
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 uint32_t SystemCoreClock=F_CPU;
 #else
 /*
@@ -77,7 +77,7 @@ void init( void )
 //  // Clock EIC for I/O interrupts
 //  PM->APBAMASK.reg |= PM_APBAMASK_EIC ;
 
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
   MCLK->APBAMASK.reg |= MCLK_APBAMASK_SERCOM0 | MCLK_APBAMASK_SERCOM1 | MCLK_APBAMASK_TC0 | MCLK_APBAMASK_TC1;
   
   MCLK->APBBMASK.reg |= MCLK_APBBMASK_SERCOM2 | MCLK_APBBMASK_SERCOM3 | MCLK_APBBMASK_TCC0 | MCLK_APBBMASK_TCC1 | MCLK_APBBMASK_TC3 | MCLK_APBBMASK_TC2;
@@ -87,7 +87,7 @@ void init( void )
   MCLK->APBDMASK.reg |= MCLK_APBDMASK_DAC | MCLK_APBDMASK_SERCOM4 | MCLK_APBDMASK_SERCOM5 | MCLK_APBDMASK_ADC0 | MCLK_APBDMASK_ADC1 | MCLK_APBDMASK_TCC4
 		  | MCLK_APBDMASK_TC6 | MCLK_APBDMASK_TC7 | MCLK_APBDMASK_SERCOM6 | MCLK_APBDMASK_SERCOM7;
 
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
   MCLK_REGS->MCLK_APBAMASK |= MCLK_APBAMASK_SERCOM0_Msk | MCLK_APBAMASK_SERCOM1_Msk |
                               MCLK_APBAMASK_TC0_Msk | MCLK_APBAMASK_TC1_Msk;
   MCLK_REGS->MCLK_APBBMASK |= MCLK_APBBMASK_SERCOM2_Msk | MCLK_APBBMASK_SERCOM3_Msk |
@@ -128,7 +128,7 @@ void init( void )
 
   // Initialize Analog Controller
   // Setting clock
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
   //set to 1/(1/(48000000/32) * 6) = 250000 SPS
 	GCLK->PCHCTRL[ADC0_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos); //use clock generator 1 (48Mhz)
 	GCLK->PCHCTRL[ADC1_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos); //use clock generator 1 (48Mhz)
@@ -170,7 +170,7 @@ void init( void )
 	DAC->DACCTRL[0].bit.REFRESH = 2;
 	DAC->DACCTRL[1].bit.REFRESH = 2;
 
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
   GCLK_REGS->GCLK_PCHCTRL[ADC0_GCLK_ID] = GCLK_PCHCTRL_GEN_GCLK1 |
                                                  GCLK_PCHCTRL_CHEN_Msk;
   GCLK_REGS->GCLK_PCHCTRL[ADC1_GCLK_ID] = GCLK_PCHCTRL_GEN_GCLK1 |
@@ -251,7 +251,7 @@ void init( void )
  #endif
 
 
-#endif //SAMD51
+#endif // __SAMD51__ / __SAME51__ / __SAME53__ / __SAME54__ / SAMD21
 }
 
 #ifdef __cplusplus

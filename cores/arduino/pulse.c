@@ -34,14 +34,14 @@ uint32_t pulseIn(uint32_t pin, uint32_t state, uint32_t timeout)
   uint32_t bit = 1 << p.ulPin;
   uint32_t stateMask = state ? bit : 0;
 
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   /*
    * The SAMD51 is fast enough to use really obvious code (similar to
    * what was used to produce pulse_asm.S, but using micros() for timing.
    * No assembly required, no conversion of loop counts to times (which is
    * worrisome in the presence of cache.)
    */
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
   const volatile uint32_t *port = &PORT_REGS->GROUP[p.ulPort].PORT_IN;
 #else
   const volatile uint32_t *port = &PORT->Group[p.ulPort].IN.reg;
