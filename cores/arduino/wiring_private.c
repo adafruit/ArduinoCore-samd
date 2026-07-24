@@ -68,7 +68,7 @@ int pinPeripheral( uint32_t ulPin, EPioType ulPeripheral )
     case PIO_TIMER:
     case PIO_TIMER_ALT:
     case PIO_EXTINT:
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     case PIO_TCC_PDEC:
     case PIO_COM:
     case PIO_SDHC:
@@ -99,7 +99,7 @@ int pinPeripheral( uint32_t ulPin, EPioType ulPeripheral )
                                                                     PORT_WRCONFIG_PINMASK( g_APinDescription[ulPin].ulPin - 16 ) ;
       }
 #else
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
       port_group_registers_t *group = &PORT_REGS->GROUP[g_APinDescription[ulPin].ulPort];
       uint32_t pin = g_APinDescription[ulPin].ulPin;
       uint32_t pmux = group->PORT_PMUX[pin >> 1];
@@ -110,7 +110,7 @@ int pinPeripheral( uint32_t ulPin, EPioType ulPeripheral )
         pmux = (pmux & PORT_PMUX_PMUXO_Msk) | PORT_PMUX_PMUXE(ulPeripheral);
       }
       group->PORT_PMUX[pin >> 1] = pmux;
-      group->PORT_PINCFG[pin] |= PORT_PINCFG_PMUXEN_Msk | PORT_PINCFG_DRVSTR_Msk;
+      group->PORT_PINCFG[pin] |= PORT_PINCFG_PMUXEN_Msk | PORT_PINCFG_INEN_Msk | PORT_PINCFG_DRVSTR_Msk;
 #else
       if ( g_APinDescription[ulPin].ulPin & 1 ) // is pin odd?
       {

@@ -22,7 +22,7 @@
  extern "C" {
 #endif
 
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 void pinMode(uint32_t ulPin, uint32_t ulMode)
 {
   if (g_APinDescription[ulPin].ulPinType == PIO_NOT_A_PIN) return;

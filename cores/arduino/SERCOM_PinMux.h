@@ -12,7 +12,7 @@
  *       - libraries/Wire/Wire.cpp
  */
 
-#include "sam.h"
+#include <sam.h>
 #include <stdint.h>
 
 /** @brief Shared helpers for validating SERCOM pin routing. */

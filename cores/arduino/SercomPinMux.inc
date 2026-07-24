@@ -57,21 +57,21 @@
 #define SAME54_120_SERIES (defined(__ATSAME54P19A__) || defined(__ATSAME54P20A__) || defined(__SAME54P19A__) || defined(__SAME54P20A__))
 #endif // SAME54_120_SERIES
 
-#if !defined(ARDUINO_SAMD51_E51) && !defined(ARDUINO_SAME53_E54)
+#if !defined(__SAMD51__) && !defined(__SAME51__) && !defined(__SAME53__) && !defined(__SAME54__)
 #if !(SAMD21E_SERIES || SAMD21G_SERIES || SAMD21J_SERIES || SAMDA1_SERIES)
 #define SAMD21E_SERIES 1
 #endif // !(SAMD21E_SERIES || SAMD21G_SERIES || SAMD21J_SERIES || SAMDA1_SERIES)
-#endif // !ARDUINO_SAMD51_E51 && !ARDUINO_SAME53_E54
-#if defined(ARDUINO_SAMD51_E51)
+#endif // !__SAMD51__ / __SAME51__ && !__SAME53__ / __SAME54__
+#if defined(__SAMD51__) || defined(__SAME51__)
 #if !(SAMD51_SERIES || SAMD51_120_SERIES || SAME51_SERIES)
 #define SAMD51_SERIES 1
 #endif // !(SAMD51_SERIES || SAMD51_120_SERIES || SAME51_SERIES)
-#endif // ARDUINO_SAMD51_E51
-#if defined(ARDUINO_SAME53_E54)
+#endif // __SAMD51__ / __SAME51__
+#if defined(__SAME53__) || defined(__SAME54__)
 #if !(SAME53_SERIES || SAME54_SERIES || SAME54_120_SERIES)
 #define SAME54_SERIES 1
 #endif // !(SAME53_SERIES || SAME54_SERIES || SAME54_120_SERIES)
-#endif // ARDUINO_SAME53_E54
+#endif // __SAME53__ / __SAME54__
 
 #if defined(SERCOM_PINMUX_EMIT_I2C)
 #if SAMD21E_SERIES || SAMDA1_SERIES

@@ -34,7 +34,7 @@ static void __initialize()
   memset(ISRcallback, 0, sizeof(ISRcallback));
   nints = 0;
 
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
   ///EIC MCLK is enabled by default
   for (uint32_t i = 0; i <= 15; i++)     // EIC_0_IRQn = 12 ... EIC_15_IRQn = 27
   {
@@ -46,7 +46,7 @@ static void __initialize()
   }
   
   GCLK->PCHCTRL[EIC_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK2_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
   // EIC MCLK is enabled by default.
   for (uint32_t i = 0; i <= 15; i++)
   {
@@ -76,10 +76,10 @@ static void __initialize()
 */
 
   // Enable EIC
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
   EIC->CTRLA.bit.ENABLE = 1;
   while (EIC->SYNCBUSY.bit.ENABLE == 1) { }
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
   EIC_REGS->EIC_CTRLA |= EIC_CTRLA_ENABLE_Msk;
   while (EIC_REGS->EIC_SYNCBUSY & EIC_SYNCBUSY_ENABLE_Msk) { }
 #else
@@ -111,7 +111,7 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 	}
 	uint32_t inMask = (1UL << in);
 	// Enable wakeup capability on pin in case being used during sleep
-	#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+	#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	//I believe this is done automatically
 	#else
 	EIC->WAKEUP.reg |= (1 << in);
@@ -124,7 +124,7 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 	{
 		if (in == EXTERNAL_INT_NMI) {
 			uint8_t sense;
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 			EIC_REGS->EIC_NMIFLAG = EIC_NMIFLAG_NMI_Msk;
 #else
 			EIC->NMIFLAG.bit.NMI = 1; // Clear flag
@@ -154,7 +154,7 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 				return;
 			}
 
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 			EIC_REGS->EIC_NMICTRL =
 			    (EIC_REGS->EIC_NMICTRL & ~EIC_NMICTRL_NMISENSE_Msk) |
 			    EIC_NMICTRL_NMISENSE(sense);
@@ -207,15 +207,15 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 			  default: return;
 			}
 
-			#if defined(ARDUINO_SAMD51_E51)
+			#if defined(__SAMD51__) || defined(__SAME51__)
 			EIC->CTRLA.bit.ENABLE = 0;
 			while (EIC->SYNCBUSY.bit.ENABLE == 1) { }
-			#elif defined(ARDUINO_SAME53_E54)
+			#elif defined(__SAME53__) || defined(__SAME54__)
 			EIC_REGS->EIC_CTRLA &= ~EIC_CTRLA_ENABLE_Msk;
 			while (EIC_REGS->EIC_SYNCBUSY & EIC_SYNCBUSY_ENABLE_Msk) { }
 			#endif
 
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 			EIC_REGS->EIC_CONFIG[config] =
 			    (EIC_REGS->EIC_CONFIG[config] & ~(EIC_CONFIG_SENSE0_Msk << pos)) |
 			    ((uint32_t)sense << pos);
@@ -226,17 +226,17 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 #endif
 		}
 		// Enable the interrupt
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
 		EIC_REGS->EIC_INTENSET = EIC_INTENSET_EXTINT(1 << in);
 #else
 		EIC->INTENSET.reg = EIC_INTENSET_EXTINT(1 << in);
 #endif
 	}
 
-	#if defined(ARDUINO_SAMD51_E51)
+	#if defined(__SAMD51__) || defined(__SAME51__)
 	EIC->CTRLA.bit.ENABLE = 1;
 	while (EIC->SYNCBUSY.bit.ENABLE == 1) { }
-	#elif defined(ARDUINO_SAME53_E54)
+	#elif defined(__SAME53__) || defined(__SAME54__)
 	EIC_REGS->EIC_CTRLA |= EIC_CTRLA_ENABLE_Msk;
 	while (EIC_REGS->EIC_SYNCBUSY & EIC_SYNCBUSY_ENABLE_Msk) { }
 	#endif
@@ -255,20 +255,20 @@ void detachInterrupt(uint32_t pin)
   if (in == NOT_AN_INTERRUPT) return;
 
   if(in == EXTERNAL_INT_NMI) {
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
     EIC_REGS->EIC_NMICTRL &= ~EIC_NMICTRL_NMISENSE_Msk;
 #else
     EIC->NMICTRL.bit.NMISENSE = 0; // Turn off detection
 #endif
   } else {
-#if defined(ARDUINO_SAME53_E54)
+#if defined(__SAME53__) || defined(__SAME54__)
     EIC_REGS->EIC_INTENCLR = EIC_INTENCLR_EXTINT(1 << in);
 #else
     EIC->INTENCLR.reg = EIC_INTENCLR_EXTINT(1 << in);
 #endif
   
   // Disable wakeup capability on pin during sleep
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 //I believe this is done automatically
 #else
     // Disable wakeup capability on pin during sleep
@@ -296,7 +296,7 @@ void detachInterrupt(uint32_t pin)
 /*
  * External Interrupt Controller NVIC Interrupt Handler
  */
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 void InterruptHandler(uint32_t unused_i)
 {
   (void)unused_i;
@@ -306,7 +306,7 @@ void InterruptHandler(uint32_t unused_i)
   // Loop over all enabled interrupts in the list
   for (uint32_t i=0; i<nints; i++)
   {
-	#if defined(ARDUINO_SAME53_E54)
+	#if defined(__SAME53__) || defined(__SAME54__)
 	if ((EIC_REGS->EIC_INTFLAG & ISRlist[i]) != 0)
 	#else
 	if ((EIC->INTFLAG.reg & ISRlist[i]) != 0)
@@ -315,7 +315,7 @@ void InterruptHandler(uint32_t unused_i)
 	  // Call the callback function
 	  ISRcallback[i]();
 	  // Clear the interrupt
-	#if defined(ARDUINO_SAME53_E54)
+	#if defined(__SAME53__) || defined(__SAME54__)
 	  EIC_REGS->EIC_INTFLAG = ISRlist[i];
 	#else
 	  EIC->INTFLAG.reg = ISRlist[i];
@@ -324,7 +324,7 @@ void InterruptHandler(uint32_t unused_i)
   }
 }
 
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 void EIC_0_Handler(void)
 {
   InterruptHandler(EXTERNAL_INT_0);
@@ -404,7 +404,7 @@ void EIC_15_Handler(void)
 {
   InterruptHandler(EXTERNAL_INT_15);
 }
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
 void EIC_EXTINT_0_Handler(void) { InterruptHandler(EXTERNAL_INT_0); }
 void EIC_EXTINT_1_Handler(void) { InterruptHandler(EXTERNAL_INT_1); }
 void EIC_EXTINT_2_Handler(void) { InterruptHandler(EXTERNAL_INT_2); }
