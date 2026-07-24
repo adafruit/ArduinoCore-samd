@@ -45,7 +45,7 @@ extern "C"{
 #endif // __cplusplus
 
 // Include Atmel headers
-#include "sam.h"
+#include <sam.h>
 #include "wiring_constants.h"
 
 extern uint32_t SystemCoreClock;
@@ -158,7 +158,7 @@ void loop( void ) ;
   #include "USB/USBDesc.h"
   #include "USB/USBCore.h"
   #include "USB/USBAPI.h"
-  #if !defined(ARDUINO_SAME53_E54)
+  #if !defined(__SAME53__) && !defined(__SAME54__)
     #include "USB/USB_host.h"
   #endif
 #endif

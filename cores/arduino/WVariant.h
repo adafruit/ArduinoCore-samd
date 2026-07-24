@@ -20,15 +20,15 @@
 #pragma once
 
 #include <stdint.h>
-#include "sam.h"
+#include <sam.h>
 #include <limits.h>
 
-#if defined(ARDUINO_SAMD51_E51)
+#if defined(__SAMD51__) || defined(__SAME51__)
 enum {
   ARDUINO_TCC_INSTANCE_COUNT = TCC_INST_NUM,
   ARDUINO_TC_INSTANCE_COUNT = TC_INST_NUM,
 };
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
 enum {
   ARDUINO_TCC_INSTANCE_COUNT = 5,
   ARDUINO_TC_INSTANCE_COUNT = 8,
@@ -56,7 +56,7 @@ typedef enum _EAnalogChannel
   ADC_Channel5=5,
   ADC_Channel6=6,
   ADC_Channel7=7,
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   ADC_Channel8=8,
   ADC_Channel9=9,
 #else
@@ -67,7 +67,7 @@ typedef enum _EAnalogChannel
 #endif
   ADC_Channel10=10,
   ADC_Channel11=11,
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   ADC_Channel12=12,
   ADC_Channel13=13,
   ADC_Channel14=14,
@@ -90,7 +90,7 @@ typedef enum _EAnalogChannel
   ADC_Channel_PTAT=0x1C,
 } EAnalogChannel ;
 
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
 #if defined(__SAMD51G19A__) || defined(__SAME51G19A__)
 
@@ -336,7 +336,7 @@ typedef enum _EPioType
   PIO_SERCOM_ALT,       /* The pin is controlled by the associated signal of peripheral D. */
   PIO_TIMER,            /* The pin is controlled by the associated signal of peripheral E. */
   PIO_TIMER_ALT,        /* The pin is controlled by the associated signal of peripheral F. */
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   PIO_TCC_PDEC,			/* The pin is controlled by the associated signal of peripheral G. */
   PIO_COM,             /* The pin is controlled by the associated signal of peripheral H. */
   PIO_SDHC,             /* The pin is controlled by the associated signal of peripheral I. */
@@ -370,7 +370,7 @@ typedef enum _EPioType
 #define PIN_ATTR_EXTINT        (1UL<<6)
 #define PIN_ATTR_ANALOG_ALT	   (1UL<<7)
 
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 // these correspond to the mux table
 #define PIN_ATTR_PWM_E         (1UL<<3)
 #define PIN_ATTR_PWM_F         (1UL<<8)
