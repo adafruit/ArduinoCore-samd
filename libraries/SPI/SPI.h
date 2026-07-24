@@ -23,10 +23,6 @@
 #include <Arduino.h>
 #include "SERCOM.h"
 
-#if defined(SERCOM_INST_NUM) && (SPI_INTERFACES_COUNT > SERCOM_INST_NUM)
-#error "SPI_INTERFACES_COUNT exceeds available SERCOM instances for this MCU"
-#endif // SERCOM_INST_NUM && SPI_INTERFACES_COUNT > SERCOM_INST_NUM
-
 // SPI_HAS_TRANSACTION means SPI has
 //   - beginTransaction()
 //   - endTransaction()
@@ -42,7 +38,7 @@
 #define SPI_MODE2 0x03
 #define SPI_MODE3 0x01
 
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
 // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
 // this affects ALL SPI peripherals including some that should NOT be
@@ -63,7 +59,7 @@
 #define MAX_SPI 24000000
 #endif // !MAX_SPI
 #define SPI_MIN_CLOCK_DIVIDER (uint8_t)(1 + ((F_CPU - 1) / MAX_SPI))
-#endif // ARDUINO_SAMD51_E51 || ARDUINO_SAME53_E54
+#endif // __SAMD51__ / __SAME51__ || __SAME53__ / __SAME54__
 
 class SPISettings {
   public:
@@ -84,11 +80,11 @@ class SPISettings {
   }
 
   void init_AlwaysInline(uint32_t clock, BitOrder bitOrder, uint8_t dataMode) __attribute__((__always_inline__)) {
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     this->clockFreq = clock; // Clipping handled in SERCOM.cpp
 #else
     this->clockFreq = clock >= MAX_SPI ? MAX_SPI : clock;
-#endif // ARDUINO_SAMD51_E51 || ARDUINO_SAME53_E54
+#endif // __SAMD51__ / __SAME51__ || __SAME53__ / __SAME54__
 
     this->bitOrder = (bitOrder == MSBFIRST ? MSB_FIRST : LSB_FIRST);
 
