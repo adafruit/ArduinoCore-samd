@@ -36,6 +36,7 @@ extern "C" void tud_event_hook_cb(uint8_t rhport, uint32_t eventId, bool inIsr) 
 #endif
 
 bool PendSV::initializeCoreServices() {
+  NVIC_SetPriority(PendSV_IRQn, (1 << __NVIC_PRIO_BITS) - 1);
 #if defined(USE_TINYUSB)
   return instance().registerService(PendSVChannels::Usb, tinyUsbDeviceTaskService, nullptr);
 #else
