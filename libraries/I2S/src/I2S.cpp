@@ -21,7 +21,7 @@
 
 #include "utility/DMA.h"
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
 #include "utility/SAMD51_I2SDevice.h"
 
@@ -115,7 +115,7 @@ int I2SClass::begin(int mode, long sampleRate, int bitsPerSample, bool driveCloc
 
   if (_beginCount == 0) {
     // enable the I2S interface
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     MCLK->APBDMASK.reg |= MCLK_APBDMASK_I2S;
 #else
     PM->APBCMASK.reg |= PM_APBCMASK_I2S;
@@ -197,7 +197,7 @@ void I2SClass::end()
     i2sd.disable();
 
     // disable the I2S interface
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   MCLK->APBDMASK.reg &= ~(MCLK_APBDMASK_I2S);
 #else
     PM->APBCMASK.reg &= ~PM_APBCMASK_I2S;

@@ -18,6 +18,7 @@
 */
 
 #include "sam.h"
+#include "same5x_compat_shim.h"
 #include "variant.h"
 
 #include <stdio.h>
@@ -25,7 +26,7 @@
 // Constants for Clock generators
 #define GENERIC_CLOCK_GENERATOR_MAIN      (0u)
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 #define GENERIC_CLOCK_GENERATOR_XOSC32K   (3u)
 #define GENERIC_CLOCK_GENERATOR_48M		  (1u)
 #define GENERIC_CLOCK_GENERATOR_48M_SYNC	GCLK_SYNCBUSY_GENCTRL1
@@ -55,7 +56,7 @@ void SystemInit( void )
 {
 
 //***************** SAMD51 ************************//
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   NVMCTRL->CTRLA.reg |= NVMCTRL_CTRLA_RWS(0);
   
   #ifndef CRYSTALLESS

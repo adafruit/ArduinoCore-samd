@@ -26,7 +26,7 @@
 #include <Adafruit_TinyUSB.h>
 #endif
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
  // Different prescalers depending on FCPU (avoid overflowing 16-bit counter)
  #if(F_CPU > 200000000)
   #define usToTicks(_us)    ((clockCyclesPerMicrosecond() * _us) / 128)
@@ -78,7 +78,7 @@ void Servo_Handler(timer16_Sequence_t timer, Tc *tc, uint8_t channel, uint8_t in
 {
     if (currentServoIndex[timer] < 0) {
         tc->COUNT16.COUNT.reg = (uint16_t) 0;
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
         while(tc->COUNT16.SYNCBUSY.bit.COUNT);
 #else
         WAIT_TC16_REGS_SYNC(tc)
@@ -98,7 +98,7 @@ void Servo_Handler(timer16_Sequence_t timer, Tc *tc, uint8_t channel, uint8_t in
         }
 
         // Get the counter value
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
         // Note from datasheet: Prior to any read access, this register must be synchronized by user by writing the according TC
         // Command value to the Control B Set register (CTRLBSET.CMD=READSYNC)
         while (tc->COUNT16.SYNCBUSY.bit.CTRLB);
@@ -106,14 +106,14 @@ void Servo_Handler(timer16_Sequence_t timer, Tc *tc, uint8_t channel, uint8_t in
         while (tc->COUNT16.SYNCBUSY.bit.CTRLB);
 #endif
         uint16_t tcCounterValue = tc->COUNT16.COUNT.reg;
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
         while(tc->COUNT16.SYNCBUSY.bit.COUNT);
 #else
         WAIT_TC16_REGS_SYNC(tc)
 #endif
 
         tc->COUNT16.CC[channel].reg = (uint16_t) (tcCounterValue + SERVO(timer, currentServoIndex[timer]).ticks);
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
         if(channel == 0) {
             while(tc->COUNT16.SYNCBUSY.bit.CC0);
         } else if(channel == 1) {
@@ -128,7 +128,7 @@ void Servo_Handler(timer16_Sequence_t timer, Tc *tc, uint8_t channel, uint8_t in
 
         // Get the counter value
         uint16_t tcCounterValue = tc->COUNT16.COUNT.reg;
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
         while(tc->COUNT16.SYNCBUSY.bit.COUNT);
 #else
         WAIT_TC16_REGS_SYNC(tc)
@@ -140,7 +140,7 @@ void Servo_Handler(timer16_Sequence_t timer, Tc *tc, uint8_t channel, uint8_t in
         else {
             tc->COUNT16.CC[channel].reg = (uint16_t) (tcCounterValue + 4UL);   // at least REFRESH_INTERVAL has elapsed
         }
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
         if(channel == 0) {
             while(tc->COUNT16.SYNCBUSY.bit.CC0);
         } else if(channel == 1) {
@@ -161,7 +161,7 @@ static inline void resetTC (Tc* TCx)
 {
     // Disable TCx
     TCx->COUNT16.CTRLA.reg &= ~TC_CTRLA_ENABLE;
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     while(TCx->COUNT16.SYNCBUSY.bit.ENABLE);
 #else
     WAIT_TC16_REGS_SYNC(TCx)
@@ -169,7 +169,7 @@ static inline void resetTC (Tc* TCx)
 
     // Reset TCx
     TCx->COUNT16.CTRLA.reg = TC_CTRLA_SWRST;
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     while(TCx->COUNT16.SYNCBUSY.bit.SWRST);
 #else
     WAIT_TC16_REGS_SYNC(TCx)
@@ -181,7 +181,7 @@ static void _initISR(Tc *tc, uint8_t channel, uint32_t id, IRQn_Type irqn, uint8
 {
     (void)id;
     // Select GCLK0 as timer/counter input clock source
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     int idx = gcmForTimer;           // see datasheet Table 14-9
     GCLK->PCHCTRL[idx].bit.GEN  = 0; // Select GCLK0 as periph clock source
     GCLK->PCHCTRL[idx].bit.CHEN = 1; // Enable peripheral
@@ -198,7 +198,7 @@ static void _initISR(Tc *tc, uint8_t channel, uint32_t id, IRQn_Type irqn, uint8
     // Set timer counter mode to 16 bits
     tc->COUNT16.CTRLA.reg |= TC_CTRLA_MODE_COUNT16;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     // Set timer counter mode as normal PWM
     tc->COUNT16.WAVE.bit.WAVEGEN = TCC_WAVE_WAVEGEN_NPWM_Val;
 
@@ -220,7 +220,7 @@ static void _initISR(Tc *tc, uint8_t channel, uint32_t id, IRQn_Type irqn, uint8
 
     // Count up
     tc->COUNT16.CTRLBCLR.bit.DIR = 1;
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     while(tc->COUNT16.SYNCBUSY.bit.CTRLB);
 #else
     WAIT_TC16_REGS_SYNC(tc)
@@ -228,7 +228,7 @@ static void _initISR(Tc *tc, uint8_t channel, uint32_t id, IRQn_Type irqn, uint8
 
     // First interrupt request after 1 ms
     tc->COUNT16.CC[channel].reg = (uint16_t) usToTicks(1000UL);
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     if(channel == 0) {
         while(tc->COUNT16.SYNCBUSY.bit.CC0);
     } else if(channel == 1) {
@@ -250,7 +250,7 @@ static void _initISR(Tc *tc, uint8_t channel, uint32_t id, IRQn_Type irqn, uint8
 
     // Enable the timer and start it
     tc->COUNT16.CTRLA.reg |= TC_CTRLA_ENABLE;
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     while(tc->COUNT16.SYNCBUSY.bit.ENABLE);
 #else
     WAIT_TC16_REGS_SYNC(tc)

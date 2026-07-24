@@ -38,7 +38,7 @@
 #define SPI_MODE2 0x03
 #define SPI_MODE3 0x01
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
   // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
   // this affects ALL SPI peripherals including some that should NOT be
@@ -80,7 +80,7 @@ class SPISettings {
   }
 
   void init_AlwaysInline(uint32_t clock, BitOrder bitOrder, uint8_t dataMode) __attribute__((__always_inline__)) {
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     this->clockFreq = clock; // Clipping handled in SERCOM.cpp
 #else
     this->clockFreq = clock >= MAX_SPI ? MAX_SPI : clock;
@@ -144,14 +144,14 @@ class SPIClass {
   int getDMAC_ID_TX(void);
   int getDMAC_ID_RX(void);
   uint8_t getSercomIndex(void) { return _p_sercom->getSercomIndex(); };
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   // SERCOM clock source override is available only on SAMD51.
   void setClockSource(SercomClockSource clk);
 #else
   // On SAMD21, this compiles to nothing, so user code doesn't need to
   // check and conditionally compile lines for different architectures.
   void setClockSource(SercomClockSource clk) { (void)clk; };
-#endif // end __SAMD51__
+#endif // end SAMD51/SAME5x
 
   private:
   void config(SPISettings settings);

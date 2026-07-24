@@ -30,7 +30,7 @@ volatile int64_t toggleCount;
 volatile bool toneIsActive = false;
 volatile bool firstTimeRunning = false;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   #define TONE_TC         TC0
   #define TONE_TC_IRQn    TC0_IRQn
   #define TONE_TC_GCLK_ID	TC0_GCLK_ID
@@ -86,7 +86,7 @@ void tone (uint32_t outputPin, uint32_t frequency, uint32_t duration)
     
     NVIC_SetPriority(TONE_TC_IRQn, 5);
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     GCLK->PCHCTRL[TONE_TC_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK0_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
 #else
     // Enable GCLK for TC4 and TC5 (timer counter input clock)
@@ -150,7 +150,7 @@ void tone (uint32_t outputPin, uint32_t frequency, uint32_t duration)
   uint16_t tmpReg = 0;
   tmpReg |= TC_CTRLA_MODE_COUNT16;  // Set Timer counter Mode to 16 bits
   
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	TONE_TC->COUNT16.WAVE.reg = TC_WAVE_WAVEGEN_MFRQ;  // Set TONE_TC mode as match frequency
 #else
   tmpReg |= TC_CTRLA_WAVEGEN_MFRQ;  // Set TONE_TC mode as match frequency
