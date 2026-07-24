@@ -19,13 +19,16 @@
 #ifndef _SERCOM_CLASS_
 #define _SERCOM_CLASS_
 
-#include "sam.h"
+#include <sam.h>
 #include "SERCOM_PinMux.h"
 #include "SERCOM_Txn.h"
 #include "RingBuffer.h"
 #include <array>
 
 #ifdef USE_ZERODMA
+#if defined(__SAME53__) || defined(__SAME54__)
+typedef dmac_descriptor_registers_t DmacDescriptor;
+#endif // __SAME53__ / __SAME54__
 class Adafruit_ZeroDMA;
 #endif // USE_ZERODMA
 
@@ -160,6 +163,12 @@ typedef enum
 
 typedef enum
 {
+	WIRE_SLAVE_ACT_NO_ACTION = 0,
+	WIRE_SLAVE_ACT_COMPLETE = 2
+} SercomSlaveCommandWire;
+
+typedef enum
+{
 	WIRE_MASTER_ACK_ACTION = 0,
 	WIRE_MASTER_NACK_ACTION
 } SercomMasterAckActionWire;
@@ -180,11 +189,11 @@ typedef enum {
 class SERCOM
 {
 	public:
-#ifdef ARDUINO_SAME53_E54
+#if defined(__SAME53__) || defined(__SAME54__)
 		SERCOM(sercom_registers_t* s) ;
 #else
 		SERCOM(Sercom* s) ;
-#endif // ARDUINO_SAME53_E54
+#endif // __SAME53__ / __SAME54__
 		void resetSERCOM( void ) ;
 		inline void enableSERCOM( void ) ;
 		inline void disableSERCOM( void ) ;
@@ -192,19 +201,19 @@ class SERCOM
 		inline void waitSyncBusySwrst( void ) ;
 		inline void waitSyncBusySysOp( void ) ;
 		inline void waitSyncBusyCtrlB( void ) ;
-#ifdef ARDUINO_SAME53_E54
+#if defined(__SAME53__) || defined(__SAME54__)
 		inline void disableInterrupts(uint8_t mask) { sercom->I2CM.SERCOM_INTENCLR = mask; }
 		inline void enableInterrupts(uint8_t mask) { sercom->I2CM.SERCOM_INTENSET = mask; }
 		inline uint8_t getINTFLAG( void ) const { return sercom->I2CM.SERCOM_INTFLAG; }
 		inline uint16_t getSTATUS( void ) const { return sercom->I2CM.SERCOM_STATUS; }
-		inline void clearINTFLAG( void ) { sercom->I2CM.SERCOM_INTFLAG = 0xFF; }
+		inline void clearINTFLAG(uint8_t mask = 0xFF) { sercom->I2CM.SERCOM_INTFLAG = mask; }
 #else
 		inline void disableInterrupts(uint8_t mask) { sercom->I2CM.INTENCLR.reg = mask; }
 		inline void enableInterrupts(uint8_t mask) { sercom->I2CM.INTENSET.reg = mask; }
 		inline uint8_t getINTFLAG( void ) const { return sercom->I2CM.INTFLAG.reg; }
 		inline uint16_t getSTATUS( void ) const { return sercom->I2CM.STATUS.reg; }
-		inline void clearINTFLAG( void ) { sercom->I2CM.INTFLAG.reg = 0xFF; }
-#endif // ARDUINO_SAME53_E54
+		inline void clearINTFLAG(uint8_t mask = 0xFF) { sercom->I2CM.INTFLAG.reg = mask; }
+#endif // __SAME53__ / __SAME54__
 
 		/* ========== UART ========== */
 		void initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint32_t baudrate=0) ;
@@ -273,8 +282,15 @@ class SERCOM
 		inline void setTxnWIRE(SercomTxn* txn);
 		inline void setDmaWIRE(bool useDma) { _wire.useDma = useDma; }
 		inline bool isDmaWIRE(void) const { return _wire.useDma; }
-		void registerReceiveWIRE(void (*cb)(void* user, int length), void* user);
-		void deferReceiveWIRE(int length);
+		inline void markBusReleasePendingWIRE(void) { _wire.releasePending = true; }
+		using WireReceiveCallback = void (*)(void* user);
+		using WireRequestCallback = void (*)(void* user);
+		void registerReceiveWIRE(WireReceiveCallback callback, void* user);
+		void registerRequestWIRE(WireRequestCallback callback, void* user);
+		void deferReceiveWIRE(void);
+		void deferRequestWIRE(void);
+		void deferReceiveCompleteWIRE(void);
+		SercomTxn* retireSlaveTransactionWIRE(bool reserveForFollowup);
 		void setSlaveWIRE( void ) ;
 		void setMasterWIRE( void ) ;
 
@@ -286,11 +302,16 @@ class SERCOM
 		inline void prepareNackBitWIRE( void ) ;
 		inline void prepareAckBitWIRE( void ) ;
         inline void prepareCommandBitsWIRE(uint8_t cmd) ;
+		inline void prepareSlaveCommandBitsWIRE(uint8_t cmd);
 		SercomTxn* startTransmissionWIRE( void ) ;
 		bool startTransmissionWIRE( uint8_t address, SercomWireReadWriteFlag flag ) = delete ;
 		SercomTxn* stopTransmissionWIRE( void ) ;
 		SercomTxn* stopTransmissionWIRE( SercomWireError error ) ;
 		bool enqueueWIRE(SercomTxn* txn);
+		inline bool canEnqueueWIRE(void) { return !_txnQueue.isFull(); }
+		bool abortWIRE(SercomWireError error = SercomWireError::MASTER_TIMEOUT);
+		inline bool isAbortPendingWIRE(void) const { return _wire.abortPending; }
+		bool serviceAbortWIRE(void);
 		void deferStopWIRE(SercomWireError error);
 
 		inline bool sendDataWIRE( void ) ;
@@ -317,15 +338,15 @@ class SERCOM
 
 		inline bool isDBGSTOP( void ) const;
 		inline void setDBGSTOP( bool stop );
-#ifdef ARDUINO_SAME53_E54
+#if defined(__SAME53__) || defined(__SAME54__)
 		inline sercom_registers_t* getSercom() const { return sercom; }
 #else
 		inline Sercom* getSercom() const { return sercom; }
-#endif // ARDUINO_SAME53_E54
+#endif // __SAME53__ / __SAME54__
 		int8_t getSercomIndex(void) ;
         uint32_t getSercomFreqRef(void) ;
 
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 		// SERCOM clock source override is only available on
 		// SAMD51 (not 21) ... but these functions are declared
 		// regardless so user code doesn't need ifdefs or lengthy
@@ -351,6 +372,7 @@ class SERCOM
 		static void dispatchService(uint8_t sercomId, void *context);
 		static void dispatchPending(void);
 
+
 #ifdef USE_ZERODMA
 		using DmaCallback = void (*)(Adafruit_ZeroDMA*);
 		enum class DmaStatus : uint8_t {
@@ -364,7 +386,8 @@ class SERCOM
 		};
 
 		DmaStatus dmaInit(int8_t sercomId, uint8_t beatSize = 0); // beatSize: 0=byte (default), 1=halfword, 2=word
-		void dmaSetCallbacks(DmaCallback txCb, DmaCallback rxCb);
+		void dmaSetCallbacks(DmaCallback txCb, DmaCallback rxCb,
+		                     DmaCallback errorCb = nullptr);
 		DmaStatus dmaStartTx(const void* src, volatile void* dstReg, size_t len);
 		DmaStatus dmaStartRx(void* dst, volatile void* srcReg, size_t len);
 		DmaStatus dmaStartDuplex(const void* txSrc, void* rxDst, volatile void* txReg, volatile void* rxReg, size_t len,
@@ -382,6 +405,8 @@ class SERCOM
 		// --- WIRE DMA callbacks (ISR-safe, PendSV-only completion) ---
 		static inline void dmaTxCallbackWIRE(Adafruit_ZeroDMA* dma);
 		static inline void dmaRxCallbackWIRE(Adafruit_ZeroDMA* dma);
+		static void dmaRxSuspendCallbackWIRE(Adafruit_ZeroDMA* dma);
+		static inline void dmaErrorCallbackWIRE(Adafruit_ZeroDMA* dma);
 		// --- SPI DMA callbacks (protocol-owned) ---
 		static inline void dmaTxCallbackSPI(Adafruit_ZeroDMA* dma);
 		static inline void dmaRxCallbackSPI(Adafruit_ZeroDMA* dma);
@@ -408,26 +433,27 @@ class SERCOM
 #endif // SERCOM_STRICT_PADS
 
     private:
-#ifdef ARDUINO_SAME53_E54
+		bool startNextQueuedWIRE(void);
+#if defined(__SAME53__) || defined(__SAME54__)
 		sercom_registers_t *sercom;
 #else
 		Sercom *sercom;
-#endif // ARDUINO_SAME53_E54
+#endif // __SAME53__ / __SAME54__
 		uint32_t freqRef = 48000000ul; // Frequency corresponding to clockSource
-#if defined(ARDUINO_SAMD51_E51) || defined(ARDUINO_SAME53_E54)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 		SercomClockSource clockSource;
-#endif // ARDUINO_SAMD51_E51 || ARDUINO_SAME53_E54
+#endif // __SAMD51__ / __SAME51__ || __SAME53__ / __SAME54__
 
 #if defined(SERCOM_INST_NUM) && (SERCOM_INST_NUM > 0)
 		static constexpr size_t kSercomCount = SERCOM_INST_NUM;
-#elif defined(ARDUINO_SAME53_E54) && defined(SERCOM7_REGS)
+#elif (defined(__SAME53__) || defined(__SAME54__)) && defined(SERCOM7_REGS)
 		static constexpr size_t kSercomCount = 8;
-#elif defined(ARDUINO_SAME53_E54) && defined(SERCOM5_REGS)
+#elif (defined(__SAME53__) || defined(__SAME54__)) && defined(SERCOM5_REGS)
 		static constexpr size_t kSercomCount = 6;
 #else
 		#pragma message("SERCOM_INST_NUM not defined; SERCOM support disabled.")
 		static constexpr size_t kSercomCount = 0;
-#endif // SERCOM_INST_NUM / ARDUINO_SAME53_E54
+#endif // SERCOM_INST_NUM / __SAME53__ / __SAME54__
 
 		struct SercomState {
 			Role role = Role::None;
@@ -453,19 +479,22 @@ class SERCOM
 		// for (hs) mode and DMA.
 		struct WireConfig {
             uint32_t ctrla = 0x00000000;             // default CTRLA value: auto ENABLE
-#ifdef ARDUINO_SAME53_E54
+#if defined(__SAME53__) || defined(__SAME54__)
 			uint32_t ctrlb = SERCOM_I2CM_CTRLB_SMEN_Msk; // default CTRLB value: SMEN
 #else
 			uint32_t ctrlb = SERCOM_I2CM_CTRLB_SMEN; // default CTRLB value: SMEN
-#endif // ARDUINO_SAME53_E54
+#endif // __SAME53__ / __SAME54__
 			uint32_t baud  = 0x000000FF;             // default to lowest supported speed
 			uint32_t addr  = 0x00000000;             // default address no GCEN, no ADDRMASK, 7-bit address only
 			uint8_t masterSpeed = 0x0;               // default to lowest speed
 			uint8_t slaveSpeed = 0x0;                // default to lowest speed
 			bool inited = false;		             // whether initMaster/SlaveWIRE has been called
-			bool slaveConfigured = false;             // return to client mode after queued host work
-			bool useDma = false;		             // per transaction DMA use flag for Host/Client modes
+			bool slaveConfigured = false;             // return to slave mode after queued master work
+			bool useDma = false;		             // per-transaction DMA use for master/slave modes
 			bool active = false;                     // active transaction in progress
+			bool releasePending = false;              // STOP requested; callback waits until OWNER clears
+			bool abortPending = false;                // wait for MB/SB before issuing timeout STOP
+			SercomWireError abortError = SercomWireError::MASTER_TIMEOUT;
 			uint8_t retryCount = 0;                  // retry count for recoverable bus errors
 			SercomWireError returnValue = SercomWireError::SUCCESS;
 			SercomTxn* currentTxn = nullptr;
@@ -500,10 +529,11 @@ class SERCOM
 		} _uart;
 
 		RingBufferN<SERCOM_QUEUE_LENGTH, SercomTxn*> _txnQueue;
-		void (*_wireDeferredCb)(void* user, int length) = nullptr;
-		void* _wireDeferredUser = nullptr;
-		int _wireDeferredLength = 0;
-		bool _wireDeferredPending = false;
+		void* _wireCallbackUser = nullptr;
+		WireReceiveCallback _wireReceiveCb = nullptr;
+		WireRequestCallback _wireRequestCb = nullptr;
+		bool _wireReceivePending = false;
+		bool _wireRequestPending = false;
 
 #ifdef USE_ZERODMA
 		Adafruit_ZeroDMA* _dmaTx = nullptr;
@@ -512,12 +542,14 @@ class SERCOM
 		DmacDescriptor* _dmaRxDesc = nullptr;
 		DmaCallback _dmaTxCb = nullptr;
 		DmaCallback _dmaRxCb = nullptr;
+		DmaCallback _dmaErrorCb = nullptr;
 		uint8_t _dmaDummy = 0;
 		uint8_t _dmaTxTrigger = 0;
 		uint8_t _dmaRxTrigger = 0;
 		bool _dmaConfigured = false;
 		bool _dmaTxActive = false;
 		bool _dmaRxActive = false;
+		bool _wireRxSuspendPending = false;
 		DmaStatus _dmaLastError = DmaStatus::Ok;
 #endif // USE_ZERODMA
 };

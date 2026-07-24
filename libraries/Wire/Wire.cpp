@@ -81,30 +81,48 @@ extern "C" {
 #define WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(token)                            \
   WIRE_SERCOM_HANDLER_OTHER_FROM_INDEX(WIRE_SERCOM_INDEX(token))
 
-#define WIRE_DEFINE_SINGLE_HANDLER(handler, instance)                          \
-  void handler(void) { instance.onService(); }
 
+#define WIRE_DEFINE_SINGLE_HANDLER(handler, instance)                          \
+  void handler(void) {                                                         \
+    instance.onService();                                                      \
+  }
+
+#if defined(__SAMD51__) || defined(__SAME51__)
 #define WIRE_DEFINE_SAMD51_E51_HANDLERS(handler0, handler1, handler2,          \
                                         handler3, instance)                    \
-  void handler0(void) { instance.onService(); }                                \
-  void handler1(void) { instance.onService(); }                                \
-  void handler2(void) { instance.onService(); }                                \
-  void handler3(void) { instance.onService(); }
+  void handler0(void) {                                                        \
+    instance.onService();                                                      \
+  }                                                                            \
+  void handler1(void) {                                                        \
+    instance.onService();                                                      \
+  }                                                                            \
+  void handler2(void) {                                                        \
+    instance.onService();                                                      \
+  }                                                                            \
+  void handler3(void) {                                                        \
+    instance.onService();                                                      \
+  }
 
+#define WIRE_DEFINE_SERCOM_HANDLERS(prefix, instance)                          \
+  WIRE_DEFINE_SAMD51_E51_HANDLERS(                                             \
+      prefix##_IT_HANDLER_0, prefix##_IT_HANDLER_1, prefix##_IT_HANDLER_2,     \
+      prefix##_IT_HANDLER_3, instance)
+#elif defined(__SAME53__) || defined(__SAME54__)
 #define WIRE_DEFINE_SAME53_E54_HANDLERS(handler0, handler1, handler2,          \
                                         handlerOther, instance)                \
-  void handler0(void) { instance.onService(); }                                \
-  void handler1(void) { instance.onService(); }                                \
-  void handler2(void) { instance.onService(); }                                \
-  void handlerOther(void) { instance.onService(); }
+  void handler0(void) {                                                        \
+    instance.onService();                                                      \
+  }                                                                            \
+  void handler1(void) {                                                        \
+    instance.onService();                                                      \
+  }                                                                            \
+  void handler2(void) {                                                        \
+    instance.onService();                                                      \
+  }                                                                            \
+  void handlerOther(void) {                                                    \
+    instance.onService();                                                      \
+  }
 
-#ifdef ARDUINO_SAMD51_E51
-#define WIRE_DEFINE_SERCOM_HANDLERS(prefix, instance)                          \
-  WIRE_DEFINE_SAMD51_E51_HANDLERS(prefix##_IT_HANDLER_0,                       \
-                                  prefix##_IT_HANDLER_1,                       \
-                                  prefix##_IT_HANDLER_2,                       \
-                                  prefix##_IT_HANDLER_3, instance)
-#elif defined(ARDUINO_SAME53_E54)
 #define WIRE_DEFINE_SERCOM_HANDLERS(prefix, instance)                          \
   WIRE_DEFINE_SAME53_E54_HANDLERS(prefix##_IT_HANDLER_0,                       \
                                   prefix##_IT_HANDLER_1,                       \
@@ -113,7 +131,7 @@ extern "C" {
 #else
 #define WIRE_DEFINE_SERCOM_HANDLERS(prefix, instance)                          \
   WIRE_DEFINE_SINGLE_HANDLER(prefix##_IT_HANDLER, instance)
-#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // __SAMD51__ / __SAME51__ / __SAME53__ / __SAME54__
 
 namespace sercomPinMux {
 bool wirePinValidForSercom(uint8_t arduinoPin, uint8_t sercomIndex) {
@@ -153,8 +171,11 @@ TwoWire::TwoWire(SERCOM * s, uint8_t pinSDA, uint8_t pinSCL)
   rxBufferPtr = rxBuffer;
   rxBufferCapacity = WIRE_BUFFER_LENGTH;
   txBufferCapacity = WIRE_BUFFER_LENGTH;
-  pendingReceive = false;
-  pendingReceiveLength = 0;
+  onRequestCallback = nullptr;
+  onReceiveCallback = nullptr;
+  onReceiveResultCallback = nullptr;
+  requestCompletionCallback = nullptr;
+  requestCompletionUser = nullptr;
   txnPoolHead = 0;
 }
 
@@ -187,6 +208,7 @@ bool TwoWire::begin(uint16_t address, bool enableGeneralCall, uint8_t speed,
   sercom->initSlaveWIRE(address, enableGeneralCall, speed, enable10Bit);
   sercom->enableWIRE();
   sercom->registerReceiveWIRE(&TwoWire::onDeferredReceive, this);
+  sercom->registerRequestWIRE(&TwoWire::onDeferredRequest, this);
   return true;
 }
 
@@ -202,10 +224,16 @@ void TwoWire::end() {
   sercom->resetWIRE();   // SWRST: resets hardware + clears state + drains queue
 }
 
+bool TwoWire::abortTransmission(int status) {
+  return sercom->abortWIRE(static_cast<SercomWireError>(status));
+}
+
 uint8_t TwoWire::requestFrom(uint8_t address, size_t quantity, bool stopBit, uint8_t* rxBuffer,
                              void (*onComplete)(void* user, int status), void* user)
 {
   if(quantity == 0)
+    return 0;
+  if (!sercom->canEnqueueWIRE())
     return 0;
 
   loader = SercomTxn{};
@@ -288,9 +316,16 @@ void TwoWire::beginTransmission(uint8_t address) {
 //  2 : NACK on transmit of address
 //  3 : NACK on transmit of data
 //  4 : Other error
-uint8_t TwoWire::endTransmission(bool stopBit, void (*onComplete)(void* user, int status), void* user)
-{
+uint8_t TwoWire::endTransmission(bool stopBit,
+                                 void (*onComplete)(void *user, int status),
+                                 void *user) {
   transmissionBegun = false ;
+
+  if (!sercom->canEnqueueWIRE()) {
+    if (onComplete)
+      return static_cast<uint8_t>(SercomWireError::QUEUE_FULL);
+    return 4;
+  }
 
   // Allocate a fresh transaction from the pool and copy staged data from loader
   SercomTxn* txn = allocateTxn();
@@ -445,11 +480,23 @@ void TwoWire::flush(void)
 void TwoWire::onReceive(void(*function)(int))
 {
   onReceiveCallback = function;
+  onReceive(static_cast<void (*)(SercomWireError, int)>(nullptr));
+}
+
+void TwoWire::onReceive(void (*function)(SercomWireError, int)) {
+  onReceiveResultCallback = function;
 }
 
 void TwoWire::onRequest(void(*function)(void))
 {
+  onRequest(function, nullptr, nullptr);
+}
+
+void TwoWire::onRequest(void (*function)(void), RequestCompletion completion,
+                        void *user) {
   onRequestCallback = function;
+  requestCompletionCallback = completion;
+  requestCompletionUser = user;
 }
 
 void TwoWire::setRxBuffer(uint8_t* buffer, size_t length)
@@ -511,19 +558,72 @@ void TwoWire::onTxnComplete(void* user, int status)
   self->txnDone = true;
 }
 
-void TwoWire::onDeferredReceive(void* user, int length)
-{
+void TwoWire::onDeferredReceive(void *user) {
   if (!user)
     return;
-  TwoWire* self = static_cast<TwoWire*>(user);
-  if (!self->pendingReceive)
-    return;
-  if (self->onReceiveCallback)
-    self->onReceiveCallback(length);
+  TwoWire *self = static_cast<TwoWire *>(user);
   self->rxLength = 0;
   self->rxIndex = 0;
-  self->pendingReceive = false;
-  self->pendingReceiveLength = 0;
+  self->slaveTxn = SercomTxn{};
+  self->slaveTxn.rxPtr = self->rxBufferPtr;
+  self->slaveTxn.length = self->rxBufferCapacity;
+  self->slaveTxn.config = 0;
+  self->slaveTxn.onComplete = &TwoWire::onSlaveReceiveComplete;
+  self->slaveTxn.user = self;
+  self->sercom->setTxnWIRE(&self->slaveTxn);
+  if (!self->sercom->startTransmissionWIRE()) {
+    self->sercom->deferStopWIRE(SercomWireError::DMA_ERROR);
+    return;
+  }
+}
+
+void TwoWire::onDeferredRequest(void *user) {
+  if (!user)
+    return;
+  TwoWire *self = static_cast<TwoWire *>(user);
+  self->loader = SercomTxn{};
+  self->transmissionBegun = true;
+  if (self->onRequestCallback)
+    self->onRequestCallback();
+  self->transmissionBegun = false;
+  if (self->loader.txPtr == nullptr || self->loader.length == 0) {
+    if (self->requestCompletionCallback)
+      self->requestCompletionCallback(self->requestCompletionUser,
+                                      SercomWireError::SUCCESS);
+    return;
+  }
+  self->slaveTxn = self->loader;
+  self->slaveTxn.config |= I2C_CFG_READ;
+  self->slaveTxn.onComplete = &TwoWire::onSlaveRequestComplete;
+  self->slaveTxn.user = self;
+  self->sercom->setTxnWIRE(&self->slaveTxn);
+  if (!self->sercom->startTransmissionWIRE()) {
+    self->sercom->deferStopWIRE(SercomWireError::DMA_ERROR);
+    return;
+  }
+}
+
+void TwoWire::onSlaveReceiveComplete(void *user, int status) {
+  if (!user)
+    return;
+  TwoWire *self = static_cast<TwoWire *>(user);
+  const SercomWireError error = static_cast<SercomWireError>(status);
+  const int received = static_cast<int>(self->sercom->getTxnIndexWIRE());
+  self->rxLength = received;
+  self->rxIndex = 0;
+  if (error == SercomWireError::SUCCESS && self->onReceiveCallback)
+    self->onReceiveCallback(received);
+  if (self->onReceiveResultCallback)
+    self->onReceiveResultCallback(error, received);
+}
+
+void TwoWire::onSlaveRequestComplete(void *user, int status) {
+  if (!user)
+    return;
+  TwoWire *self = static_cast<TwoWire *>(user);
+  if (self->requestCompletionCallback)
+    self->requestCompletionCallback(self->requestCompletionUser,
+                                    static_cast<SercomWireError>(status));
 }
 
 #if WIRE_INTERFACES_COUNT > 0
@@ -544,11 +644,11 @@ TwoWire Wire(&PERIPH_WIRE, PIN_WIRE_SDA, PIN_WIRE_SCL);
 #define WIRE_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE)
 #define WIRE_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE)
 #define WIRE_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE)
-#ifdef ARDUINO_SAMD51_E51
+#if defined(__SAMD51__) || defined(__SAME51__)
 #define WIRE_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE)
-#elif defined(ARDUINO_SAME53_E54)
+#elif defined(__SAME53__) || defined(__SAME54__)
 #define WIRE_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE)
-#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#endif // __SAMD51__ / __SAME51__ / __SAME53__ / __SAME54__
 #endif // !WIRE_IT_HANDLER_0
 WIRE_DEFINE_SERCOM_HANDLERS(WIRE, Wire)
 #endif // WIRE_INTERFACES_COUNT > 0
@@ -562,13 +662,14 @@ WIRE_DEFINE_SERCOM_HANDLERS(WIRE, Wire)
 #define WIRE1_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE1)
 #define WIRE1_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE1)
 #define WIRE1_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE1)
-#ifdef ARDUINO_SAMD51_E51
+#if defined(__SAMD51__) || defined(__SAME51__)
 #define WIRE1_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE1)
-#elif defined(ARDUINO_SAME53_E54)
-#define WIRE1_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE1)
-#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#elif defined(__SAME53__) || defined(__SAME54__)
+#define WIRE1_IT_HANDLER_OTHER                                               \
+    WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE1)
+#endif // __SAMD51__ / __SAME51__ / __SAME53__ / __SAME54__
 #endif // !WIRE1_IT_HANDLER_0
-WIRE_DEFINE_SERCOM_HANDLERS(WIRE1, Wire1)
+  WIRE_DEFINE_SERCOM_HANDLERS(WIRE1, Wire1)
 #endif // WIRE_INTERFACES_COUNT > 1
 
 #if WIRE_INTERFACES_COUNT > 2
@@ -580,13 +681,14 @@ WIRE_DEFINE_SERCOM_HANDLERS(WIRE1, Wire1)
 #define WIRE2_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE2)
 #define WIRE2_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE2)
 #define WIRE2_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE2)
-#ifdef ARDUINO_SAMD51_E51
+#if defined(__SAMD51__) || defined(__SAME51__)
 #define WIRE2_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE2)
-#elif defined(ARDUINO_SAME53_E54)
-#define WIRE2_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE2)
-#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#elif defined(__SAME53__) || defined(__SAME54__)
+#define WIRE2_IT_HANDLER_OTHER                                               \
+    WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE2)
+#endif // __SAMD51__ / __SAME51__ / __SAME53__ / __SAME54__
 #endif // !WIRE2_IT_HANDLER_0
-WIRE_DEFINE_SERCOM_HANDLERS(WIRE2, Wire2)
+  WIRE_DEFINE_SERCOM_HANDLERS(WIRE2, Wire2)
 #endif // WIRE_INTERFACES_COUNT > 2
 
 #if WIRE_INTERFACES_COUNT > 3
@@ -598,13 +700,14 @@ WIRE_DEFINE_SERCOM_HANDLERS(WIRE2, Wire2)
 #define WIRE3_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE3)
 #define WIRE3_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE3)
 #define WIRE3_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE3)
-#ifdef ARDUINO_SAMD51_E51
+#if defined(__SAMD51__) || defined(__SAME51__)
 #define WIRE3_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE3)
-#elif defined(ARDUINO_SAME53_E54)
-#define WIRE3_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE3)
-#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#elif defined(__SAME53__) || defined(__SAME54__)
+#define WIRE3_IT_HANDLER_OTHER                                               \
+    WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE3)
+#endif // __SAMD51__ / __SAME51__ / __SAME53__ / __SAME54__
 #endif // !WIRE3_IT_HANDLER_0
-WIRE_DEFINE_SERCOM_HANDLERS(WIRE3, Wire3)
+  WIRE_DEFINE_SERCOM_HANDLERS(WIRE3, Wire3)
 #endif // WIRE_INTERFACES_COUNT > 3
 
 #if WIRE_INTERFACES_COUNT > 4
@@ -616,13 +719,14 @@ WIRE_DEFINE_SERCOM_HANDLERS(WIRE3, Wire3)
 #define WIRE4_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE4)
 #define WIRE4_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE4)
 #define WIRE4_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE4)
-#ifdef ARDUINO_SAMD51_E51
+#if defined(__SAMD51__) || defined(__SAME51__)
 #define WIRE4_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE4)
-#elif defined(ARDUINO_SAME53_E54)
-#define WIRE4_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE4)
-#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#elif defined(__SAME53__) || defined(__SAME54__)
+#define WIRE4_IT_HANDLER_OTHER                                               \
+    WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE4)
+#endif // __SAMD51__ / __SAME51__ / __SAME53__ / __SAME54__
 #endif // !WIRE4_IT_HANDLER_0
-WIRE_DEFINE_SERCOM_HANDLERS(WIRE4, Wire4)
+  WIRE_DEFINE_SERCOM_HANDLERS(WIRE4, Wire4)
 #endif // WIRE_INTERFACES_COUNT > 4
 
 #if WIRE_INTERFACES_COUNT > 5
@@ -634,11 +738,12 @@ WIRE_DEFINE_SERCOM_HANDLERS(WIRE4, Wire4)
 #define WIRE5_IT_HANDLER_0 WIRE_SERCOM_HANDLER0_FROM_TOKEN(PERIPH_WIRE5)
 #define WIRE5_IT_HANDLER_1 WIRE_SERCOM_HANDLER1_FROM_TOKEN(PERIPH_WIRE5)
 #define WIRE5_IT_HANDLER_2 WIRE_SERCOM_HANDLER2_FROM_TOKEN(PERIPH_WIRE5)
-#ifdef ARDUINO_SAMD51_E51
+#if defined(__SAMD51__) || defined(__SAME51__)
 #define WIRE5_IT_HANDLER_3 WIRE_SERCOM_HANDLER3_FROM_TOKEN(PERIPH_WIRE5)
-#elif defined(ARDUINO_SAME53_E54)
-#define WIRE5_IT_HANDLER_OTHER WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE5)
-#endif // ARDUINO_SAMD51_E51 / ARDUINO_SAME53_E54
+#elif defined(__SAME53__) || defined(__SAME54__)
+#define WIRE5_IT_HANDLER_OTHER                                               \
+    WIRE_SERCOM_HANDLER_OTHER_FROM_TOKEN(PERIPH_WIRE5)
+#endif // __SAMD51__ / __SAME51__ / __SAME53__ / __SAME54__
 #endif // !WIRE5_IT_HANDLER_0
-WIRE_DEFINE_SERCOM_HANDLERS(WIRE5, Wire5)
+  WIRE_DEFINE_SERCOM_HANDLERS(WIRE5, Wire5)
 #endif // WIRE_INTERFACES_COUNT > 5
