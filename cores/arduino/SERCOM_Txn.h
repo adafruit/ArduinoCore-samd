@@ -54,7 +54,8 @@ enum class SercomWireError : uint8_t
   SLAVE_TIMEOUT = 11,    // Slave timeout (STATUS.SEXTTOUT)
   LENGTH_ERROR = 12,     // LENERR when LEN/LENEN mismatch (STATUS.LENERR)
   UNKNOWN_ERROR = 13,    // Error flag set but no specific bit matched
-  DMA_ERROR = 14         // DMAC transfer/descriptor bus error
+  DMA_ERROR = 14,        // DMAC transfer/descriptor bus error
+  BUS_RELEASE_TIMEOUT = 15 // STOP issued but BUSSTATE did not return to IDLE
 };
 
 // SPI error reporting (async callbacks)

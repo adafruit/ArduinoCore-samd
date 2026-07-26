@@ -183,20 +183,20 @@ inline void TwoWire::onService(void)
 #if defined(__SAME53__) || defined(__SAME54__)
   const bool rxNack = status & SERCOM_I2CM_STATUS_RXNACK_Msk;
   const bool wireError = flags & SERCOM_I2CM_INTFLAG_ERROR_Msk;
-  const bool slaveDrdy = flags & SERCOM_I2CS_INTFLAG_DRDY_Msk;
+  const bool slaveDrdy =
+      !isMaster && (flags & SERCOM_I2CS_INTFLAG_DRDY_Msk);
 #else
   const bool rxNack = status & SERCOM_I2CM_STATUS_RXNACK;
   const bool wireError = flags & SERCOM_I2CM_INTFLAG_ERROR;
-  const bool slaveDrdy = flags & SERCOM_I2CS_INTFLAG_DRDY;
+  const bool slaveDrdy = !isMaster && (flags & SERCOM_I2CS_INTFLAG_DRDY);
 #endif // __SAME53__ / __SAME54__
 
   SercomTxn *activeTxn = sercom->getCurrentTxnWIRE();
-  const bool effectiveSlaveRead =
-      activeTxn && (activeTxn->config & I2C_CFG_READ) != 0;
-  const bool actionableRxNack =
-      isMaster ? rxNack : slaveDrdy && effectiveSlaveRead && rxNack;
+  const bool rxSlaveNack =
+      rxNack && activeTxn && (activeTxn->config & I2C_CFG_READ) != 0;
+  const bool isRxNack = isMaster ? rxNack : rxSlaveNack;
 
-  if (actionableRxNack || wireError) {
+  if (isRxNack || wireError) {
 #if defined(__SAME53__) || defined(__SAME54__)
     const bool arbitrationLost = status & SERCOM_I2CM_STATUS_ARBLOST_Msk;
     const bool busError = status & SERCOM_I2CM_STATUS_BUSERR_Msk;
@@ -220,7 +220,7 @@ inline void TwoWire::onService(void)
 
     SercomWireError error = SercomWireError::UNKNOWN_ERROR;
 
-    if (actionableRxNack) {
+    if (isRxNack) {
       error = isMaster && awaitingAddressAck ? SercomWireError::NACK_ON_ADDRESS
                                              : SercomWireError::NACK_ON_DATA;
     } else if (arbitrationLost) {

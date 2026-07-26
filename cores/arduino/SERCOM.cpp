@@ -1030,10 +1030,8 @@ void SERCOM::setSlaveWIRE(void)
   sercom->I2CS.SERCOM_CTRLB = slaveCtrlb;
   sercom->I2CS.SERCOM_ADDR = _wire.addr;
   enableWIRE();
-  sercom->I2CS.SERCOM_INTENSET = SERCOM_I2CS_INTENSET_ERROR_Msk  |
-                                 SERCOM_I2CS_INTENSET_PREC_Msk   |
-                                 SERCOM_I2CS_INTENSET_AMATCH_Msk |
-                                 SERCOM_I2CS_INTENSET_DRDY_Msk;
+  sercom->I2CS.SERCOM_INTENSET =
+      SERCOM_I2CS_INTENSET_ERROR_Msk | SERCOM_I2CS_INTENSET_AMATCH_Msk;
 #else
   uint32_t slaveCtrlb = _wire.ctrlb;
   if (slaveCtrlb & SERCOM_I2CS_CTRLB_SMEN)
@@ -1044,11 +1042,10 @@ void SERCOM::setSlaveWIRE(void)
   sercom->I2CS.CTRLB.reg = slaveCtrlb;
   sercom->I2CS.ADDR.reg = _wire.addr;
   enableWIRE();
-  // Enable slave interrupts: address match, data ready, stop/restart.
-  sercom->I2CS.INTENSET.reg = SERCOM_I2CS_INTENSET_ERROR  | // Error
-                              SERCOM_I2CS_INTENSET_PREC   | // Stop
-                              SERCOM_I2CS_INTENSET_AMATCH | // Address Match
-                              SERCOM_I2CS_INTENSET_DRDY;    // Data Ready
+  // ERROR and AMATCH remain armed while the slave is idle. DRDY and PREC are
+  // owned by an active transaction and are enabled in startTransmissionWIRE().
+  sercom->I2CS.INTENSET.reg =
+      SERCOM_I2CS_INTENSET_ERROR | SERCOM_I2CS_INTENSET_AMATCH;
 #endif // __SAME53__ / __SAME54__
 }
 
@@ -1112,11 +1109,6 @@ SercomTxn* SERCOM::startTransmissionWIRE( void )
     // Mirror the master engine selection: eligible transactions use DMA;
     // larger transactions remain on the interrupt-driven DATA path.
     if (isDmaWIRE()) {
-#if defined(__SAME53__) || defined(__SAME54__)
-      disableInterrupts(SERCOM_I2CS_INTENCLR_DRDY_Msk);
-#else
-      disableInterrupts(SERCOM_I2CS_INTENCLR_DRDY);
-#endif // __SAME53__ / __SAME54__
       if (!_dmaConfigured)
         dmaInit(getSercomIndex());
       if (!_dmaConfigured || !_dmaTx || !_dmaRx)
@@ -1129,20 +1121,33 @@ SercomTxn* SERCOM::startTransmissionWIRE( void )
       const bool started = slaveTransmit ? sendDataWIRE() : readDataWIRE();
       if (!started)
         return nullptr;
+#if defined(__SAME53__) || defined(__SAME54__)
+      enableInterrupts(SERCOM_I2CS_INTENSET_DRDY_Msk |
+                       SERCOM_I2CS_INTENSET_PREC_Msk);
+#else
+      enableInterrupts(SERCOM_I2CS_INTENSET_DRDY | SERCOM_I2CS_INTENSET_PREC);
+#endif // __SAME53__ / __SAME54__
       if (slaveTransmit) {
         clearAmatch();
       }
     } else {
 #if defined(__SAME53__) || defined(__SAME54__)
-      enableInterrupts(SERCOM_I2CS_INTENSET_DRDY_Msk);
+      enableInterrupts(SERCOM_I2CS_INTENSET_DRDY_Msk |
+                       SERCOM_I2CS_INTENSET_PREC_Msk);
 #else
-      enableInterrupts(SERCOM_I2CS_INTENSET_DRDY);
+      enableInterrupts(SERCOM_I2CS_INTENSET_DRDY | SERCOM_I2CS_INTENSET_PREC);
 #endif // __SAME53__ / __SAME54__
       clearAmatch();
     }
 #else
     // The no-DMA build advances this transaction from slave DRDY interrupts.
     setDmaWIRE(false);
+#if defined(__SAME53__) || defined(__SAME54__)
+    enableInterrupts(SERCOM_I2CS_INTENSET_DRDY_Msk |
+                     SERCOM_I2CS_INTENSET_PREC_Msk);
+#else
+    enableInterrupts(SERCOM_I2CS_INTENSET_DRDY | SERCOM_I2CS_INTENSET_PREC);
+#endif // __SAME53__ / __SAME54__
     clearAmatch();
 #endif // USE_ZERODMA
     return txn;
@@ -1369,6 +1374,7 @@ SercomTxn* SERCOM::stopTransmissionWIRE( void )
 
 SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
 {
+  constexpr uint32_t kWireStopSettleTimeoutUs = 100u;
   // Policy: only auto-retry recoverable bus-state errors here. All other
   // errors are surfaced to the transaction callback for protocol handling.
   // Retry/backoff policy is intentionally deferred; a future change may add
@@ -1388,6 +1394,12 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
   bool isMaster = isMasterWIRE();
 
   if (!isMaster) {
+#if defined(__SAME53__) || defined(__SAME54__)
+    disableInterrupts(SERCOM_I2CS_INTENCLR_DRDY_Msk |
+                      SERCOM_I2CS_INTENCLR_PREC_Msk);
+#else
+    disableInterrupts(SERCOM_I2CS_INTENCLR_DRDY | SERCOM_I2CS_INTENCLR_PREC);
+#endif // __SAME53__ / __SAME54__
     const bool receivePending = _wireReceivePending;
     const bool requestPending = _wireRequestPending;
     const bool followupPending = receivePending || requestPending;
@@ -1456,6 +1468,8 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
 
   waitSyncBusySysOp();
 
+  SercomWireError completionError = error;
+
   // Undocumented HW limitation: DMA transfers must terminate with STOP and bus release.
   // After a DMA write, the host holds the bus ~7.33 us before the next transfer (Sr window).
   // Writing ADDR during that window leaves the bus in an undefined state and breaks
@@ -1476,25 +1490,33 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
 #endif // __SAME53__ / __SAME54__
     };
 
-    while (!busIsIdle() &&
-           static_cast<uint32_t>(micros() - stopSettleStart) < 4u)
+    while (!busIsIdle() && static_cast<uint32_t>(micros() - stopSettleStart) <
+                               kWireStopSettleTimeoutUs)
       ;
 
-    if (!busIsIdle())
-      prepareCommandBitsWIRE(WIRE_MASTER_ACT_STOP);
+    if (!busIsIdle()) {
+      completionError = SercomWireError::BUS_RELEASE_TIMEOUT;
+      // The device datasheet identifies CTRLA.SWRST as recovery for an I2C
+      // protocol hang. Preserve the cached Wire configuration and transaction
+      // queue, reset only the peripheral, then restore a known master state.
+      resetSERCOM();
+      setMasterWIRE();
+    }
   }
 
   // Preserve the tested async-DMA master retirement order: publish the
   // callback before inspecting chainNext, dequeuing, or restoring slave mode.
   if (txn && txn->onComplete)
-    txn->onComplete(txn->user, static_cast<int>(error));
+    txn->onComplete(txn->user, static_cast<int>(completionError));
 
   // Allow multi-phase I2C transactions to chain without dequeuing.
-  if (txn && txn->chainNext) {
+  if (txn && completionError == SercomWireError::SUCCESS && txn->chainNext) {
     txn->chainNext = false; // reset for next iteration
     startTransmissionWIRE();
     return txn;
   }
+  if (txn)
+    txn->chainNext = false;
 
   SercomTxn* headTxn = nullptr;
   if (_txnQueue.peek(headTxn) && headTxn == txn)
