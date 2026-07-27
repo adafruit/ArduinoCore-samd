@@ -1382,6 +1382,69 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
 
   SercomTxn *txn = _wire.currentTxn;
 
+  SercomWireCompletionReport &report = _wire.lastCompletionReport;
+  report = {};
+  report.error = error;
+  report.address = txn ? txn->address : 0u;
+  report.requestedLength = txn ? static_cast<uint16_t>(txn->length) : 0u;
+  report.transferredLength = static_cast<uint16_t>(_wire.txnIndex);
+  report.role =
+      isMasterWIRE() ? SercomWireRole::Master : SercomWireRole::Slave;
+  report.read = txn && (txn->config & I2C_CFG_READ);
+
+  const auto refreshCompletionReport = [this, &report]() {
+    report.transferredLength = static_cast<uint16_t>(_wire.txnIndex);
+
+    if (report.role == SercomWireRole::Slave) {
+      report.bus = report.error == SercomWireError::SUCCESS
+                       ? SercomWireBusDisposition::Released
+                       : SercomWireBusDisposition::Unknown;
+    } else {
+      const uint16_t status = getSTATUS();
+#if defined(__SAME53__) || defined(__SAME54__)
+      const uint8_t busState =
+          static_cast<uint8_t>((status & SERCOM_I2CM_STATUS_BUSSTATE_Msk) >>
+                               SERCOM_I2CM_STATUS_BUSSTATE_Pos);
+      const bool clockHeld =
+          (status & SERCOM_I2CM_STATUS_CLKHOLD_Msk) != 0u;
+#else
+      const uint8_t busState =
+          static_cast<uint8_t>((status & SERCOM_I2CM_STATUS_BUSSTATE_Msk) >>
+                               SERCOM_I2CM_STATUS_BUSSTATE_Pos);
+      const bool clockHeld = (status & SERCOM_I2CM_STATUS_CLKHOLD) != 0u;
+#endif // __SAME53__ / __SAME54__
+
+      if (isBusOwnerWIRE())
+        report.bus = SercomWireBusDisposition::LocalOwner;
+      else if (clockHeld)
+        report.bus = SercomWireBusDisposition::Unknown;
+      else if (busState == WIRE_IDLE_STATE)
+        report.bus = SercomWireBusDisposition::Released;
+      else if (busState == WIRE_BUSY_STATE)
+        report.bus = SercomWireBusDisposition::OtherOwner;
+      else
+        report.bus = SercomWireBusDisposition::Unknown;
+    }
+
+    if (report.error == SercomWireError::SUCCESS) {
+      report.delivery = SercomWireDelivery::Complete;
+    } else if (report.error == SercomWireError::NACK_ON_ADDRESS ||
+               report.error == SercomWireError::QUEUE_FULL ||
+               report.error == SercomWireError::BUS_CONFLICT ||
+               report.error == SercomWireError::BUS_STATE_UNKNOWN) {
+      report.delivery = report.transferredLength == 0u
+                            ? SercomWireDelivery::None
+                            : SercomWireDelivery::Ambiguous;
+    } else if (report.error == SercomWireError::NACK_ON_DATA) {
+      report.delivery = report.transferredLength == 0u
+                            ? SercomWireDelivery::None
+                            : SercomWireDelivery::Partial;
+    } else if (report.read && report.transferredLength != 0u) {
+      report.delivery = SercomWireDelivery::Partial;
+    } else {
+      report.delivery = SercomWireDelivery::Ambiguous;
+    }
+  };
 
   // Explicit timeout cancellation is a newer entrance into the shared
   // PendSV retirement service. Keep it outside the tested normal master
@@ -1418,6 +1481,7 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
       dmaAbortRx();
 #endif // USE_ZERODMA
       retireSlaveTransactionWIRE(followupPending);
+      refreshCompletionReport();
       if (txn->onComplete)
         txn->onComplete(txn->user, static_cast<int>(completionError));
     }
@@ -1504,6 +1568,7 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
     }
   }
 
+  refreshCompletionReport();
   // Preserve the tested async-DMA master retirement order: publish the
   // callback before inspecting chainNext, dequeuing, or restoring slave mode.
   if (txn && txn->onComplete)

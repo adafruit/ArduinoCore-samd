@@ -56,6 +56,9 @@ public:
                           void *user = nullptr);
   bool abortTransmission(
       int status = static_cast<int>(SercomWireError::MASTER_TIMEOUT));
+  inline const SercomWireCompletionReport &lastCompletionReport(void) const {
+    return sercom->lastCompletionReportWIRE();
+  }
 
   // If onComplete is nullptr, this blocks for legacy sync behavior.
   // If onComplete is non-null, this enqueues and returns immediately (async).

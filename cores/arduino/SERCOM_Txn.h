@@ -58,6 +58,36 @@ enum class SercomWireError : uint8_t
   BUS_RELEASE_TIMEOUT = 15 // STOP issued but BUSSTATE did not return to IDLE
 };
 
+enum class SercomWireRole : uint8_t {
+  Master,
+  Slave,
+};
+
+enum class SercomWireBusDisposition : uint8_t {
+  Released,
+  LocalOwner,
+  OtherOwner,
+  Unknown,
+};
+
+enum class SercomWireDelivery : uint8_t {
+  None,
+  Partial,
+  Complete,
+  Ambiguous,
+};
+
+struct SercomWireCompletionReport {
+  SercomWireError error = SercomWireError::SUCCESS;
+  uint16_t address = 0;
+  uint16_t requestedLength = 0;
+  uint16_t transferredLength = 0;
+  SercomWireRole role = SercomWireRole::Master;
+  SercomWireBusDisposition bus = SercomWireBusDisposition::Unknown;
+  SercomWireDelivery delivery = SercomWireDelivery::Ambiguous;
+  bool read = false;
+};
+
 // SPI error reporting (async callbacks)
 enum class SercomSpiError : uint8_t
 {
