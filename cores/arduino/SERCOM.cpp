@@ -1176,10 +1176,6 @@ SercomTxn* SERCOM::startTransmissionWIRE( void )
   addr = (uint16_t)((addr << 1) | (read ? 1u : 0u));
 
   if (!isBusOwnerWIRE()) {
-    if (isArbLostWIRE() && !isBusIdleWIRE()) {
-      stopTransmissionWIRE(SercomWireError::ARBITRATION_LOST);
-      return nullptr;
-    }
     if (isBusUnknownWIRE()) {
       stopTransmissionWIRE(SercomWireError::BUS_STATE_UNKNOWN);
       return nullptr;

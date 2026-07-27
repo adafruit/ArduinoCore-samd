@@ -221,13 +221,26 @@ inline void TwoWire::onService(void)
     const bool masterTimeout = isMaster && (masterExtendTimeout || lowTimeout);
     const bool slaveTimeout = slaveExtendTimeout || (!isMaster && lowTimeout);
 
+    if (isMaster && arbitrationLost) {
+#ifdef USE_ZERODMA
+      sercom->dmaAbortTx();
+      sercom->dmaAbortRx();
+      sercom->setDmaWIRE(false);
+#endif
+      // Arbitration loss releases SDA and SCL. Re-arm the same queue head by
+      // writing ADDR again. ADDR clears ARBLOST; when another master still
+      // owns the bus, SERCOM remains in BUSY and waits for IDLE before START.
+      sercom->clearINTFLAG();
+      awaitingAddressAck = true;
+      sercom->startTransmissionWIRE();
+      return;
+    }
+
     SercomWireError error = SercomWireError::UNKNOWN_ERROR;
 
     if (isRxNack) {
       error = isMaster && awaitingAddressAck ? SercomWireError::NACK_ON_ADDRESS
                                              : SercomWireError::NACK_ON_DATA;
-    } else if (arbitrationLost) {
-      error = SercomWireError::ARBITRATION_LOST;
     } else if (busError) {
       error = SercomWireError::BUS_ERROR;
     } else if (masterTimeout) {
