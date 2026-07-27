@@ -500,6 +500,7 @@ class SERCOM
 			SercomTxn* currentTxn = nullptr;
 			size_t txnIndex = 0;
 			size_t txnLength = 0;
+			size_t dmaBlockLength = 0;
 		} _wire;
 
 		struct SpiConfig {

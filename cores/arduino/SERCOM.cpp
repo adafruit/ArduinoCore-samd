@@ -962,10 +962,10 @@ void SERCOM::dmaRxSuspendCallbackWIRE(Adafruit_ZeroDMA *dma) {
         reinterpret_cast<const DmacDescriptor *>(DMAC->WRBADDR.reg);
     remaining = writeback[channel].BTCNT.reg;
 #endif // __SAME53__ / __SAME54__
-    if (inst->_wire.txnLength >= remaining)
-      transferred = inst->_wire.txnLength - remaining;
+    if (inst->_wire.dmaBlockLength >= remaining)
+      transferred = inst->_wire.dmaBlockLength - remaining;
   }
-  inst->_wire.txnIndex = transferred;
+  inst->_wire.txnIndex += transferred;
   inst->dmaAbortRx();
   inst->deferStopWIRE(SercomWireError::SUCCESS);
 }
