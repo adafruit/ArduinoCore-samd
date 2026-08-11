@@ -209,6 +209,7 @@ bool TwoWire::begin(uint16_t address, bool enableGeneralCall, uint8_t speed,
   sercom->enableWIRE();
   sercom->registerReceiveWIRE(&TwoWire::onDeferredReceive, this);
   sercom->registerRequestWIRE(&TwoWire::onDeferredRequest, this);
+  prepareSlaveReceive();
   return true;
 }
 
@@ -229,7 +230,8 @@ bool TwoWire::abortTransmission(int status) {
 }
 
 uint8_t TwoWire::requestFrom(uint8_t address, size_t quantity, bool stopBit, uint8_t* rxBuffer,
-                             void (*onComplete)(void* user, int status), void* user)
+                             void (*onComplete)(void* user, int status), void* user,
+                             bool replaySafe)
 {
   if(quantity == 0)
     return 0;
@@ -246,7 +248,8 @@ uint8_t TwoWire::requestFrom(uint8_t address, size_t quantity, bool stopBit, uin
     loader.length = ( quantity > WIRE_BUFFER_LENGTH) ? WIRE_BUFFER_LENGTH : quantity;
   }
 
-  loader.config = I2C_CFG_READ | (stopBit ? I2C_CFG_STOP : 0);
+  loader.config = I2C_CFG_READ | (stopBit ? I2C_CFG_STOP : 0) |
+                  (replaySafe ? I2C_CFG_REPLAY_SAFE : 0);
   loader.address = address;
 
   // Allocate fresh transaction from pool and copy loader data
@@ -310,6 +313,13 @@ void TwoWire::beginTransmission(uint8_t address) {
   transmissionBegun = true;
 }
 
+void TwoWire::setTransactionReplaySafe(bool replaySafe) {
+  if (replaySafe)
+    loader.config |= I2C_CFG_REPLAY_SAFE;
+  else
+    loader.config &= ~I2C_CFG_REPLAY_SAFE;
+}
+
 // Errors:
 //  0 : Success
 //  1 : Data too long
@@ -333,7 +343,8 @@ uint8_t TwoWire::endTransmission(bool stopBit,
   txn->chainNext = false;
 
   // Set parameters that weren't known during beginTransmission/write
-  txn->config = stopBit ? I2C_CFG_STOP : 0;
+  txn->config = (loader.config & I2C_CFG_REPLAY_SAFE) |
+                (stopBit ? I2C_CFG_STOP : 0);
   if (onComplete) {
     txn->onComplete = onComplete;
     txn->user = (user == nullptr) ? txn : user;
@@ -558,19 +569,25 @@ void TwoWire::onTxnComplete(void* user, int status)
   self->txnDone = true;
 }
 
+void TwoWire::prepareSlaveReceive() {
+  rxLength = 0;
+  rxIndex = 0;
+  slaveTxn = SercomTxn{};
+  slaveTxn.rxPtr = rxBufferPtr;
+  slaveTxn.length = rxBufferCapacity;
+  slaveTxn.config = 0;
+  slaveTxn.onComplete = &TwoWire::onSlaveReceiveComplete;
+  slaveTxn.user = this;
+  sercom->setSlaveTxnWIRE(&slaveTxn);
+}
+
 void TwoWire::onDeferredReceive(void *user) {
   if (!user)
     return;
   TwoWire *self = static_cast<TwoWire *>(user);
-  self->rxLength = 0;
-  self->rxIndex = 0;
-  self->slaveTxn = SercomTxn{};
-  self->slaveTxn.rxPtr = self->rxBufferPtr;
-  self->slaveTxn.length = self->rxBufferCapacity;
-  self->slaveTxn.config = 0;
-  self->slaveTxn.onComplete = &TwoWire::onSlaveReceiveComplete;
-  self->slaveTxn.user = self;
+  self->prepareSlaveReceive();
   self->sercom->setTxnWIRE(&self->slaveTxn);
+  self->sercom->markSlaveTransactionActiveWIRE();
   if (!self->sercom->startTransmissionWIRE()) {
     self->sercom->deferStopWIRE(SercomWireError::DMA_ERROR);
     return;
@@ -597,6 +614,7 @@ void TwoWire::onDeferredRequest(void *user) {
   self->slaveTxn.onComplete = &TwoWire::onSlaveRequestComplete;
   self->slaveTxn.user = self;
   self->sercom->setTxnWIRE(&self->slaveTxn);
+  self->sercom->markSlaveTransactionActiveWIRE();
   if (!self->sercom->startTransmissionWIRE()) {
     self->sercom->deferStopWIRE(SercomWireError::DMA_ERROR);
     return;
@@ -624,6 +642,7 @@ void TwoWire::onSlaveRequestComplete(void *user, int status) {
   if (self->requestCompletionCallback)
     self->requestCompletionCallback(self->requestCompletionUser,
                                     static_cast<SercomWireError>(status));
+  self->prepareSlaveReceive();
 }
 
 #if WIRE_INTERFACES_COUNT > 0

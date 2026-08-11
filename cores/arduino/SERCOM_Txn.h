@@ -110,6 +110,7 @@ enum : uint16_t {
   I2C_CFG_CRC     = 1u << 2,
   I2C_CFG_10BIT   = 1u << 3,
   I2C_CFG_NODMA   = 1u << 4,
+  I2C_CFG_REPLAY_SAFE = 1u << 5,
 };
 
 // I2C STATUS register error-clear masks (write to I2CM.STATUS or I2CS.STATUS)

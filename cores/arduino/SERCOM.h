@@ -207,12 +207,14 @@ class SERCOM
 		inline uint8_t getINTFLAG( void ) const { return sercom->I2CM.SERCOM_INTFLAG; }
 		inline uint16_t getSTATUS( void ) const { return sercom->I2CM.SERCOM_STATUS; }
 		inline void clearINTFLAG(uint8_t mask = 0xFF) { sercom->I2CM.SERCOM_INTFLAG = mask; }
+		inline void clearStatusWIRE(uint16_t mask) { sercom->I2CM.SERCOM_STATUS = mask; }
 #else
 		inline void disableInterrupts(uint8_t mask) { sercom->I2CM.INTENCLR.reg = mask; }
 		inline void enableInterrupts(uint8_t mask) { sercom->I2CM.INTENSET.reg = mask; }
 		inline uint8_t getINTFLAG( void ) const { return sercom->I2CM.INTFLAG.reg; }
 		inline uint16_t getSTATUS( void ) const { return sercom->I2CM.STATUS.reg; }
 		inline void clearINTFLAG(uint8_t mask = 0xFF) { sercom->I2CM.INTFLAG.reg = mask; }
+		inline void clearStatusWIRE(uint16_t mask) { sercom->I2CM.STATUS.reg = mask; }
 #endif // __SAME53__ / __SAME54__
 
 		/* ========== UART ========== */
@@ -280,6 +282,22 @@ class SERCOM
 		void initSlaveWIRE(uint16_t address, bool enableGeneralCall = false, uint8_t speed = 0x0, bool enable10Bit = false) ;
 		void initMasterWIRE(uint32_t baudrate) ;
 		inline void setTxnWIRE(SercomTxn* txn);
+		inline void setSlaveTxnWIRE(SercomTxn* txn);
+		inline bool isSlaveTransactionActiveWIRE(void) const {
+			return _wire.slaveTransactionActive;
+		}
+		inline void markSlaveTransactionActiveWIRE(void) {
+			_wire.slaveTransactionActive = true;
+		}
+		inline void discardIdleSlaveTransactionWIRE(void) {
+			if (!_wire.slaveTransactionActive &&
+			    _wire.currentTxn == _wire.slaveTxn) {
+				_wire.active = false;
+				_wire.currentTxn = nullptr;
+				_wire.txnIndex = 0;
+				_wire.txnLength = 0;
+			}
+		}
 		inline void setDmaWIRE(bool useDma) { _wire.useDma = useDma; }
 		inline bool isDmaWIRE(void) const { return _wire.useDma; }
 		inline void markBusReleasePendingWIRE(void) { _wire.releasePending = true; }
@@ -313,6 +331,9 @@ class SERCOM
 		inline bool isAbortPendingWIRE(void) const { return _wire.abortPending; }
 		bool serviceAbortWIRE(void);
 		void deferStopWIRE(SercomWireError error);
+		void deferBusErrorRecoveryWIRE(bool arbitrationLost,
+		                               bool commandReady);
+		SercomTxn* serviceBusErrorRecoveryWIRE(void);
 
 		inline bool sendDataWIRE( void ) ;
 		inline bool isMasterWIRE( void );
@@ -495,12 +516,20 @@ class SERCOM
 			bool slaveConfigured = false;             // return to slave mode after queued master work
 			bool useDma = false;		             // per-transaction DMA use for master/slave modes
 			bool active = false;                     // active transaction in progress
+			bool slaveTransactionActive = false;     // AMATCH observed for cached slave descriptor
 			bool releasePending = false;              // STOP requested; callback waits until OWNER clears
 			bool abortPending = false;                // wait for MB/SB before issuing timeout STOP
+			bool busErrorRecoveryPending = false;
+			uint32_t busErrorRecoveryStartedUs = 0;
+			bool busErrorRecoveryDeadlineActive = false;
+			uint32_t busErrorRecoveryDeadlineStartedUs = 0;
+			bool busErrorRecoveryArbitrationLost = false;
+			bool busErrorRecoveryCommandReady = false;
 			SercomWireError abortError = SercomWireError::MASTER_TIMEOUT;
 			uint8_t retryCount = 0;                  // retry count for recoverable bus errors
 			SercomWireError returnValue = SercomWireError::SUCCESS;
 			SercomTxn* currentTxn = nullptr;
+			SercomTxn* slaveTxn = nullptr;
 			size_t txnIndex = 0;
 			size_t txnLength = 0;
 			size_t dmaBlockLength = 0;
