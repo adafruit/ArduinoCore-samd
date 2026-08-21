@@ -1625,10 +1625,20 @@ SercomTxn* SERCOM::stopTransmissionWIRE( SercomWireError error )
         _wireRequestCb(_wireCallbackUser);
     }
 
+    // An enqueue that arrives during an active slave transaction must wait
+    // until that transaction retires. Give that already-admitted master work
+    // the idle handoff before restoring the cached slave descriptor, whose
+    // active/current state would otherwise make startNextQueuedWIRE() refuse
+    // to run it.
+    if (_wire.currentTxn == nullptr)
+      startNextQueuedWIRE();
+
     if (_wire.currentTxn == nullptr && _wire.slaveTxn != nullptr)
       setTxnWIRE(_wire.slaveTxn);
-
-    startNextQueuedWIRE();
+#if defined(SERCOM_WIRE_TEST_POINTS)
+    recordTestPointWIRE(SercomWireTestEvent::StopSlaveComplete,
+                        static_cast<int>(completionError));
+#endif
     return _wire.currentTxn;
   }
 
