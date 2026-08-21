@@ -215,6 +215,9 @@ inline void TwoWire::onService(void)
 #else
   const bool busError = status & SERCOM_I2CM_STATUS_BUSERR;
 #endif // __SAME53__ / __SAME54__
+  const uint8_t busState =
+      (status & SERCOM_I2CM_STATUS_BUSSTATE_Msk) >>
+      SERCOM_I2CM_STATUS_BUSSTATE_Pos;
   const bool slaveBusError = !isMaster && wireError && busError;
   if (slaveBusError) {
 #if defined(__SAME53__) || defined(__SAME54__)
@@ -290,17 +293,13 @@ inline void TwoWire::onService(void)
 #endif // __SAME53__ / __SAME54__
 
     if (isMaster && busError) {
-      simio::wire::BusState busState = simio::wire::BusState::Unknown;
-      if (sercom->isBusIdleWIRE())
-        busState = simio::wire::BusState::Idle;
-      else if (sercom->isBusOwnerWIRE())
-        busState = simio::wire::BusState::Owner;
-      else if (sercom->isBusBusyWIRE())
-        busState = simio::wire::BusState::Busy;
+      const auto capturedBusState =
+          static_cast<simio::wire::BusState>(busState);
       const bool replayAllowed =
           activeTxn && (activeTxn->config & I2C_CFG_REPLAY_SAFE);
       const auto busErrorAction = simio::wire::decideBusErrorAction(
-          {true, busState, arbitrationLost, commandReady, terminalCondition,
+          {true, capturedBusState, arbitrationLost, commandReady,
+           terminalCondition,
            replayAllowed, activeTxn != nullptr});
       if (busErrorAction != simio::wire::BusErrorAction::RetireAmbiguous &&
           busErrorAction != simio::wire::BusErrorAction::RetireTerminal) {
@@ -319,7 +318,7 @@ inline void TwoWire::onService(void)
     }
 
     if (isMaster && arbitrationLost && !busError) {
-      if (sercom->isBusOwnerWIRE() && arbitrationOnly) {
+      if (busState == WIRE_OWNER_STATE && arbitrationOnly) {
         // ARBLOST normally transitions OWNER to BUSY. If OWNER remains set,
         // rewriting ADDR would request a repeated START and restart a
         // transaction that the hardware still owns. Clear only the error
@@ -364,13 +363,6 @@ inline void TwoWire::onService(void)
       } else if (busError) {
         error = SercomWireError::BUS_ERROR;
       } else if (isMaster) {
-#if defined(__SAME53__) || defined(__SAME54__)
-        const uint8_t busState = (status & SERCOM_I2CM_STATUS_BUSSTATE_Msk) >>
-                                 SERCOM_I2CM_STATUS_BUSSTATE_Pos;
-#else
-        const uint8_t busState = (status & SERCOM_I2CM_STATUS_BUSSTATE_Msk) >>
-                                 SERCOM_I2CM_STATUS_BUSSTATE_Pos;
-#endif // __SAME53__ / __SAME54__
         if (busState == WIRE_UNKNOWN_STATE)
           error = SercomWireError::BUS_STATE_UNKNOWN;
       }
