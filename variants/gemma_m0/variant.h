@@ -112,22 +112,25 @@ static const uint8_t DAC0 = PIN_DAC0;
  */
 
 // Serial1 (sercom 0)
-#define PIN_SERIAL1_RX       (2ul) // PA05
-#define PAD_SERIAL1_RX       (SERCOM_RX_PAD_1)
-#define PIN_SERIAL1_TX       (0ul) // PA04
-#define PAD_SERIAL1_TX       (UART_TX_PAD_0)
+#define PIN_SERIAL1_RX           (2ul) // PA05
+#define PAD_SERIAL1_RX           (SERCOM_RX_PAD_1)
+#define PIN_SERIAL1_TX           (0ul) // PA04
+#define PAD_SERIAL1_TX           (UART_TX_PAD_0)
+#define PERIPH_SERIAL1           sercom0
+#define SERIAL1_IT_HANDLER       SERCOM0_Handler
+#define UART_VARIANT_OWNS_SERIAL1
 
 /*
  * SPI Interfaces
  */
 #define SPI_INTERFACES_COUNT 1 // we'll just have SPI CLK and MOSI on sercom 0, no MISO
 
-#define PIN_SPI_MISO         (6u)  // PA06, not actually available
-#define PIN_SPI_MOSI         (0ul) // PA04
-#define PIN_SPI_SCK          (2ul) // PA05
-#define PERIPH_SPI           sercom0
-#define PAD_SPI_TX           SPI_PAD_0_SCK_1
-#define PAD_SPI_RX         SERCOM_RX_PAD_2
+#define PIN_SPI_MISO             (6u)  // PA06, not actually available
+#define PIN_SPI_MOSI             (0ul) // PA04
+#define PIN_SPI_SCK              (2ul) // PA05
+#define PERIPH_SPI               sercom0
+#define PAD_SPI_TX               SPI_PAD_0_SCK_1
+#define PAD_SPI_RX               SERCOM_RX_PAD_2
 
 static const uint8_t SS	  = 1 ;	// only pin remaining (shrug)
 static const uint8_t MOSI = PIN_SPI_MOSI ;
@@ -140,9 +143,9 @@ static const uint8_t SCK  = PIN_SPI_SCK ;
  */
 #define WIRE_INTERFACES_COUNT 1
 
-#define PIN_WIRE_SDA         (0u)
-#define PIN_WIRE_SCL         (2u)
-#define PERIPH_WIRE          sercom0
+#define PIN_WIRE_SDA             (0u)
+#define PIN_WIRE_SCL             (2u)
+#define PERIPH_WIRE              sercom0
 //#define WIRE_IT_HANDLER    // hack! we call the i2c handler from within the serial handler!
 
 static const uint8_t SDA = PIN_WIRE_SDA;
@@ -200,4 +203,3 @@ extern Uart Serial1;
 #define SERIAL_PORT_HARDWARE_OPEN   Serial1
 
 #endif /* _VARIANT_ARDUINO_ZERO_ */
-

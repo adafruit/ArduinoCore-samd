@@ -132,42 +132,5 @@ SERCOM sercom3( SERCOM3 ) ;
 SERCOM sercom4( SERCOM4 ) ;
 SERCOM sercom5( SERCOM5 ) ;
 
-Uart Serial1( &sercom1, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
-
-void SERCOM1_0_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM1_1_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM1_2_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM1_3_Handler()
-{
-  Serial1.IrqHandler();
-}
-
 
 // sercom for internal ESP32 UART connection
-Uart Serial2( &sercom4, PIN_SERIAL2_RX, PIN_SERIAL2_TX, PAD_SERIAL2_RX, PAD_SERIAL2_TX ) ;
-
-void SERCOM4_0_Handler()
-{
-  Serial2.IrqHandler();
-}
-void SERCOM4_1_Handler()
-{
-  Serial2.IrqHandler();
-}
-void SERCOM4_2_Handler()
-{
-  Serial2.IrqHandler();
-}
-void SERCOM4_3_Handler()
-{
-  Serial2.IrqHandler();
-}

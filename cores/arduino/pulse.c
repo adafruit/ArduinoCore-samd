@@ -34,14 +34,18 @@ uint32_t pulseIn(uint32_t pin, uint32_t state, uint32_t timeout)
   uint32_t bit = 1 << p.ulPin;
   uint32_t stateMask = state ? bit : 0;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   /*
    * The SAMD51 is fast enough to use really obvious code (similar to
    * what was used to produce pulse_asm.S, but using micros() for timing.
    * No assembly required, no conversion of loop counts to times (which is
    * worrisome in the presence of cache.)
    */
-  const volatile uint32_t *port = &(PORT->Group[p.ulPort].IN.reg);
+#if defined(__SAME53__) || defined(__SAME54__)
+  const volatile uint32_t *port = &PORT_REGS->GROUP[p.ulPort].PORT_IN;
+#else
+  const volatile uint32_t *port = &PORT->Group[p.ulPort].IN.reg;
+#endif
   uint32_t usCallStart;  // microseconds at start of call, for timeout.
   uint32_t usPulseStart; // microseconds at start of measured pulse.
   usCallStart = usPulseStart = micros();
@@ -80,4 +84,3 @@ uint32_t pulseIn(uint32_t pin, uint32_t state, uint32_t timeout)
     return 0;
 #endif // SAMD51
 }
-

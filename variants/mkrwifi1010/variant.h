@@ -96,13 +96,13 @@ static const uint8_t A6  = PIN_A6;
 #define SPI_INTERFACES_COUNT 2
  
 // SPI
-#define PIN_SPI_MISO  (10u)
-#define PIN_SPI_MOSI  (8u)
-#define PIN_SPI_SCK   (9u)
-#define PIN_SPI_SS    (4u)
-#define PERIPH_SPI    sercom1
-#define PAD_SPI_TX    SPI_PAD_0_SCK_1
-#define PAD_SPI_RX    SERCOM_RX_PAD_3
+#define PIN_SPI_MISO             (10u)
+#define PIN_SPI_MOSI             (8u)
+#define PIN_SPI_SCK              (9u)
+#define PIN_SPI_SS               (4u)
+#define PERIPH_SPI               sercom1
+#define PAD_SPI_TX               SPI_PAD_0_SCK_1
+#define PAD_SPI_RX               SERCOM_RX_PAD_3
 
 static const uint8_t SS   = PIN_SPI_SS;   // SPI Slave SS not used. Set here only for reference.
 static const uint8_t MOSI = PIN_SPI_MOSI;
@@ -110,13 +110,13 @@ static const uint8_t MISO = PIN_SPI_MISO;
 static const uint8_t SCK  = PIN_SPI_SCK;
 
 // SPI1
-#define PIN_SPI1_MISO    (27u)
-#define PIN_SPI1_MOSI    (26u)
-#define PIN_SPI1_SCK     (29u)
-#define PIN_SPI1_SS      (28u)
-#define PERIPH_SPI1   sercom4
-#define PAD_SPI1_TX   SPI_PAD_0_SCK_3
-#define PAD_SPI1_RX   SERCOM_RX_PAD_1
+#define PIN_SPI1_MISO            (27u)
+#define PIN_SPI1_MOSI            (26u)
+#define PIN_SPI1_SCK             (29u)
+#define PIN_SPI1_SS              (28u)
+#define PERIPH_SPI1              sercom4
+#define PAD_SPI1_TX              SPI_PAD_0_SCK_3
+#define PAD_SPI1_RX              SERCOM_RX_PAD_1
 static const uint8_t SS1   = PIN_SPI1_SS;
 static const uint8_t MOSI1 = PIN_SPI1_MOSI;
 static const uint8_t MISO1 = PIN_SPI1_MISO;
@@ -132,10 +132,9 @@ static const uint8_t SCK1  = PIN_SPI1_SCK;
 #define WIRE_INTERFACES_COUNT 1
 
 // Wire
-#define PIN_WIRE_SDA        (11u)
-#define PIN_WIRE_SCL        (12u)
-#define PERIPH_WIRE         sercom2
-#define WIRE_IT_HANDLER     SERCOM2_Handler
+#define PIN_WIRE_SDA             (11u)
+#define PIN_WIRE_SCL             (12u)
+#define PERIPH_WIRE              sercom2
 
 // USB
 // ---
@@ -169,19 +168,21 @@ extern SERCOM sercom5;
 
 // Serial1
 extern Uart Serial1;
-#define PIN_SERIAL1_RX (13ul)
-#define PIN_SERIAL1_TX (14ul)
-#define PAD_SERIAL1_TX (UART_TX_PAD_2)
-#define PAD_SERIAL1_RX (SERCOM_RX_PAD_3)
+#define PIN_SERIAL1_RX           (13ul)
+#define PIN_SERIAL1_TX           (14ul)
+#define PAD_SERIAL1_TX           (UART_TX_PAD_2)
+#define PAD_SERIAL1_RX           (SERCOM_RX_PAD_3)
+#define PERIPH_SERIAL1           sercom5
 
 // Serial2
 extern Uart Serial2;
-#define PIN_SERIAL2_RX (27ul)
-#define PIN_SERIAL2_TX (26ul)
-#define PAD_SERIAL2_TX (UART_TX_RTS_CTS_PAD_0_2_3)
-#define PAD_SERIAL2_RX (SERCOM_RX_PAD_1)
-#define PIN_SERIAL2_RTS (28u)
-#define PIN_SERIAL2_CTS (29u)
+#define PIN_SERIAL2_RX           (27ul)
+#define PIN_SERIAL2_TX           (26ul)
+#define PAD_SERIAL2_TX           (UART_TX_RTS_CTS_PAD_0_2_3)
+#define PAD_SERIAL2_RX           (SERCOM_RX_PAD_1)
+#define PERIPH_SERIAL2           sercom4
+#define PIN_SERIAL2_RTS          (28u)
+#define PIN_SERIAL2_CTS          (29u)
 
 #endif // __cplusplus
 

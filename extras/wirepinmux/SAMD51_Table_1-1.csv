@@ -1,0 +1,14 @@
+﻿Table 1-1. SAM E53/E54 Family Features with Ethernet,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+,,,,,Peripherals,,,,,,,,,,,,,,,,,,,Analog,,,,,Security,,,,
+Device,Flash (KB),SRAM (KB) / Backup RAM (KB),Pins,Packages,Ethernet Controller,CAN-FD,SERCOM,TC/Compare,TCC (24-bit/16-bit),I2S,USB,QSPI,SDHC,DMA Channels,PCC (data size),CCL,Position Decoder,RTC,WDT,Frequency Measurement,Event System (Channels),External Interrupt Lines,I/O Pins,ADC (Channels ADC0/ADC1),Analog Comparators (Channels),DAC (Channels),PTC (Mutual/Self-capacitance Channels),Temperature Sensor,AES,TRNG,Public Key Cryptography (PUKCC),Integrity Check Monitor,Tamper Pins
+SAME53N20,1024,256 / 8,100,TQFP,Y,N,8,"8/2","2/3",Y,Y,Y,2,32,14,4,Y,Y,Y,Y,32,16,81,"16/12",4,2,"256/32",Y,Y,Y,Y,Y,5
+SAME53N19,512,192 / 8,100,TQFP,Y,N,8,"8/2","2/3",Y,Y,Y,2,32,14,4,Y,Y,Y,Y,32,16,81,"16/12",4,2,"256/32",Y,Y,Y,Y,Y,5
+SAME53J20,1024,256 / 8,64,"TQFP,VQFN",Y,N,6,"6/2","2/3",Y,Y,Y,1,32,10,4,Y,Y,Y,Y,32,16,51,"16/8",4,2,"256/32",Y,Y,Y,Y,Y,3
+SAME53J19,512,192 / 8,64,"TQFP,VQFN",Y,N,6,"6/2","2/3",Y,Y,Y,1,32,10,4,Y,Y,Y,Y,32,16,51,"16/8",4,2,"256/32",Y,Y,Y,Y,Y,3
+SAME53J18,256,128 / 8,64,"TQFP,VQFN",Y,N,6,"6/2","2/3",Y,Y,Y,1,32,10,4,Y,Y,Y,Y,32,16,51,"16/8",4,2,"256/32",Y,Y,Y,Y,Y,3
+SAME54P20,1024,256 / 8,128,TQFP,Y,Y,8,"8/2","2/3",Y,Y,Y,2,32,14,4,Y,Y,Y,Y,32,16,99,"16/16",4,2,"256/32",Y,Y,Y,Y,Y,5
+SAME54P20,1024,256 / 8,120,TFBGA,Y,Y,8,"8/2","2/3",Y,Y,Y,2,32,14,4,Y,Y,Y,Y,32,16,99,"16/16",4,2,"256/32",Y,Y,Y,Y,Y,5
+SAME54P19,512,192 / 8,128,TQFP,Y,Y,8,"8/2","2/3",Y,Y,Y,2,32,14,4,Y,Y,Y,Y,32,16,99,"16/16",4,2,"256/32",Y,Y,Y,Y,Y,5
+SAME54P19,512,192 / 8,120,TFBGA,Y,Y,8,"8/2","2/3",Y,Y,Y,2,32,14,4,Y,Y,Y,Y,32,16,99,"16/16",4,2,"256/32",Y,Y,Y,Y,Y,5
+SAME54N20,1024,256 / 8,100,TQFP,Y,Y,8,"8/2","2/3",Y,Y,Y,2,32,14,4,Y,Y,Y,Y,32,16,81,"16/12",4,2,"256/32",Y,Y,Y,Y,Y,5
+SAME54N19,512,192 / 8,100,TQFP,Y,Y,8,"8/2","2/3",Y,Y,Y,2,32,14,4,Y,Y,Y,Y,32,16,81,"16/12",4,2,"256/32",Y,Y,Y,Y,Y,5

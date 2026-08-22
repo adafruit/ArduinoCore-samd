@@ -4,3 +4,6 @@
 bootloaders/*/build/
 *~
 /libraries/**/build/
+.ci-home
+.ci_home
+*.log

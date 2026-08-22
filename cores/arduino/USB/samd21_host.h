@@ -23,7 +23,11 @@
 extern "C" {
 #endif
 
+#if defined(__SAME53__) || defined(__SAME54__)
+extern __attribute__((__aligned__(4))) volatile usb_descriptor_host_registers_t usb_pipe_table[USB_EPT_NUM];
+#else
 extern __attribute__((__aligned__(4))) volatile UsbHostDescriptor usb_pipe_table[USB_EPT_NUM];
+#endif
 
 #define  USB_EP_DIR_IN        0x80  // USB_SETUP_DEVICE_TO_HOST
 #define  USB_EP_DIR_OUT       0x00  // USB_SETUP_HOST_TO_DEVICE
@@ -41,9 +45,15 @@ extern __attribute__((__aligned__(4))) volatile UsbHostDescriptor usb_pipe_table
 #define USB_HOST_PCFG_PTOKEN_IN     USB_HOST_PCFG_PTOKEN(0x1)
 #define USB_HOST_PCFG_PTOKEN_OUT    USB_HOST_PCFG_PTOKEN(0x2)
 
+#if defined(__SAME53__) || defined(__SAME54__)
+#define USB_ERRORFLOW         USB_HOST_STATUS_BK_ERRORFLOW_Msk
+#define USB_ERRORTIMEOUT      USB_HOST_STATUS_PIPE_TOUTER_Msk
+#define USB_ERROR_DATATOGGLE  USB_HOST_STATUS_PIPE_DTGLER_Msk
+#else
 #define USB_ERRORFLOW	      USB_HOST_STATUS_BK_ERRORFLOW
 #define USB_ERRORTIMEOUT      USB_HOST_STATUS_PIPE_TOUTER
 #define USB_ERROR_DATATOGGLE  USB_HOST_STATUS_PIPE_DTGLER
+#endif
 
 #define USB_PCKSIZE_SIZE_8_BYTES        0
 #define USB_PCKSIZE_SIZE_16_BYTES       1
@@ -55,6 +65,9 @@ extern __attribute__((__aligned__(4))) volatile UsbHostDescriptor usb_pipe_table
 #define USB_PCKSIZE_SIZE_1023_BYTES_FS  7   
 #define USB_PCKSIZE_SIZE_1024_BYTES_HS  7  
 
+#if defined(__SAME53__) || defined(__SAME54__)
+// SAME53/E54 host operations use the native register structures directly in samd21_host.c.
+#else
 #define USB_HOST_DTGL(p)               (USB->HOST.HostPipe[p].PSTATUS.reg & USB_HOST_PSTATUS_DTGL)>>USB_HOST_PSTATUS_DTGL_Pos
 
 // USB host connection/disconnection monitoring
@@ -121,6 +134,7 @@ extern __attribute__((__aligned__(4))) volatile UsbHostDescriptor usb_pipe_table
 
 // Force full speed mode
 #define uhd_force_full_speed()              USB->HOST.CTRLB.reg &= ~USB_HOST_CTRLB_SPDCONF_Msk
+#endif
 
 #ifdef __cplusplus
 }

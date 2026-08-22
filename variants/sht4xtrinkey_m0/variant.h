@@ -102,12 +102,12 @@ static const uint8_t A1  = PIN_A1;
  */
 #define SPI_INTERFACES_COUNT 1
 
-#define PIN_SPI_MISO         PIN_A0
-#define PIN_SPI_MOSI         PIN_A0
-#define PIN_SPI_SCK          PIN_A0
-#define PERIPH_SPI           sercom0
-#define PAD_SPI_TX           SPI_PAD_0_SCK_1
-#define PAD_SPI_RX           SERCOM_RX_PAD_0
+#define PIN_SPI_MISO             PIN_A0
+#define PIN_SPI_MOSI             PIN_A0
+#define PIN_SPI_SCK              PIN_A0
+#define PERIPH_SPI               sercom0
+#define PAD_SPI_TX               SPI_PAD_0_SCK_1
+#define PAD_SPI_RX               SERCOM_RX_PAD_0
 
 static const uint8_t SS	  = PIN_A0;
 static const uint8_t MOSI = PIN_SPI_MOSI;
@@ -119,10 +119,9 @@ static const uint8_t SCK  = PIN_SPI_SCK;
  */
 #define WIRE_INTERFACES_COUNT 1
 
-#define PIN_WIRE_SDA         (3u)
-#define PIN_WIRE_SCL         (4u)
-#define PERIPH_WIRE          sercom0
-#define WIRE_IT_HANDLER      SERCOM0_Handler
+#define PIN_WIRE_SDA             (3u)
+#define PIN_WIRE_SCL             (4u)
+#define PERIPH_WIRE              sercom0
 
 static const uint8_t SDA = PIN_WIRE_SDA;
 static const uint8_t SCL = PIN_WIRE_SCL;

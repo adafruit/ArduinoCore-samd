@@ -148,12 +148,12 @@ static const uint8_t DAC0 = PIN_DAC0;
 #define SPI_INTERFACES_COUNT 3
 
 // SPI interface for QSPI flash
-#define PIN_SPI_MISO         (30u)
-#define PIN_SPI_SCK          (31u)
-#define PIN_SPI_MOSI         (32u)
-#define PERIPH_SPI           sercom3
-#define PAD_SPI_TX           SPI_PAD_2_SCK_3  // MOSI / SCK
-#define PAD_SPI_RX           SERCOM_RX_PAD_0  // MISO
+#define PIN_SPI_MISO             (30u)
+#define PIN_SPI_SCK              (31u)
+#define PIN_SPI_MOSI             (32u)
+#define PERIPH_SPI               sercom3
+#define PAD_SPI_TX               SPI_PAD_2_SCK_3  // MOSI / SCK
+#define PAD_SPI_RX               SERCOM_RX_PAD_0  // MISO
 
 static const uint8_t SS	  = 33 ;
 static const uint8_t MOSI = PIN_SPI_MOSI ;
@@ -162,12 +162,12 @@ static const uint8_t SCK  = PIN_SPI_SCK ;
 
 
 // Extra hardware SPI for Gizmo
-#define PIN_SPI1_SCK          (40u)
-#define PIN_SPI1_MOSI         (39u)
-#define PIN_SPI1_MISO         (41u)
-#define PERIPH_SPI1           sercom5
-#define PAD_SPI1_TX           SPI_PAD_0_SCK_1  // MOSI / SCK
-#define PAD_SPI1_RX           SERCOM_RX_PAD_2  // MISO not avail
+#define PIN_SPI1_SCK             (40u)
+#define PIN_SPI1_MOSI            (39u)
+#define PIN_SPI1_MISO            (41u)
+#define PERIPH_SPI1              sercom5
+#define PAD_SPI1_TX              SPI_PAD_0_SCK_1  // MOSI / SCK
+#define PAD_SPI1_RX              SERCOM_RX_PAD_2  // MISO not avail
 
 static const uint8_t SS1	  = 42 ;
 static const uint8_t MOSI1 = PIN_SPI_MOSI ;
@@ -176,13 +176,13 @@ static const uint8_t SCK1  = PIN_SPI_SCK ;
 
 
 // Extra hardware for SD card
-#define PIN_SPI2_SCK          (10u)
-#define PIN_SPI2_MOSI         (9u)
-#define PIN_SPI2_MISO         (6u)
-#define PIN_SPI2_SS           (5u)
-#define PERIPH_SPI2           sercom0
-#define PAD_SPI2_TX           SPI_PAD_2_SCK_3  // MOSI / SCK
-#define PAD_SPI2_RX           SERCOM_RX_PAD_1  // MISO not avail
+#define PIN_SPI2_SCK             (10u)
+#define PIN_SPI2_MOSI            (9u)
+#define PIN_SPI2_MISO            (6u)
+#define PIN_SPI2_SS              (5u)
+#define PERIPH_SPI2              sercom0
+#define PAD_SPI2_TX              SPI_PAD_2_SCK_3  // MOSI / SCK
+#define PAD_SPI2_RX              SERCOM_RX_PAD_1  // MISO not avail
 
 static const uint8_t SS2   = 5 ;
 static const uint8_t MOSI2 = PIN_SPI2_MOSI ;
@@ -203,18 +203,16 @@ static const uint8_t SCK2  = PIN_SPI2_SCK ;
 #define WIRE_INTERFACES_COUNT 2
 
   // "external" public i2c interface
-#define PIN_WIRE_SDA         (2u)
-#define PIN_WIRE_SCL         (3u)
-#define PERIPH_WIRE          sercom5
-#define WIRE_IT_HANDLER      SERCOM5_Handler
+#define PIN_WIRE_SDA             (2u)
+#define PIN_WIRE_SCL             (3u)
+#define PERIPH_WIRE              sercom5
 static const uint8_t SDA = PIN_WIRE_SDA;
 static const uint8_t SCL = PIN_WIRE_SCL;
 
   // "internal" lis3dh i2c interface
-#define PIN_WIRE1_SDA         (28u)
-#define PIN_WIRE1_SCL         (29u)
-#define PERIPH_WIRE1          sercom1
-#define WIRE1_IT_HANDLER      SERCOM1_Handler
+#define PIN_WIRE1_SDA            (28u)
+#define PIN_WIRE1_SCL            (29u)
+#define PERIPH_WIRE1             sercom1
 static const uint8_t SDA1 = PIN_WIRE1_SDA;
 static const uint8_t SCL1 = PIN_WIRE1_SCL;
 
@@ -244,10 +242,11 @@ extern SERCOM sercom5;
 
 // Serial1
 extern Uart Serial1;
-#define PIN_SERIAL1_RX       (0ul)
-#define PIN_SERIAL1_TX       (1ul)
-#define PAD_SERIAL1_TX       (UART_TX_PAD_0)
-#define PAD_SERIAL1_RX       (SERCOM_RX_PAD_1)
+#define PIN_SERIAL1_RX           (0ul)
+#define PIN_SERIAL1_TX           (1ul)
+#define PAD_SERIAL1_TX           (UART_TX_PAD_0)
+#define PAD_SERIAL1_RX           (SERCOM_RX_PAD_1)
+#define PERIPH_SERIAL1           sercom4
 #endif // __cplusplus
 
 

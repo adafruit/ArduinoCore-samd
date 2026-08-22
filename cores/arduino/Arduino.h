@@ -45,8 +45,10 @@ extern "C"{
 #endif // __cplusplus
 
 // Include Atmel headers
-#include "sam.h"
+#include <sam.h>
 #include "wiring_constants.h"
+
+extern uint32_t SystemCoreClock;
 
 #define clockCyclesPerMicrosecond() ( SystemCoreClock / 1000000L )
 #define clockCyclesToMicroseconds(a) ( ((a) * 1000L) / (SystemCoreClock / 1000L) )
@@ -156,7 +158,9 @@ void loop( void ) ;
   #include "USB/USBDesc.h"
   #include "USB/USBCore.h"
   #include "USB/USBAPI.h"
-  #include "USB/USB_host.h"
+  #if !defined(__SAME53__) && !defined(__SAME54__)
+    #include "USB/USB_host.h"
+  #endif
 #endif
 
 #endif // Arduino_h

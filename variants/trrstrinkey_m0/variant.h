@@ -114,12 +114,12 @@ static const uint8_t A5  = PIN_A5;
  */
 #define SPI_INTERFACES_COUNT 1
 
-#define PIN_SPI_MISO         PIN_RING1
-#define PIN_SPI_MOSI         PIN_RING2
-#define PIN_SPI_SCK          PIN_SLEEVE
-#define PERIPH_SPI           sercom0
-#define PAD_SPI_TX           SPI_PAD_0_SCK_1
-#define PAD_SPI_RX           SERCOM_RX_PAD_2
+#define PIN_SPI_MISO             PIN_RING1
+#define PIN_SPI_MOSI             PIN_RING2
+#define PIN_SPI_SCK              PIN_SLEEVE
+#define PERIPH_SPI               sercom0
+#define PAD_SPI_TX               SPI_PAD_0_SCK_1
+#define PAD_SPI_RX               SERCOM_RX_PAD_2
 
 static const uint8_t SS	  = PIN_TIP;
 static const uint8_t MOSI = PIN_SPI_MOSI;
@@ -132,16 +132,14 @@ static const uint8_t SCK  = PIN_SPI_SCK;
 #define WIRE_INTERFACES_COUNT 2
 
 // QT Port
-#define PIN_WIRE_SDA         (7ul)
-#define PIN_WIRE_SCL         (8ul)
-#define PERIPH_WIRE          sercom2
-#define WIRE_IT_HANDLER      SERCOM2_Handler
+#define PIN_WIRE_SDA             (7ul)
+#define PIN_WIRE_SCL             (8ul)
+#define PERIPH_WIRE              sercom2
 
 // second, sekret I2C on the headphone jack
-#define PIN_WIRE1_SDA         PIN_RING2
-#define PIN_WIRE1_SCL         PIN_SLEEVE
-#define PERIPH_WIRE1          sercom0
-#define WIRE1_IT_HANDLER      SERCOM0_Handler
+#define PIN_WIRE1_SDA            PIN_RING2
+#define PIN_WIRE1_SCL            PIN_SLEEVE
+#define PERIPH_WIRE1             sercom0
 
 static const uint8_t SDA = PIN_WIRE_SDA;
 static const uint8_t SCL = PIN_WIRE_SCL;

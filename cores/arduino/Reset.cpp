@@ -33,7 +33,7 @@ extern const uint32_t __text_start__;
 
 #else
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 #define APP_START 0x00004004
 #else
 #define APP_START 0x00002004
@@ -42,8 +42,10 @@ extern const uint32_t __text_start__;
 #endif
 
 static inline bool nvmReady(void) {
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
 		return NVMCTRL->STATUS.reg & NVMCTRL_STATUS_READY;
+#elif defined(__SAME53__) || defined(__SAME54__)
+		return NVMCTRL_REGS->NVMCTRL_STATUS & NVMCTRL_STATUS_READY_Msk;
 #else
         return NVMCTRL->INTFLAG.reg & NVMCTRL_INTFLAG_READY;
 #endif
@@ -54,7 +56,7 @@ static void banzai() {
 	// Disable all interrupts
 	__disable_irq();
 	
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	//THESE MUST MATCH THE BOOTLOADER
 	#define DOUBLE_TAP_MAGIC 			0xf01669efUL
 	#define BOOT_DOUBLE_TAP_ADDRESS     (HSRAM_ADDR + HSRAM_SIZE - 4)
