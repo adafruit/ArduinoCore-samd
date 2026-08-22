@@ -24,6 +24,14 @@
 extern "C" {
 #endif
 
+#if (defined(__SAMD51__) || defined(__SAME51__)) && !defined(ARDUINO_SAMD51_E51)
+#define ARDUINO_SAMD51_E51
+#endif
+
+#if (defined(__SAME53__) || defined(__SAME54__)) && !defined(ARDUINO_SAME53_E54)
+#define ARDUINO_SAME53_E54
+#endif
+
 static int _readResolution = 10;
 static int _ADCResolution = 10;
 
