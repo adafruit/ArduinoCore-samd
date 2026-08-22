@@ -863,7 +863,7 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
 
     const uint16_t inputCtrlReg = static_cast<uint16_t>(
         ADC_INPUTCTRL_MUXPOS(channel->muxPos_) | ADC_INPUTCTRL_MUXNEG(channel->muxNeg_) |
-        (channel->differentialMode_ ? ADC_INPUTCTRL_DIFFMODE_Msk : 0u));
+        (channel->differentialMode_ ? ADC_INPUTCTRL_DIFFMODE : 0u));
     adcWriteInputctrl(adc, inputCtrlReg);
 
     const uint8_t avgCtrlReg =
@@ -879,9 +879,9 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     adcWriteCtrla(adc, ctrlaReg);
 
     const uint16_t ctrlbReg = static_cast<uint16_t>(
-        (channel->leftAdjust_ ? ADC_CTRLB_LEFTADJ_Msk : 0u) |
-        (channel->freeRun_ ? ADC_CTRLB_FREERUN_Msk : 0u) |
-        (channel->corrEnabled_ ? ADC_CTRLB_CORREN_Msk : 0u) |
+        (channel->leftAdjust_ ? ADC_CTRLB_LEFTADJ : 0u) |
+        (channel->freeRun_ ? ADC_CTRLB_FREERUN : 0u) |
+        (channel->corrEnabled_ ? ADC_CTRLB_CORREN : 0u) |
         ADC_CTRLB_RESSEL(static_cast<uint8_t>(channel->ressel_)) |
         ADC_CTRLB_WINMODE(channel->windowEnabled_
                               ? static_cast<uint8_t>(channel->winMode_)
@@ -889,10 +889,10 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     adcWriteCtrlb(adc, ctrlbReg);
 
     const uint8_t evctrlReg =
-        static_cast<uint8_t>((channel->evWinmonEo_ ? ADC_EVCTRL_WINMONEO_Msk : 0u) |
-                             (channel->evResrdyEo_ ? ADC_EVCTRL_RESRDYEO_Msk : 0u) |
+        static_cast<uint8_t>((channel->evWinmonEo_ ? ADC_EVCTRL_WINMONEO : 0u) |
+                             (channel->evResrdyEo_ ? ADC_EVCTRL_RESRDYEO : 0u) |
                              (channel->evSyncei_ ? kAdcEvctrlSynceiBit : 0u) |
-                             (channel->evStartei_ ? ADC_EVCTRL_STARTEI_Msk : 0u));
+                             (channel->evStartei_ ? ADC_EVCTRL_STARTEI : 0u));
     adcWriteEvctrl(adc, evctrlReg);
 
     adcWriteWinlt(adc, channel->windowLower_);
