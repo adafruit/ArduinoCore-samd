@@ -166,6 +166,24 @@ constexpr uint8_t kAdcPendSvServiceId = PendSVChannels::Adc;
 constexpr uint32_t kAdcNvicPriority = (1u << __NVIC_PRIO_BITS) - 1u;
 
 #ifdef ADC_HAS_D5X_E5X_REGISTERS
+#ifdef ADC_HAS_SAME53_E54_REGISTERS
+constexpr uint16_t kAdcInputctrlDiffmodeBit = ADC_INPUTCTRL_DIFFMODE_Msk;
+constexpr uint16_t kAdcCtrlbLeftadjBit = ADC_CTRLB_LEFTADJ_Msk;
+constexpr uint16_t kAdcCtrlbFreerunBit = ADC_CTRLB_FREERUN_Msk;
+constexpr uint16_t kAdcCtrlbCorrenBit = ADC_CTRLB_CORREN_Msk;
+constexpr uint8_t kAdcEvctrlWinmoneoBit = ADC_EVCTRL_WINMONEO_Msk;
+constexpr uint8_t kAdcEvctrlResrdyeoBit = ADC_EVCTRL_RESRDYEO_Msk;
+constexpr uint8_t kAdcEvctrlStarteiBit = ADC_EVCTRL_STARTEI_Msk;
+#else
+constexpr uint16_t kAdcInputctrlDiffmodeBit = ADC_INPUTCTRL_DIFFMODE;
+constexpr uint16_t kAdcCtrlbLeftadjBit = ADC_CTRLB_LEFTADJ;
+constexpr uint16_t kAdcCtrlbFreerunBit = ADC_CTRLB_FREERUN;
+constexpr uint16_t kAdcCtrlbCorrenBit = ADC_CTRLB_CORREN;
+constexpr uint8_t kAdcEvctrlWinmoneoBit = ADC_EVCTRL_WINMONEO;
+constexpr uint8_t kAdcEvctrlResrdyeoBit = ADC_EVCTRL_RESRDYEO;
+constexpr uint8_t kAdcEvctrlStarteiBit = ADC_EVCTRL_STARTEI;
+#endif
+
 #ifdef ADC_EVCTRL_SYNCEI
 constexpr uint8_t kAdcEvctrlSynceiBit = ADC_EVCTRL_SYNCEI;
 #elif defined(ADC_EVCTRL_FLUSHEI_Msk)
@@ -863,7 +881,7 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
 
     const uint16_t inputCtrlReg = static_cast<uint16_t>(
         ADC_INPUTCTRL_MUXPOS(channel->muxPos_) | ADC_INPUTCTRL_MUXNEG(channel->muxNeg_) |
-        (channel->differentialMode_ ? ADC_INPUTCTRL_DIFFMODE_Msk : 0u));
+        (channel->differentialMode_ ? kAdcInputctrlDiffmodeBit : 0u));
     adcWriteInputctrl(adc, inputCtrlReg);
 
     const uint8_t avgCtrlReg =
@@ -879,9 +897,9 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     adcWriteCtrla(adc, ctrlaReg);
 
     const uint16_t ctrlbReg = static_cast<uint16_t>(
-        (channel->leftAdjust_ ? ADC_CTRLB_LEFTADJ_Msk : 0u) |
-        (channel->freeRun_ ? ADC_CTRLB_FREERUN_Msk : 0u) |
-        (channel->corrEnabled_ ? ADC_CTRLB_CORREN_Msk : 0u) |
+        (channel->leftAdjust_ ? kAdcCtrlbLeftadjBit : 0u) |
+        (channel->freeRun_ ? kAdcCtrlbFreerunBit : 0u) |
+        (channel->corrEnabled_ ? kAdcCtrlbCorrenBit : 0u) |
         ADC_CTRLB_RESSEL(static_cast<uint8_t>(channel->ressel_)) |
         ADC_CTRLB_WINMODE(channel->windowEnabled_
                               ? static_cast<uint8_t>(channel->winMode_)
@@ -889,10 +907,10 @@ bool AdcEngine::applyChannelAndStart(ChannelADC *channel, bool monitorMode) {
     adcWriteCtrlb(adc, ctrlbReg);
 
     const uint8_t evctrlReg =
-        static_cast<uint8_t>((channel->evWinmonEo_ ? ADC_EVCTRL_WINMONEO_Msk : 0u) |
-                             (channel->evResrdyEo_ ? ADC_EVCTRL_RESRDYEO_Msk : 0u) |
+        static_cast<uint8_t>((channel->evWinmonEo_ ? kAdcEvctrlWinmoneoBit : 0u) |
+                             (channel->evResrdyEo_ ? kAdcEvctrlResrdyeoBit : 0u) |
                              (channel->evSyncei_ ? kAdcEvctrlSynceiBit : 0u) |
-                             (channel->evStartei_ ? ADC_EVCTRL_STARTEI_Msk : 0u));
+                             (channel->evStartei_ ? kAdcEvctrlStarteiBit : 0u));
     adcWriteEvctrl(adc, evctrlReg);
 
     adcWriteWinlt(adc, channel->windowLower_);
