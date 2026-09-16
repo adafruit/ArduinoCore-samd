@@ -34,7 +34,7 @@ static void __initialize()
   memset(ISRcallback, 0, sizeof(ISRcallback));
   nints = 0;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
   ///EIC MCLK is enabled by default
   for (uint32_t i = 0; i <= 15; i++)     // EIC_0_IRQn = 12 ... EIC_15_IRQn = 27
   {
@@ -46,6 +46,19 @@ static void __initialize()
   }
   
   GCLK->PCHCTRL[EIC_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK2_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+#elif defined(__SAME53__) || defined(__SAME54__)
+  // EIC MCLK is enabled by default.
+  for (uint32_t i = 0; i <= 15; i++)
+  {
+    IRQn_Type irqn = (IRQn_Type)(EIC_EXTINT_0_IRQn + i);
+    NVIC_DisableIRQ(irqn);
+    NVIC_ClearPendingIRQ(irqn);
+    NVIC_SetPriority(irqn, 0);
+    NVIC_EnableIRQ(irqn);
+  }
+
+  GCLK_REGS->GCLK_PCHCTRL[EIC_GCLK_ID] = GCLK_PCHCTRL_GEN_GCLK2 |
+                                               GCLK_PCHCTRL_CHEN_Msk;
 #else
   NVIC_DisableIRQ(EIC_IRQn);
   NVIC_ClearPendingIRQ(EIC_IRQn);
@@ -63,9 +76,12 @@ static void __initialize()
 */
 
   // Enable EIC
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
   EIC->CTRLA.bit.ENABLE = 1;
   while (EIC->SYNCBUSY.bit.ENABLE == 1) { }
+#elif defined(__SAME53__) || defined(__SAME54__)
+  EIC_REGS->EIC_CTRLA |= EIC_CTRLA_ENABLE_Msk;
+  while (EIC_REGS->EIC_SYNCBUSY & EIC_SYNCBUSY_ENABLE_Msk) { }
 #else
   EIC->CTRL.bit.ENABLE = 1;
   while (EIC->STATUS.bit.SYNCBUSY == 1) { }
@@ -95,7 +111,7 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 	}
 	uint32_t inMask = (1UL << in);
 	// Enable wakeup capability on pin in case being used during sleep
-	#if defined(__SAMD51__)
+	#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	//I believe this is done automatically
 	#else
 	EIC->WAKEUP.reg |= (1 << in);
@@ -107,28 +123,44 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 	if (callback)
 	{
 		if (in == EXTERNAL_INT_NMI) {
+			uint8_t sense;
+#if defined(__SAME53__) || defined(__SAME54__)
+			EIC_REGS->EIC_NMIFLAG = EIC_NMIFLAG_NMI_Msk;
+#else
 			EIC->NMIFLAG.bit.NMI = 1; // Clear flag
+#endif
 			switch (mode) {
 			  case LOW:
-				EIC->NMICTRL.bit.NMISENSE = EIC_NMICTRL_NMISENSE_LOW;
+				sense = EIC_NMICTRL_NMISENSE_LOW_Val;
 				break;
 
 			  case HIGH:
-				EIC->NMICTRL.bit.NMISENSE = EIC_NMICTRL_NMISENSE_HIGH;
+				sense = EIC_NMICTRL_NMISENSE_HIGH_Val;
 				break;
 
 			  case CHANGE:
-				EIC->NMICTRL.bit.NMISENSE = EIC_NMICTRL_NMISENSE_BOTH;
+				sense = EIC_NMICTRL_NMISENSE_BOTH_Val;
 				break;
 
 			  case FALLING:
-				EIC->NMICTRL.bit.NMISENSE = EIC_NMICTRL_NMISENSE_FALL;
+				sense = EIC_NMICTRL_NMISENSE_FALL_Val;
 				break;
 
 			  case RISING:
-				EIC->NMICTRL.bit.NMISENSE = EIC_NMICTRL_NMISENSE_RISE;
+				sense = EIC_NMICTRL_NMISENSE_RISE_Val;
 				break;
+
+			  default:
+				return;
 			}
+
+#if defined(__SAME53__) || defined(__SAME54__)
+			EIC_REGS->EIC_NMICTRL =
+			    (EIC_REGS->EIC_NMICTRL & ~EIC_NMICTRL_NMISENSE_Msk) |
+			    EIC_NMICTRL_NMISENSE(sense);
+#else
+			EIC->NMICTRL.bit.NMISENSE = sense;
+#endif
 
 			// Assign callback to interrupt
 			ISRcallback[EXTERNAL_INT_NMI] = callback;
@@ -164,42 +196,49 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 			  pos = in << 2;
 			}
 
-			#if defined (__SAMD51__)
-			EIC->CTRLA.bit.ENABLE = 0;
-			while (EIC->SYNCBUSY.bit.ENABLE == 1) { }
-			#endif
-
-			EIC->CONFIG[config].reg &=~ (EIC_CONFIG_SENSE0_Msk << pos); // Reset sense mode, important when changing trigger mode during runtime
+			uint8_t sense;
 			switch (mode)
 			{
-			  case LOW:
-				EIC->CONFIG[config].reg |= EIC_CONFIG_SENSE0_LOW_Val << pos;
-				break;
-
-			  case HIGH:
-				EIC->CONFIG[config].reg |= EIC_CONFIG_SENSE0_HIGH_Val << pos;
-				break;
-
-			  case CHANGE:
-				EIC->CONFIG[config].reg |= EIC_CONFIG_SENSE0_BOTH_Val << pos;
-				break;
-
-			  case FALLING:
-				EIC->CONFIG[config].reg |= EIC_CONFIG_SENSE0_FALL_Val << pos;
-				break;
-
-			  case RISING:
-				EIC->CONFIG[config].reg |= EIC_CONFIG_SENSE0_RISE_Val << pos;
-				break;
+			  case LOW: sense = EIC_CONFIG_SENSE0_LOW_Val; break;
+			  case HIGH: sense = EIC_CONFIG_SENSE0_HIGH_Val; break;
+			  case CHANGE: sense = EIC_CONFIG_SENSE0_BOTH_Val; break;
+			  case FALLING: sense = EIC_CONFIG_SENSE0_FALL_Val; break;
+			  case RISING: sense = EIC_CONFIG_SENSE0_RISE_Val; break;
+			  default: return;
 			}
+
+			#if defined(__SAMD51__) || defined(__SAME51__)
+			EIC->CTRLA.bit.ENABLE = 0;
+			while (EIC->SYNCBUSY.bit.ENABLE == 1) { }
+			#elif defined(__SAME53__) || defined(__SAME54__)
+			EIC_REGS->EIC_CTRLA &= ~EIC_CTRLA_ENABLE_Msk;
+			while (EIC_REGS->EIC_SYNCBUSY & EIC_SYNCBUSY_ENABLE_Msk) { }
+			#endif
+
+#if defined(__SAME53__) || defined(__SAME54__)
+			EIC_REGS->EIC_CONFIG[config] =
+			    (EIC_REGS->EIC_CONFIG[config] & ~(EIC_CONFIG_SENSE0_Msk << pos)) |
+			    ((uint32_t)sense << pos);
+#else
+			EIC->CONFIG[config].reg =
+			    (EIC->CONFIG[config].reg & ~(EIC_CONFIG_SENSE0_Msk << pos)) |
+			    ((uint32_t)sense << pos);
+#endif
 		}
 		// Enable the interrupt
+#if defined(__SAME53__) || defined(__SAME54__)
+		EIC_REGS->EIC_INTENSET = EIC_INTENSET_EXTINT(1 << in);
+#else
 		EIC->INTENSET.reg = EIC_INTENSET_EXTINT(1 << in);
+#endif
 	}
 
-	#if defined (__SAMD51__)
+	#if defined(__SAMD51__) || defined(__SAME51__)
 	EIC->CTRLA.bit.ENABLE = 1;
 	while (EIC->SYNCBUSY.bit.ENABLE == 1) { }
+	#elif defined(__SAME53__) || defined(__SAME54__)
+	EIC_REGS->EIC_CTRLA |= EIC_CTRLA_ENABLE_Msk;
+	while (EIC_REGS->EIC_SYNCBUSY & EIC_SYNCBUSY_ENABLE_Msk) { }
 	#endif
 }
 
@@ -216,12 +255,20 @@ void detachInterrupt(uint32_t pin)
   if (in == NOT_AN_INTERRUPT) return;
 
   if(in == EXTERNAL_INT_NMI) {
+#if defined(__SAME53__) || defined(__SAME54__)
+    EIC_REGS->EIC_NMICTRL &= ~EIC_NMICTRL_NMISENSE_Msk;
+#else
     EIC->NMICTRL.bit.NMISENSE = 0; // Turn off detection
+#endif
   } else {
+#if defined(__SAME53__) || defined(__SAME54__)
+    EIC_REGS->EIC_INTENCLR = EIC_INTENCLR_EXTINT(1 << in);
+#else
     EIC->INTENCLR.reg = EIC_INTENCLR_EXTINT(1 << in);
+#endif
   
   // Disable wakeup capability on pin during sleep
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 //I believe this is done automatically
 #else
     // Disable wakeup capability on pin during sleep
@@ -249,7 +296,7 @@ void detachInterrupt(uint32_t pin)
 /*
  * External Interrupt Controller NVIC Interrupt Handler
  */
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 void InterruptHandler(uint32_t unused_i)
 {
   (void)unused_i;
@@ -259,16 +306,25 @@ void InterruptHandler(uint32_t unused_i)
   // Loop over all enabled interrupts in the list
   for (uint32_t i=0; i<nints; i++)
   {
+	#if defined(__SAME53__) || defined(__SAME54__)
+	if ((EIC_REGS->EIC_INTFLAG & ISRlist[i]) != 0)
+	#else
 	if ((EIC->INTFLAG.reg & ISRlist[i]) != 0)
+	#endif
 	{
 	  // Call the callback function
 	  ISRcallback[i]();
 	  // Clear the interrupt
+	#if defined(__SAME53__) || defined(__SAME54__)
+	  EIC_REGS->EIC_INTFLAG = ISRlist[i];
+	#else
 	  EIC->INTFLAG.reg = ISRlist[i];
+	#endif
 	}
   }
 }
 
+#if defined(__SAMD51__) || defined(__SAME51__)
 void EIC_0_Handler(void)
 {
   InterruptHandler(EXTERNAL_INT_0);
@@ -348,6 +404,24 @@ void EIC_15_Handler(void)
 {
   InterruptHandler(EXTERNAL_INT_15);
 }
+#elif defined(__SAME53__) || defined(__SAME54__)
+void EIC_EXTINT_0_Handler(void) { InterruptHandler(EXTERNAL_INT_0); }
+void EIC_EXTINT_1_Handler(void) { InterruptHandler(EXTERNAL_INT_1); }
+void EIC_EXTINT_2_Handler(void) { InterruptHandler(EXTERNAL_INT_2); }
+void EIC_EXTINT_3_Handler(void) { InterruptHandler(EXTERNAL_INT_3); }
+void EIC_EXTINT_4_Handler(void) { InterruptHandler(EXTERNAL_INT_4); }
+void EIC_EXTINT_5_Handler(void) { InterruptHandler(EXTERNAL_INT_5); }
+void EIC_EXTINT_6_Handler(void) { InterruptHandler(EXTERNAL_INT_6); }
+void EIC_EXTINT_7_Handler(void) { InterruptHandler(EXTERNAL_INT_7); }
+void EIC_EXTINT_8_Handler(void) { InterruptHandler(EXTERNAL_INT_8); }
+void EIC_EXTINT_9_Handler(void) { InterruptHandler(EXTERNAL_INT_9); }
+void EIC_EXTINT_10_Handler(void) { InterruptHandler(EXTERNAL_INT_10); }
+void EIC_EXTINT_11_Handler(void) { InterruptHandler(EXTERNAL_INT_11); }
+void EIC_EXTINT_12_Handler(void) { InterruptHandler(EXTERNAL_INT_12); }
+void EIC_EXTINT_13_Handler(void) { InterruptHandler(EXTERNAL_INT_13); }
+void EIC_EXTINT_14_Handler(void) { InterruptHandler(EXTERNAL_INT_14); }
+void EIC_EXTINT_15_Handler(void) { InterruptHandler(EXTERNAL_INT_15); }
+#endif
 #else
 
 void EIC_Handler(void)

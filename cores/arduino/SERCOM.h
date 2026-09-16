@@ -19,7 +19,18 @@
 #ifndef _SERCOM_CLASS_
 #define _SERCOM_CLASS_
 
-#include "sam.h"
+#include <sam.h>
+#include "SERCOM_PinMux.h"
+#include "SERCOM_Txn.h"
+#include "RingBuffer.h"
+#include <array>
+
+#ifdef USE_ZERODMA
+#if defined(__SAME53__) || defined(__SAME54__)
+typedef dmac_descriptor_registers_t DmacDescriptor;
+#endif // __SAME53__ / __SAME54__
+class Adafruit_ZeroDMA;
+#endif // USE_ZERODMA
 
 // SAMD51 has configurable MAX_SPI, else use peripheral clock default.
 // Update: changing MAX_SPI via compiler flags is DEPRECATED, because
@@ -30,10 +41,14 @@
   #define SERCOM_SPI_FREQ_REF (MAX_SPI * 2)
 #else
   #define SERCOM_SPI_FREQ_REF 48000000ul
-#endif
+#endif // MAX_SPI
 // Other SERCOM peripherals always use the 48 MHz clock
 #define SERCOM_FREQ_REF       48000000ul
 #define SERCOM_NVIC_PRIORITY  ((1<<__NVIC_PRIO_BITS) - 1)
+
+#ifndef SERCOM_QUEUE_LENGTH
+#define SERCOM_QUEUE_LENGTH 8
+#endif // !SERCOM_QUEUE_LENGTH
 
 typedef enum
 {
@@ -148,6 +163,12 @@ typedef enum
 
 typedef enum
 {
+	WIRE_SLAVE_ACT_NO_ACTION = 0,
+	WIRE_SLAVE_ACT_COMPLETE = 2
+} SercomSlaveCommandWire;
+
+typedef enum
+{
 	WIRE_MASTER_ACK_ACTION = 0,
 	WIRE_MASTER_NACK_ACTION
 } SercomMasterAckActionWire;
@@ -168,7 +189,33 @@ typedef enum {
 class SERCOM
 {
 	public:
+#if defined(__SAME53__) || defined(__SAME54__)
+		SERCOM(sercom_registers_t* s) ;
+#else
 		SERCOM(Sercom* s) ;
+#endif // __SAME53__ / __SAME54__
+		void resetSERCOM( void ) ;
+		inline void enableSERCOM( void ) ;
+		inline void disableSERCOM( void ) ;
+		inline void waitSyncBusyEnable( void ) ;
+		inline void waitSyncBusySwrst( void ) ;
+		inline void waitSyncBusySysOp( void ) ;
+		inline void waitSyncBusyCtrlB( void ) ;
+#if defined(__SAME53__) || defined(__SAME54__)
+		inline void disableInterrupts(uint8_t mask) { sercom->I2CM.SERCOM_INTENCLR = mask; }
+		inline void enableInterrupts(uint8_t mask) { sercom->I2CM.SERCOM_INTENSET = mask; }
+		inline uint8_t getINTFLAG( void ) const { return sercom->I2CM.SERCOM_INTFLAG; }
+		inline uint16_t getSTATUS( void ) const { return sercom->I2CM.SERCOM_STATUS; }
+		inline void clearINTFLAG(uint8_t mask = 0xFF) { sercom->I2CM.SERCOM_INTFLAG = mask; }
+		inline void clearStatusWIRE(uint16_t mask) { sercom->I2CM.SERCOM_STATUS = mask; }
+#else
+		inline void disableInterrupts(uint8_t mask) { sercom->I2CM.INTENCLR.reg = mask; }
+		inline void enableInterrupts(uint8_t mask) { sercom->I2CM.INTENSET.reg = mask; }
+		inline uint8_t getINTFLAG( void ) const { return sercom->I2CM.INTFLAG.reg; }
+		inline uint16_t getSTATUS( void ) const { return sercom->I2CM.STATUS.reg; }
+		inline void clearINTFLAG(uint8_t mask = 0xFF) { sercom->I2CM.INTFLAG.reg = mask; }
+		inline void clearStatusWIRE(uint16_t mask) { sercom->I2CM.STATUS.reg = mask; }
+#endif // __SAME53__ / __SAME54__
 
 		/* ========== UART ========== */
 		void initUART(SercomUartMode mode, SercomUartSampleRate sampleRate, uint32_t baudrate=0) ;
@@ -176,7 +223,8 @@ class SERCOM
 		void initPads(SercomUartTXPad txPad, SercomRXPad rxPad) ;
 
 		void resetUART( void ) ;
-		void enableUART( void ) ;
+		void enableUART( void ) { enableSERCOM(); }
+		void disableUART( void ) { disableSERCOM(); }
 		void flushUART( void ) ;
 		void clearStatusUART( void ) ;
 		bool availableDataUART( void ) ;
@@ -189,15 +237,22 @@ class SERCOM
 		int writeDataUART(uint8_t data) ;
 		bool isUARTError() ;
 		void acknowledgeUARTError() ;
+		void enableReceiveCompleteInterruptUART();
+		void disableReceiveCompleteInterruptUART();
 		void enableDataRegisterEmptyInterruptUART();
 		void disableDataRegisterEmptyInterruptUART();
+		bool enqueueUART(SercomTxn* txn);
+		bool startTransmissionUART(void);
+		SercomTxn* stopTransmissionUART(void);
+		SercomTxn* stopTransmissionUART(SercomUartError error);
+		void deferStopUART(SercomUartError error);
 
 		/* ========== SPI ========== */
 		void initSPI(SercomSpiTXPad mosi, SercomRXPad miso, SercomSpiCharSize charSize, SercomDataOrder dataOrder) ;
 		void initSPIClock(SercomSpiClockMode clockMode, uint32_t baudrate) ;
 		void resetSPI( void ) ;
-		void enableSPI( void ) ;
-		void disableSPI( void ) ;
+		void enableSPI( void ) { enableSERCOM(); }
+		void disableSPI( void ) { disableSERCOM(); }
 		void setDataOrderSPI(SercomDataOrder dataOrder) ;
 		SercomDataOrder getDataOrderSPI( void ) ;
 		void setBaudrateSPI(uint8_t divider) ;
@@ -207,37 +262,114 @@ class SERCOM
 		bool isDataRegisterEmptySPI( void ) ;
 		bool isTransmitCompleteSPI( void ) ;
 		bool isReceiveCompleteSPI( void ) ;
+		bool enqueueSPI(SercomTxn* txn);
+		bool startTransmissionSPI(void);
+		void deferStopSPI(SercomSpiError error);
+		SercomTxn* stopTransmissionSPI(void);
+		SercomTxn* stopTransmissionSPI(SercomSpiError error);
+		inline SercomTxn* getCurrentTxnSPI(void) { return _spi.currentTxn; }
+		inline const SercomTxn* getCurrentTxnSPI(void) const { return _spi.currentTxn; }
+		inline size_t getTxnIndexSPI(void) const { return _spi.index; }
+		inline size_t getTxnLengthSPI(void) const { return _spi.length; }
+		inline bool isActiveSPI(void) const { return _spi.active; }
+		inline void setTxnIndexSPI(size_t index) { _spi.index = index; }
+		inline void setReturnValueSPI(SercomSpiError err) { _spi.returnValue = err; }
+		inline bool sendDataSPI(void);
+		inline bool readDataSPI(void);
 
 		/* ========== WIRE ========== */
-		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false) ;
+		void initSlaveWIRE(uint8_t address, bool enableGeneralCall = false, uint8_t speed = 0x0) ;
+		void initSlaveWIRE(uint16_t address, bool enableGeneralCall = false, uint8_t speed = 0x0, bool enable10Bit = false) ;
 		void initMasterWIRE(uint32_t baudrate) ;
+		inline void setTxnWIRE(SercomTxn* txn);
+		inline void setSlaveTxnWIRE(SercomTxn* txn);
+		inline bool isSlaveTransactionActiveWIRE(void) const {
+			return _wire.slaveTransactionActive;
+		}
+		inline void markSlaveTransactionActiveWIRE(void) {
+			_wire.slaveTransactionActive = true;
+		}
+		inline void discardIdleSlaveTransactionWIRE(void) {
+			if (!_wire.slaveTransactionActive &&
+			    _wire.currentTxn == _wire.slaveTxn) {
+				_wire.active = false;
+				_wire.currentTxn = nullptr;
+				_wire.txnIndex = 0;
+				_wire.txnLength = 0;
+			}
+		}
+		inline void setDmaWIRE(bool useDma) { _wire.useDma = useDma; }
+		inline bool isDmaWIRE(void) const { return _wire.useDma; }
+		inline void markBusReleasePendingWIRE(void) { _wire.releasePending = true; }
+		using WireReceiveCallback = void (*)(void* user);
+		using WireRequestCallback = void (*)(void* user);
+		void registerReceiveWIRE(WireReceiveCallback callback, void* user);
+		void registerRequestWIRE(WireRequestCallback callback, void* user);
+		void deferReceiveWIRE(void);
+		void deferRequestWIRE(void);
+		void deferReceiveCompleteWIRE(void);
+		SercomTxn* retireSlaveTransactionWIRE(bool reserveForFollowup);
+		void setSlaveWIRE( void ) ;
+		void setMasterWIRE( void ) ;
 
 		void resetWIRE( void ) ;
-		void enableWIRE( void ) ;
-                void disableWIRE( void );
-                void prepareNackBitWIRE( void ) ;
-                void prepareAckBitWIRE( void ) ;
-                void prepareCommandBitsWire(uint8_t cmd);
-		bool startTransmissionWIRE(uint8_t address, SercomWireReadWriteFlag flag) ;
-		bool sendDataMasterWIRE(uint8_t data) ;
-		bool sendDataSlaveWIRE(uint8_t data) ;
-		bool isMasterWIRE( void ) ;
-		bool isSlaveWIRE( void ) ;
-		bool isBusIdleWIRE( void ) ;
-		bool isBusOwnerWIRE( void ) ;
-		bool isBusUnknownWIRE( void ) ;
-		bool isArbLostWIRE( void );
-		bool isBusBusyWIRE( void );
-		bool isDataReadyWIRE( void ) ;
-		bool isStopDetectedWIRE( void ) ;
-		bool isRestartDetectedWIRE( void ) ;
-		bool isAddressMatch( void ) ;
-		bool isMasterReadOperationWIRE( void ) ;
-                bool isRXNackReceivedWIRE( void ) ;
-		int availableWIRE( void ) ;
-		uint8_t readDataWIRE( void ) ;
-		int8_t getSercomIndex(void);
-                uint32_t getSercomFreqRef(void);
+		void clearQueueWIRE( void ) ;
+		inline void enableWIRE( void ) ;
+		inline void disableWIRE( void ) { disableSERCOM(); }
+		void setBaudrateWIRE(uint32_t baudrate) ;
+		inline void prepareNackBitWIRE( void ) ;
+		inline void prepareAckBitWIRE( void ) ;
+        inline void prepareCommandBitsWIRE(uint8_t cmd) ;
+		inline void prepareSlaveCommandBitsWIRE(uint8_t cmd);
+		SercomTxn* startTransmissionWIRE( void ) ;
+		bool startTransmissionWIRE( uint8_t address, SercomWireReadWriteFlag flag ) = delete ;
+		SercomTxn* stopTransmissionWIRE( void ) ;
+		SercomTxn* stopTransmissionWIRE( SercomWireError error ) ;
+		bool enqueueWIRE(SercomTxn* txn);
+		inline bool canEnqueueWIRE(void) { return !_txnQueue.isFull(); }
+		bool abortWIRE(SercomWireError error = SercomWireError::MASTER_TIMEOUT);
+		inline bool isAbortPendingWIRE(void) const { return _wire.abortPending; }
+		bool serviceAbortWIRE(void);
+		void deferStopWIRE(SercomWireError error);
+		void deferBusErrorRecoveryWIRE(bool arbitrationLost,
+		                               bool commandReady);
+		SercomTxn* serviceBusErrorRecoveryWIRE(void);
+
+		inline bool sendDataWIRE( void ) ;
+		inline bool isMasterWIRE( void );
+		inline bool isSlaveWIRE( void );
+		inline bool isBusIdleWIRE( void );
+		inline bool isBusOwnerWIRE( void );
+		inline bool isBusUnknownWIRE( void );
+		inline bool isArbLostWIRE( void );
+		inline bool isBusBusyWIRE( void );
+		inline bool isDataReadyWIRE( void );
+		inline bool isStopDetectedWIRE( void );
+		inline bool isRestartDetectedWIRE( void );
+		inline bool isAddressMatch( void );
+		inline bool isMasterReadOperationWIRE( void );
+		inline bool isRXNackReceivedWIRE( void );
+		inline int availableWIRE( void );
+		inline bool readDataWIRE( void );
+		inline SercomTxn* getCurrentTxnWIRE(void) { return _wire.currentTxn; }
+		inline const SercomTxn* getCurrentTxnWIRE(void) const { return _wire.currentTxn; }
+		inline size_t getTxnIndexWIRE(void) const { return _wire.txnIndex; }
+		inline size_t getTxnLengthWIRE(void) const { return _wire.txnLength; }
+		inline bool isActiveWIRE(void) const { return _wire.active; }
+		inline const SercomWireCompletionReport& lastCompletionReportWIRE(void) const {
+			return _wire.lastCompletionReport;
+		}
+
+		inline bool isDBGSTOP( void ) const;
+		inline void setDBGSTOP( bool stop );
+#if defined(__SAME53__) || defined(__SAME54__)
+		inline sercom_registers_t* getSercom() const { return sercom; }
+#else
+		inline Sercom* getSercom() const { return sercom; }
+#endif // __SAME53__ / __SAME54__
+		int8_t getSercomIndex(void) ;
+        uint32_t getSercomFreqRef(void) ;
+
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 		// SERCOM clock source override is only available on
 		// SAMD51 (not 21) ... but these functions are declared
@@ -252,17 +384,210 @@ class SERCOM
 		void setClockSource(int8_t idx, SercomClockSource src, bool core) { (void)idx; (void)src; (void)core; };
 		SercomClockSource getClockSource(void) { return SERCOM_CLOCK_SOURCE_FCPU; };
 		uint32_t getFreqRef(void) { return F_CPU; };
-#endif
+#endif // SAMD51 vs 21
 
-          private:
-                Sercom *sercom;
-                uint32_t freqRef = 48000000ul; // Frequency corresponding to clockSource
+		enum class Role : uint8_t { None = 0, UART, SPI, I2C };
+		using ServiceFn = SercomTxn* (SERCOM::*)();
+
+		static bool claim(uint8_t sercomId, Role role);
+		static void release(uint8_t sercomId);
+		static bool registerService(uint8_t sercomId, ServiceFn fn);
+		static void setPending(uint8_t sercomId);
+		static void dispatchService(uint8_t sercomId, void *context);
+		static void dispatchPending(void);
+
+
+#ifdef USE_ZERODMA
+		using DmaCallback = void (*)(Adafruit_ZeroDMA*);
+		enum class DmaStatus : uint8_t {
+			Ok = 0,
+			NotConfigured,
+			NullPtr,
+			ZeroLen,
+			AllocateFailed,
+			DescriptorFailed,
+			StartFailed
+		};
+
+		DmaStatus dmaInit(int8_t sercomId, uint8_t beatSize = 0); // beatSize: 0=byte (default), 1=halfword, 2=word
+		void dmaSetCallbacks(DmaCallback txCb, DmaCallback rxCb,
+		                     DmaCallback errorCb = nullptr);
+		DmaStatus dmaStartTx(const void* src, volatile void* dstReg, size_t len);
+		DmaStatus dmaStartRx(void* dst, volatile void* srcReg, size_t len);
+		DmaStatus dmaStartDuplex(const void* txSrc, void* rxDst, volatile void* txReg, volatile void* rxReg, size_t len,
+		                 const uint8_t* dummyTx = nullptr);
+		void dmaRelease();
+		void dmaResetDescriptors();
+		void dmaAbortTx();
+		void dmaAbortRx();
+		bool dmaTxBusy() const;
+		bool dmaRxBusy() const;
+		DmaStatus dmaLastError() const;
+		// DMA callbacks are protocol-owned (Wire/SPI/UART) and registered via dmaSetCallbacks().
+		static inline SERCOM* findDmaOwner(Adafruit_ZeroDMA* dma, bool tx);
+
+		// --- WIRE DMA callbacks (ISR-safe, PendSV-only completion) ---
+		static inline void dmaTxCallbackWIRE(Adafruit_ZeroDMA* dma);
+		static inline void dmaRxCallbackWIRE(Adafruit_ZeroDMA* dma);
+		static void dmaRxSuspendCallbackWIRE(Adafruit_ZeroDMA* dma);
+		static inline void dmaErrorCallbackWIRE(Adafruit_ZeroDMA* dma);
+		// --- SPI DMA callbacks (protocol-owned) ---
+		static inline void dmaTxCallbackSPI(Adafruit_ZeroDMA* dma);
+		static inline void dmaRxCallbackSPI(Adafruit_ZeroDMA* dma);
+		// --- UART DMA callbacks (protocol-owned) ---
+		static inline void dmaTxCallbackUART(Adafruit_ZeroDMA* dma);
+		static inline void dmaRxCallbackUART(Adafruit_ZeroDMA* dma);
+#endif // USE_ZERODMA
+
+#ifdef SERCOM_STRICT_PADS
+		enum class PadFunc : uint8_t {
+			None = 0,
+			UartTx,
+			UartRx,
+			SpiMosi,
+			SpiMiso,
+			SpiSck,
+			SpiSs,
+			WireSda,
+			WireScl
+		};
+
+		static bool registerPads(uint8_t sercomId, const PadFunc (&pads)[4], bool muxFunctionD);
+		static void clearPads(uint8_t sercomId);
+#endif // SERCOM_STRICT_PADS
+
+    private:
+		bool startNextQueuedWIRE(void);
+#if defined(__SAME53__) || defined(__SAME54__)
+		sercom_registers_t *sercom;
+#else
+		Sercom *sercom;
+#endif // __SAME53__ / __SAME54__
+		uint32_t freqRef = 48000000ul; // Frequency corresponding to clockSource
 #if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
-                SercomClockSource clockSource;
-#endif
-		uint8_t calculateBaudrateSynchronous(uint32_t baudrate);
+		SercomClockSource clockSource;
+#endif // __SAMD51__ / __SAME51__ || __SAME53__ / __SAME54__
+
+#if defined(SERCOM_INST_NUM) && (SERCOM_INST_NUM > 0)
+		static constexpr size_t kSercomCount = SERCOM_INST_NUM;
+#elif (defined(__SAME53__) || defined(__SAME54__)) && defined(SERCOM7_REGS)
+		static constexpr size_t kSercomCount = 8;
+#elif (defined(__SAME53__) || defined(__SAME54__)) && defined(SERCOM5_REGS)
+		static constexpr size_t kSercomCount = 6;
+#else
+		#pragma message("SERCOM_INST_NUM not defined; SERCOM support disabled.")
+		static constexpr size_t kSercomCount = 0;
+#endif // SERCOM_INST_NUM / __SAME53__ / __SAME54__
+
+		struct SercomState {
+			Role role = Role::None;
+			ServiceFn service = nullptr;
+#ifdef SERCOM_STRICT_PADS
+			PadFunc pads[4] = { PadFunc::None, PadFunc::None, PadFunc::None, PadFunc::None };
+			bool padsConfigured = false;
+			bool muxFunctionD = false;
+#endif // SERCOM_STRICT_PADS
+		};
+
+		static std::array<SercomState, kSercomCount> s_states;
+		static std::array<SERCOM*, kSercomCount> s_instances;
+		static volatile uint32_t s_pendingMask;
+		uint8_t calculateBaudrateSynchronous(uint32_t baudrate) ;
 		uint32_t division(uint32_t dividend, uint32_t divisor) ;
 		void initClockNVIC( void ) ;
+		void initWIRE(void) ;
+
+		// Cached I2C master/slave configuration for fast role switching.
+		// This can be expanded to support additional configuration options
+		// as needed in the future. For now, it just provides default support
+		// for (hs) mode and DMA.
+		struct WireConfig {
+            uint32_t ctrla = 0x00000000;             // default CTRLA value: auto ENABLE
+#if defined(__SAME53__) || defined(__SAME54__)
+			uint32_t ctrlb = SERCOM_I2CM_CTRLB_SMEN_Msk; // default CTRLB value: SMEN
+#else
+			uint32_t ctrlb = SERCOM_I2CM_CTRLB_SMEN; // default CTRLB value: SMEN
+#endif // __SAME53__ / __SAME54__
+			uint32_t baud  = 0x000000FF;             // default to lowest supported speed
+			uint32_t addr  = 0x00000000;             // default address no GCEN, no ADDRMASK, 7-bit address only
+			uint8_t masterSpeed = 0x0;               // default to lowest speed
+			uint8_t slaveSpeed = 0x0;                // default to lowest speed
+			bool inited = false;		             // whether initMaster/SlaveWIRE has been called
+			bool slaveConfigured = false;             // return to slave mode after queued master work
+			bool useDma = false;		             // per-transaction DMA use for master/slave modes
+			bool active = false;                     // active transaction in progress
+			bool slaveTransactionActive = false;     // AMATCH observed for cached slave descriptor
+			bool releasePending = false;              // STOP requested; callback waits until OWNER clears
+			bool abortPending = false;                // wait for MB/SB before issuing timeout STOP
+			bool busErrorRecoveryPending = false;
+			uint32_t busErrorRecoveryStartedUs = 0;
+			bool busErrorRecoveryDeadlineActive = false;
+			uint32_t busErrorRecoveryDeadlineStartedUs = 0;
+			bool busErrorRecoveryArbitrationLost = false;
+			bool busErrorRecoveryCommandReady = false;
+			SercomWireError abortError = SercomWireError::MASTER_TIMEOUT;
+			uint8_t retryCount = 0;                  // retry count for recoverable bus errors
+			SercomWireError returnValue = SercomWireError::SUCCESS;
+			SercomTxn* currentTxn = nullptr;
+			SercomTxn* slaveTxn = nullptr;
+			size_t txnIndex = 0;
+			size_t txnLength = 0;
+			size_t dmaBlockLength = 0;
+			SercomWireCompletionReport lastCompletionReport = {};
+		} _wire;
+
+		struct SpiConfig {
+			bool active = false;
+			bool useDma = false;
+			bool dmaNeedTx = false;
+			bool dmaNeedRx = false;
+			bool dmaTxDone = false;
+			bool dmaRxDone = false;
+			size_t index = 0;
+			size_t length = 0;
+			SercomTxn* currentTxn = nullptr;
+			SercomSpiError returnValue = SercomSpiError::SUCCESS;
+		} _spi;
+
+		struct UartConfig {
+			bool active = false;
+			bool useDma = false;
+			bool dmaNeedTx = false;
+			bool dmaNeedRx = false;
+			bool dmaTxDone = false;
+			bool dmaRxDone = false;
+			size_t index = 0;
+			size_t length = 0;
+			SercomTxn* currentTxn = nullptr;
+			SercomUartError returnValue = SercomUartError::SUCCESS;
+		} _uart;
+
+		RingBufferN<SERCOM_QUEUE_LENGTH, SercomTxn*> _txnQueue;
+		void* _wireCallbackUser = nullptr;
+		WireReceiveCallback _wireReceiveCb = nullptr;
+		WireRequestCallback _wireRequestCb = nullptr;
+		bool _wireReceivePending = false;
+		bool _wireRequestPending = false;
+
+#ifdef USE_ZERODMA
+		Adafruit_ZeroDMA* _dmaTx = nullptr;
+		Adafruit_ZeroDMA* _dmaRx = nullptr;
+		DmacDescriptor* _dmaTxDesc = nullptr;
+		DmacDescriptor* _dmaRxDesc = nullptr;
+		DmaCallback _dmaTxCb = nullptr;
+		DmaCallback _dmaRxCb = nullptr;
+		DmaCallback _dmaErrorCb = nullptr;
+		uint8_t _dmaDummy = 0;
+		uint8_t _dmaTxTrigger = 0;
+		uint8_t _dmaRxTrigger = 0;
+		bool _dmaConfigured = false;
+		bool _dmaTxActive = false;
+		bool _dmaRxActive = false;
+		bool _wireRxSuspendPending = false;
+		DmaStatus _dmaLastError = DmaStatus::Ok;
+#endif // USE_ZERODMA
 };
 
-#endif
+#include "SERCOM_inline.h"
+
+#endif // !_SERCOM_CLASS_

@@ -114,10 +114,11 @@ static const uint8_t DAC0 = PIN_DAC0;
  */
 
 // Serial1 (sercom 0)
-#define PIN_SERIAL1_RX       (3ul) // captouch pad
-#define PAD_SERIAL1_RX       (SERCOM_RX_PAD_2)
-#define PIN_SERIAL1_TX       (2ul) // captouch pad
-#define PAD_SERIAL1_TX       (UART_TX_PAD_0)
+#define PIN_SERIAL1_RX           (3ul) // captouch pad
+#define PAD_SERIAL1_RX           (SERCOM_RX_PAD_2)
+#define PIN_SERIAL1_TX           (2ul) // captouch pad
+#define PAD_SERIAL1_TX           (UART_TX_PAD_0)
+#define PERIPH_SERIAL1           sercom0
 
 /*
  * SPI Interfaces
@@ -129,9 +130,9 @@ static const uint8_t DAC0 = PIN_DAC0;
  */
 #define WIRE_INTERFACES_COUNT 1
 
-#define PIN_WIRE_SDA         (5u)
-#define PIN_WIRE_SCL         (6u)
-#define PERIPH_WIRE          sercom1
+#define PIN_WIRE_SDA             (5u)
+#define PIN_WIRE_SCL             (6u)
+#define PERIPH_WIRE              sercom1
 //#define WIRE_IT_HANDLER    // hack! we call the i2c handler from within the serial handler!
 
 static const uint8_t SDA = PIN_WIRE_SDA;

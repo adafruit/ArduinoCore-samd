@@ -135,10 +135,11 @@ static const uint8_t ATN = PIN_ATN;
  */
 
 // Serial1 on SERCOM5
-#define PIN_SERIAL1_RX       (31ul)
-#define PIN_SERIAL1_TX       (30ul)
-#define PAD_SERIAL1_TX       (UART_TX_PAD_2)
-#define PAD_SERIAL1_RX       (SERCOM_RX_PAD_3)
+#define PIN_SERIAL1_RX           (31ul)
+#define PIN_SERIAL1_TX           (30ul)
+#define PAD_SERIAL1_TX           (UART_TX_PAD_2)
+#define PAD_SERIAL1_RX           (SERCOM_RX_PAD_3)
+#define PERIPH_SERIAL1           sercom5
 
 /*
  * SPI Interfaces
@@ -146,12 +147,12 @@ static const uint8_t ATN = PIN_ATN;
 #define SPI_INTERFACES_COUNT 2
 
   // "external" SPI, used for sensors, displays, available to user
-#define PIN_SPI_MISO         (2u)
-#define PIN_SPI_MOSI         (22u)
-#define PIN_SPI_SCK          (38u)
-#define PERIPH_SPI           sercom2
-#define PAD_SPI_TX           SPI_PAD_0_SCK_1
-#define PAD_SPI_RX           SERCOM_RX_PAD_2
+#define PIN_SPI_MISO             (2u)
+#define PIN_SPI_MOSI             (22u)
+#define PIN_SPI_SCK              (38u)
+#define PERIPH_SPI               sercom2
+#define PAD_SPI_TX               SPI_PAD_0_SCK_1
+#define PAD_SPI_RX               SERCOM_RX_PAD_2
 
 static const uint8_t SS	  = PIN_A2 ;	// SERCOM4 last PAD is present on A2 but HW SS isn't used. Set here only for reference.
 static const uint8_t MOSI = PIN_SPI_MOSI ;
@@ -159,13 +160,13 @@ static const uint8_t MISO = PIN_SPI_MISO ;
 static const uint8_t SCK  = PIN_SPI_SCK ;
 
   // "internal" SPI, used for AT86RF233 only!
-#define PIN_SPI1_MISO         (47u)
-#define PIN_SPI1_MOSI         (48u)
-#define PIN_SPI1_SCK          (46u)
+#define PIN_SPI1_MISO            (47u)
+#define PIN_SPI1_MOSI            (48u)
+#define PIN_SPI1_SCK             (46u)
 #define PIN_SPI1_SEL          (49u)
-#define PERIPH_SPI1           sercom4
-#define PAD_SPI1_TX           SPI_PAD_2_SCK_3
-#define PAD_SPI1_RX           SERCOM_RX_PAD_0
+#define PERIPH_SPI1              sercom4
+#define PAD_SPI1_TX              SPI_PAD_2_SCK_3
+#define PAD_SPI1_RX              SERCOM_RX_PAD_0
 
 static const uint8_t SS1   = PIN_SPI1_SEL ;
 static const uint8_t MOSI1 = PIN_SPI_MOSI ;
@@ -177,10 +178,9 @@ static const uint8_t SCK1  = PIN_SPI_SCK ;
  */
 #define WIRE_INTERFACES_COUNT 1
 
-#define PIN_WIRE_SDA         (20u)
-#define PIN_WIRE_SCL         (21u)
-#define PERIPH_WIRE          sercom3
-#define WIRE_IT_HANDLER      SERCOM3_Handler
+#define PIN_WIRE_SDA             (20u)
+#define PIN_WIRE_SCL             (21u)
+#define PERIPH_WIRE              sercom3
 
 static const uint8_t SDA = PIN_WIRE_SDA;
 static const uint8_t SCL = PIN_WIRE_SCL;

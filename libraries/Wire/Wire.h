@@ -23,37 +23,78 @@
 #include "Stream.h"
 #include "variant.h"
 
-#include "SERCOM.h"
 #include "RingBuffer.h"
+#include "SERCOM.h"
+#include "SERCOM_WireBusErrorPolicy.h"
+#include <stddef.h>
 
- // WIRE_HAS_END means Wire has end()
+// WIRE_HAS_END means Wire has end()
 #define WIRE_HAS_END 1
+
+// NOTE: SAMD21/SAMD51 silicon errata: when I2C master uses SCLSM=1, CTRLB.CMD
+// (STOP/RESTART) is ignored, so interrupt-driven byte mode cannot reliably end
+// transfers or issue repeated starts. Hs-mode requires SCLSM=1, therefore Hs-mode
+// is DMA-only and STOP-only (no repeated starts). The non-DMA Wire path should
+// not enable Hs-mode. Also per errata, do not enable QCEN when SCLSM=1 (bus error).
 
 class TwoWire : public Stream
 {
-  public:
-    TwoWire(SERCOM *s, uint8_t pinSDA, uint8_t pinSCL);
-    void begin();
-    void begin(uint8_t, bool enableGeneralCall = false);
-    void end();
-    void setClock(uint32_t);
+public:
+  using RequestCompletion = void (*)(void *user, SercomWireError result);
+  TwoWire(SERCOM *s, uint8_t pinSDA, uint8_t pinSCL);
+  bool begin();
+  bool begin(uint8_t, bool enableGeneralCall = false);
+  bool begin(uint16_t, bool enableGeneralCall, uint8_t speed = 0x0,
+             bool enable10Bit = false);
+  void end();
+  void setClock(uint32_t);
 
-    void beginTransmission(uint8_t);
-    uint8_t endTransmission(bool stopBit);
-    uint8_t endTransmission(void);
+  void beginTransmission(uint8_t);
+  void setTransactionReplaySafe(bool replaySafe = true);
+  // If onComplete is nullptr, this blocks for legacy sync behavior.
+  // If onComplete is non-null, this enqueues and returns immediately (async).
+  uint8_t endTransmission(bool stopBit = true,
+                          void (*onComplete)(void *user, int status) = nullptr,
+                          void *user = nullptr);
+  bool abortTransmission(
+      int status = static_cast<int>(SercomWireError::MASTER_TIMEOUT));
+  inline const SercomWireCompletionReport &lastCompletionReport(void) const {
+    return sercom->lastCompletionReportWIRE();
+  }
 
-    uint8_t requestFrom(uint8_t address, size_t quantity, bool stopBit);
-    uint8_t requestFrom(uint8_t address, size_t quantity);
+  // If onComplete is nullptr, this blocks for legacy sync behavior.
+  // If onComplete is non-null, this enqueues and returns immediately (async).
+  // If rxBuffer is nullptr, the internal buffer is used; otherwise rxBuffer is
+  // used.
+  uint8_t requestFrom(uint8_t address, size_t quantity, bool stopBit = true,
+                      uint8_t *rxBuffer = nullptr,
+                      void (*onComplete)(void *user, int status) = nullptr,
+                      void *user = nullptr, bool replaySafe = false);
 
-    size_t write(uint8_t data);
-    size_t write(const uint8_t * data, size_t quantity);
+  size_t write(uint8_t data);
+  // 3-arg write: when setExternal=true, data is used directly (zero-copy) and
+  // quantity is treated as both length and capacity; subsequent write() calls
+  // return 0. For streaming > WIRE_BUFFER_LENGTH or async usage, call
+  // setTxBuffer() before write() on every transaction.
+  size_t write(const uint8_t *data, size_t quantity, bool setExternal = false);
 
     virtual int available(void);
     virtual int read(void);
     virtual int peek(void);
     virtual void flush(void);
-    void onReceive(void(*)(int));
-    void onRequest(void(*)(void));
+    void onReceive(void (*)(int));
+    void onReceive(void (*)(SercomWireError, int));
+    void onRequest(void (*)(void));
+    void onRequest(void (*)(void), RequestCompletion completion,
+                   void *user = nullptr);
+    void setRxBuffer(uint8_t *buffer, size_t length);
+    void setTxBuffer(uint8_t *buffer, size_t length);
+    void clearRxBuffer(void);
+    void resetRxBuffer(void);
+    uint8_t *getRxBuffer(void);
+    size_t getRxLength(void) const;
+    inline SERCOM *getSercom(void) { return sercom; }
+    inline const SERCOM *getSercom(void) const { return sercom; }
 
     inline size_t write(unsigned long n) { return write((uint8_t)n); }
     inline size_t write(long n) { return write((uint8_t)n); }
@@ -61,47 +102,393 @@ class TwoWire : public Stream
     inline size_t write(int n) { return write((uint8_t)n); }
     using Print::write;
 
-    void onService(void);
+    inline void onService(void);
 
-  private:
-    SERCOM * sercom;
+private:
+  SERCOM *sercom;
     uint8_t _uc_pinSDA;
     uint8_t _uc_pinSCL;
 
     bool transmissionBegun;
 
-    // RX Buffer
-    RingBufferN<256> rxBuffer;
+    // RX/TX buffers (sync compatibility, async staging)
+    static constexpr size_t WIRE_BUFFER_LENGTH = 255;
+    uint8_t rxBuffer[WIRE_BUFFER_LENGTH];
+    uint8_t txBuffer[WIRE_BUFFER_LENGTH];
+  uint8_t *rxBufferPtr;
+    size_t rxBufferCapacity;
+    size_t rxLength;
+    size_t rxIndex;
+    size_t txBufferCapacity;
+    size_t masterIndex;
+    bool awaitingAddressAck;
+    volatile bool txnDone;
+    volatile int txnStatus;
+    SercomTxn slaveTxn;
+    SercomTxn loader; // Staging area for building transactions
 
-    //TX buffer
-    RingBufferN<256> txBuffer;
-    uint8_t txAddress;
+    // Transaction pool for async operations (matches SERCOM queue depth)
+    static constexpr size_t TXN_POOL_SIZE = 8;
+    SercomTxn txnPool[TXN_POOL_SIZE];
+    uint8_t txnPoolHead;
+
+    SercomTxn *allocateTxn();
+    void freeTxn(SercomTxn *txn);
 
     // Callback user functions
     void (*onRequestCallback)(void);
     void (*onReceiveCallback)(int);
+    void (*onReceiveResultCallback)(SercomWireError, int);
+    RequestCompletion requestCompletionCallback;
+    void *requestCompletionUser;
+
+    static void onTxnComplete(void *user, int status);
+    void prepareSlaveReceive();
+    static void onDeferredReceive(void *user);
+    static void onDeferredRequest(void *user);
+    static void onSlaveReceiveComplete(void *user, int status);
+    static void onSlaveRequestComplete(void *user, int status);
 
     // TWI clock frequency
     static const uint32_t TWI_CLOCK = 100000;
 };
 
 #if WIRE_INTERFACES_COUNT > 0
-  extern TwoWire Wire;
+extern TwoWire Wire;
 #endif
 #if WIRE_INTERFACES_COUNT > 1
-  extern TwoWire Wire1;
+extern TwoWire Wire1;
 #endif
 #if WIRE_INTERFACES_COUNT > 2
-  extern TwoWire Wire2;
+extern TwoWire Wire2;
 #endif
 #if WIRE_INTERFACES_COUNT > 3
-  extern TwoWire Wire3;
+extern TwoWire Wire3;
 #endif
 #if WIRE_INTERFACES_COUNT > 4
-  extern TwoWire Wire4;
+extern TwoWire Wire4;
 #endif
 #if WIRE_INTERFACES_COUNT > 5
-  extern TwoWire Wire5;
+extern TwoWire Wire5;
 #endif
+
+inline void TwoWire::onService(void)
+{
+  uint8_t flags = (uint8_t)sercom->getINTFLAG();
+  uint16_t status = (uint16_t)sercom->getSTATUS();
+  bool isMaster = sercom->isMasterWIRE();
+
+  if (!isMaster && !sercom->isSlaveWIRE()) {
+    sercom->clearINTFLAG();
+    return;
+  }
+
+  if (flags == 0)
+    return;
+
+#if defined(__SAME53__) || defined(__SAME54__)
+  const bool rxNack = status & SERCOM_I2CM_STATUS_RXNACK_Msk;
+  const bool wireError = flags & SERCOM_I2CM_INTFLAG_ERROR_Msk;
+  const bool slaveDrdy =
+      !isMaster && (flags & SERCOM_I2CS_INTFLAG_DRDY_Msk);
+  const bool slavePrec =
+      !isMaster && (flags & SERCOM_I2CS_INTFLAG_PREC_Msk);
+  const bool slaveAmatch =
+      !isMaster && (flags & SERCOM_I2CS_INTFLAG_AMATCH_Msk);
+#else
+  const bool rxNack = status & SERCOM_I2CM_STATUS_RXNACK;
+  const bool wireError = flags & SERCOM_I2CM_INTFLAG_ERROR;
+  const bool slaveDrdy = !isMaster && (flags & SERCOM_I2CS_INTFLAG_DRDY);
+  const bool slavePrec =
+      !isMaster && (flags & SERCOM_I2CS_INTFLAG_PREC);
+  const bool slaveAmatch =
+      !isMaster && (flags & SERCOM_I2CS_INTFLAG_AMATCH);
+#endif // __SAME53__ / __SAME54__
+
+  SercomTxn *activeTxn = sercom->getCurrentTxnWIRE();
+  const bool rxSlaveNack =
+      rxNack && activeTxn && (activeTxn->config & I2C_CFG_READ) != 0;
+  const bool isRxNack = isMaster ? rxNack : rxSlaveNack;
+
+#if defined(__SAME53__) || defined(__SAME54__)
+  const bool busError = status & SERCOM_I2CM_STATUS_BUSERR_Msk;
+#else
+  const bool busError = status & SERCOM_I2CM_STATUS_BUSERR;
+#endif // __SAME53__ / __SAME54__
+  const uint8_t busState =
+      (status & SERCOM_I2CM_STATUS_BUSSTATE_Msk) >>
+      SERCOM_I2CM_STATUS_BUSSTATE_Pos;
+  const bool slaveBusError = !isMaster && wireError && busError;
+  if (slaveBusError) {
+#if defined(__SAME53__) || defined(__SAME54__)
+    sercom->clearStatusWIRE(SERCOM_I2CS_STATUS_BUSERR_Msk);
+    sercom->clearINTFLAG(SERCOM_I2CS_INTFLAG_ERROR_Msk);
+#else
+    sercom->clearStatusWIRE(SERCOM_I2CS_STATUS_BUSERR);
+    sercom->clearINTFLAG(SERCOM_I2CS_INTFLAG_ERROR);
+#endif // __SAME53__ / __SAME54__
+  }
+
+  if (slavePrec && !slaveAmatch) {
+    if (!sercom->isSlaveTransactionActiveWIRE()) {
+      sercom->clearINTFLAG();
+      return;
+    }
+    const bool slaveTransmit =
+        activeTxn && (activeTxn->config & I2C_CFG_READ) != 0;
+#ifdef USE_ZERODMA
+    if (slaveTransmit && sercom->dmaTxBusy())
+      sercom->dmaAbortTx();
+#endif // USE_ZERODMA
+    if (slaveTransmit)
+      sercom->deferStopWIRE(SercomWireError::SUCCESS);
+    else if (activeTxn)
+      sercom->deferReceiveCompleteWIRE();
+    else
+      sercom->clearINTFLAG();
+    return;
+  }
+
+  bool continueOwnedArbitration = false;
+  if (isRxNack || (wireError && !slaveBusError)) {
+    if (!isMaster && isRxNack) {
+#ifdef USE_ZERODMA
+      if (sercom->dmaTxBusy())
+        sercom->dmaAbortTx();
+#endif // USE_ZERODMA
+      sercom->deferStopWIRE(SercomWireError::NACK_ON_DATA);
+      return;
+    }
+#if defined(__SAME53__) || defined(__SAME54__)
+    const bool arbitrationLost = status & SERCOM_I2CM_STATUS_ARBLOST_Msk;
+    const bool lowTimeout = status & SERCOM_I2CM_STATUS_LOWTOUT_Msk;
+    const bool slaveExtendTimeout = status & SERCOM_I2CM_STATUS_SEXTTOUT_Msk;
+    const bool masterExtendTimeout =
+        isMaster && (status & SERCOM_I2CM_STATUS_MEXTTOUT_Msk);
+    const bool lengthError =
+        isMaster && (status & SERCOM_I2CM_STATUS_LENERR_Msk);
+#else
+    const bool arbitrationLost = status & SERCOM_I2CM_STATUS_ARBLOST;
+    const bool lowTimeout = status & SERCOM_I2CM_STATUS_LOWTOUT;
+    const bool slaveExtendTimeout = status & SERCOM_I2CM_STATUS_SEXTTOUT;
+    const bool masterExtendTimeout =
+        isMaster && (status & SERCOM_I2CM_STATUS_MEXTTOUT);
+    const bool lengthError = isMaster && (status & SERCOM_I2CM_STATUS_LENERR);
+#endif // __SAME53__ / __SAME54__
+    const bool masterTimeout = isMaster && (masterExtendTimeout || lowTimeout);
+    const bool slaveTimeout = slaveExtendTimeout || (!isMaster && lowTimeout);
+    const bool terminalCondition =
+        isRxNack || masterTimeout || slaveTimeout || lengthError;
+    const bool arbitrationOnly = !isRxNack && !busError && !masterTimeout &&
+                                 !slaveTimeout && !lengthError;
+
+    bool commandReady = false;
+#if defined(__SAME53__) || defined(__SAME54__)
+    commandReady =
+        (flags & (SERCOM_I2CM_INTFLAG_MB_Msk | SERCOM_I2CM_INTFLAG_SB_Msk)) !=
+        0u;
+#else
+    commandReady =
+        (flags & (SERCOM_I2CM_INTFLAG_MB | SERCOM_I2CM_INTFLAG_SB)) != 0u;
+#endif // __SAME53__ / __SAME54__
+
+    if (isMaster && busError) {
+      const auto capturedBusState =
+          static_cast<simio::wire::BusState>(busState);
+      const bool replayAllowed =
+          activeTxn && (activeTxn->config & I2C_CFG_REPLAY_SAFE);
+      const auto busErrorAction = simio::wire::decideBusErrorAction(
+          {true, capturedBusState, arbitrationLost, commandReady,
+           terminalCondition,
+           replayAllowed, activeTxn != nullptr});
+      if (busErrorAction != simio::wire::BusErrorAction::RetireAmbiguous &&
+          busErrorAction != simio::wire::BusErrorAction::RetireTerminal) {
+#if defined(__SAME53__) || defined(__SAME54__)
+        sercom->clearStatusWIRE(SERCOM_I2CM_STATUS_BUSERR_Msk |
+                                SERCOM_I2CM_STATUS_ARBLOST_Msk);
+        sercom->clearINTFLAG(SERCOM_I2CM_INTFLAG_ERROR_Msk);
+#else
+        sercom->clearStatusWIRE(SERCOM_I2CM_STATUS_BUSERR |
+                                SERCOM_I2CM_STATUS_ARBLOST);
+        sercom->clearINTFLAG(SERCOM_I2CM_INTFLAG_ERROR);
+#endif // __SAME53__ / __SAME54__
+        sercom->deferBusErrorRecoveryWIRE(arbitrationLost, commandReady);
+        return;
+      }
+    }
+
+    if (isMaster && arbitrationLost && !busError) {
+      if (busState == WIRE_OWNER_STATE && arbitrationOnly) {
+        // ARBLOST normally transitions OWNER to BUSY. If OWNER remains set,
+        // rewriting ADDR would request a repeated START and restart a
+        // transaction that the hardware still owns. Clear only the error
+        // indications and preserve MB/SB so normal master service continues.
+#if defined(__SAME53__) || defined(__SAME54__)
+        sercom->clearStatusWIRE(SERCOM_I2CM_STATUS_ARBLOST_Msk);
+        sercom->clearINTFLAG(SERCOM_I2CM_INTFLAG_ERROR_Msk);
+#else
+        sercom->clearStatusWIRE(SERCOM_I2CM_STATUS_ARBLOST);
+        sercom->clearINTFLAG(SERCOM_I2CM_INTFLAG_ERROR);
+#endif // __SAME53__ / __SAME54__
+        continueOwnedArbitration = true;
+      } else {
+#ifdef USE_ZERODMA
+        sercom->dmaAbortTx();
+        sercom->dmaAbortRx();
+        sercom->setDmaWIRE(false);
+#endif
+        // Arbitration loss releases SDA and SCL. Re-arm the same queue head by
+        // writing ADDR again. ADDR clears ARBLOST; when another master still
+        // owns the bus, SERCOM remains in BUSY and waits for IDLE before START.
+        sercom->clearINTFLAG();
+        awaitingAddressAck = true;
+        sercom->startTransmissionWIRE();
+        return;
+      }
+    }
+
+    if (!continueOwnedArbitration) {
+      SercomWireError error = SercomWireError::UNKNOWN_ERROR;
+
+      if (isRxNack) {
+        error = isMaster && awaitingAddressAck
+                    ? SercomWireError::NACK_ON_ADDRESS
+                    : SercomWireError::NACK_ON_DATA;
+      } else if (masterTimeout) {
+        error = SercomWireError::MASTER_TIMEOUT;
+      } else if (slaveTimeout) {
+        error = SercomWireError::SLAVE_TIMEOUT;
+      } else if (lengthError) {
+        error = SercomWireError::LENGTH_ERROR;
+      } else if (busError) {
+        error = SercomWireError::BUS_ERROR;
+      } else if (isMaster) {
+        if (busState == WIRE_UNKNOWN_STATE)
+          error = SercomWireError::BUS_STATE_UNKNOWN;
+      }
+
+      if (isMaster && !arbitrationLost)
+        sercom->prepareCommandBitsWIRE(WIRE_MASTER_ACT_STOP);
+      if (wireError)
+        sercom->clearINTFLAG();
+      sercom->deferStopWIRE(error);
+      return;
+    }
+  }
+
+  if (isMaster) {
+    SercomTxn *txn = activeTxn;
+    if (!txn) {
+      sercom->clearINTFLAG();
+      return;
+    }
+
+    bool isRead = (txn->config & I2C_CFG_READ);
+
+    if (sercom->getTxnIndexWIRE() < sercom->getTxnLengthWIRE()) {
+      bool more = isRead ? sercom->readDataWIRE() : sercom->sendDataWIRE();
+      awaitingAddressAck = false;
+      if (!isRead || more)
+        return;
+    }
+
+    if ((txn->config & I2C_CFG_STOP) && !isRead)
+      sercom->prepareCommandBitsWIRE(WIRE_MASTER_ACT_STOP);
+    else
+      sercom->clearINTFLAG();
+
+    awaitingAddressAck = true;
+    sercom->deferStopWIRE(SercomWireError::SUCCESS);
+    return;
+  } else {
+#if defined(__SAME53__) || defined(__SAME54__)
+    bool isMasterRead = (status & SERCOM_I2CS_STATUS_DIR_Msk);
+    bool prec = slavePrec;
+    bool amatch = slaveAmatch;
+#else
+    bool isMasterRead =
+        (status & SERCOM_I2CS_STATUS_DIR); // Master Read / Slave Transmit
+    bool prec = slavePrec;       // Stop detected
+    bool amatch = slaveAmatch;   // Address Match detected
+#endif // __SAME53__ / __SAME54__
+
+    // A new address match terminates an active slave receive even when the
+    // master uses a repeated START instead of STOP. Queue receive completion
+    // before the follow-up setup so a combined write/read transaction publishes
+    // its request bytes before onRequest prepares the response.
+    if (amatch) {
+      // PREC can arrive with the next AMATCH when the preceding transaction's
+      // STOP is recognized just before a new address. It belongs to the
+      // completed transaction and must not retire the transaction started by
+      // this address match.
+      if (prec) {
+#if defined(__SAME53__) || defined(__SAME54__)
+        sercom->clearINTFLAG(SERCOM_I2CS_INTFLAG_PREC_Msk);
+#else
+        sercom->clearINTFLAG(SERCOM_I2CS_INTFLAG_PREC);
+#endif // __SAME53__ / __SAME54__
+      }
+      if (!sercom->isSlaveTransactionActiveWIRE()) {
+        sercom->discardIdleSlaveTransactionWIRE();
+        activeTxn = sercom->getCurrentTxnWIRE();
+      }
+      const bool activeReceive =
+          sercom->isSlaveTransactionActiveWIRE() && activeTxn &&
+          (activeTxn->config & I2C_CFG_READ) == 0;
+      if (activeReceive) {
+#if defined(__SAME53__) || defined(__SAME54__)
+        sercom->disableInterrupts(SERCOM_I2CS_INTENCLR_AMATCH_Msk);
+#else
+        sercom->disableInterrupts(SERCOM_I2CS_INTENCLR_AMATCH);
+#endif // __SAME53__ / __SAME54__
+        if (isMasterRead)
+          sercom->deferRequestWIRE();
+        else
+          sercom->deferReceiveWIRE();
+        sercom->deferReceiveCompleteWIRE();
+        return;
+      }
+      sercom->markSlaveTransactionActiveWIRE();
+      if (isMasterRead) {
+#if defined(__SAME53__) || defined(__SAME54__)
+        sercom->disableInterrupts(SERCOM_I2CS_INTENCLR_AMATCH_Msk);
+#else
+        sercom->disableInterrupts(SERCOM_I2CS_INTENCLR_AMATCH);
+#endif // __SAME53__ / __SAME54__
+        sercom->deferRequestWIRE();
+      } else {
+        prepareSlaveReceive();
+        sercom->setTxnWIRE(&slaveTxn);
+        sercom->startTransmissionWIRE();
+      }
+      return;
+    }
+
+    // Preserve the interrupt-driven slave byte engine both when DMA is not
+    // compiled and when this transaction is not DMA-eligible.
+    if (slaveDrdy && !amatch && !sercom->isDmaWIRE()) {
+      SercomTxn *slaveTxn = activeTxn;
+      if (!slaveTxn) {
+        sercom->clearINTFLAG();
+        return;
+      }
+
+      if (slaveTxn->config & I2C_CFG_READ) {
+        if (sercom->getTxnIndexWIRE() < sercom->getTxnLengthWIRE())
+          sercom->sendDataWIRE();
+        else {
+          sercom->prepareSlaveCommandBitsWIRE(WIRE_SLAVE_ACT_COMPLETE);
+          sercom->deferStopWIRE(SercomWireError::SUCCESS);
+        }
+      } else if (sercom->getTxnIndexWIRE() < sercom->getTxnLengthWIRE()) {
+        sercom->readDataWIRE();
+      } else {
+        sercom->prepareNackBitWIRE();
+      }
+      return;
+    }
+
+  }
+}
 
 #endif
