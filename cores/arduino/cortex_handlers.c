@@ -17,7 +17,8 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include <sam.h>
+#include "sam.h"
+#include "same5x_compat_shim.h"
 #include <variant.h>
 #include <stdio.h>
 
@@ -25,6 +26,7 @@
 extern void svcHook(void);
 extern void pendSVHook(void);
 extern int sysTickHook(void);
+extern void SystemInit(void);
 
 /* Default empty handler */
 void Dummy_Handler(void)
@@ -35,7 +37,7 @@ void Dummy_Handler(void)
   for (;;) { }
 }
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
 /* Cortex-M4 processor handlers */
 void Reset_Handler               ( void );
@@ -85,7 +87,11 @@ void DMAC_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Han
 void DMAC_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void DMAC_2_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void DMAC_3_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAME53__) || defined(__SAME54__)
+void DMAC_OTHER_Handler          ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
 void DMAC_4_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#endif
 void EVSYS_0_Handler             ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void EVSYS_1_Handler             ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void EVSYS_2_Handler             ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
@@ -129,10 +135,17 @@ void SERCOM7_2_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Han
 void SERCOM7_3_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void CAN0_Handler                ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void CAN1_Handler                ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAME53__) || defined(__SAME54__)
+void USB_OTHER_Handler           ( void ) __attribute__ ((weak));
+void USB_SOF_HSOF_Handler        ( void ) __attribute__ ((weak));
+void USB_TRCPT0_Handler          ( void ) __attribute__ ((weak));
+void USB_TRCPT1_Handler          ( void ) __attribute__ ((weak));
+#else
 void USB_0_Handler               ( void ) __attribute__ ((weak));
 void USB_1_Handler               ( void ) __attribute__ ((weak));
 void USB_2_Handler               ( void ) __attribute__ ((weak));
 void USB_3_Handler               ( void ) __attribute__ ((weak));
+#endif
 void GMAC_Handler                ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void TCC0_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void TCC0_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
@@ -255,7 +268,11 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 	  (void*) DMAC_1_Handler,                /* 32 Direct Memory Access Controller IRQ 1 */
 	  (void*) DMAC_2_Handler,                /* 33 Direct Memory Access Controller IRQ 2 */
 	  (void*) DMAC_3_Handler,                /* 34 Direct Memory Access Controller IRQ 3 */
+#if defined(__SAME53__) || defined(__SAME54__)
+	  (void*) DMAC_OTHER_Handler,            /* 35 Direct Memory Access Controller other IRQ */
+#else
 	  (void*) DMAC_4_Handler,                /* 35 Direct Memory Access Controller IRQ 4 */
+#endif
 	  (void*) EVSYS_0_Handler,               /* 36 Event System Interface IRQ 0 */
 	  (void*) EVSYS_1_Handler,               /* 37 Event System Interface IRQ 1 */
 	  (void*) EVSYS_2_Handler,               /* 38 Event System Interface IRQ 2 */
@@ -300,10 +317,17 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 	  (void*) SERCOM7_3_Handler,             /* 77 Serial Communication Interface 7 IRQ 3 */
 	  (void*) CAN0_Handler,                  /* 78 Control Area Network 0 (SAM E5x) */
 	  (void*) CAN1_Handler,                  /* 79 Control Area Network 0 (SAM E5x) */
+#if defined(__SAME53__) || defined(__SAME54__)
+	  (void*) USB_OTHER_Handler,             /* 80 Universal Serial Bus other IRQ */
+	  (void*) USB_SOF_HSOF_Handler,          /* 81 Universal Serial Bus SOF/HSOF IRQ */
+	  (void*) USB_TRCPT0_Handler,            /* 82 Universal Serial Bus transaction 0 IRQ */
+	  (void*) USB_TRCPT1_Handler,            /* 83 Universal Serial Bus transaction 1 IRQ */
+#else
 	  (void*) USB_0_Handler,                 /* 80 Universal Serial Bus IRQ 0 */
 	  (void*) USB_1_Handler,                 /* 81 Universal Serial Bus IRQ 1 */
 	  (void*) USB_2_Handler,                 /* 82 Universal Serial Bus IRQ 2 */
 	  (void*) USB_3_Handler,                 /* 83 Universal Serial Bus IRQ 3 */
+#endif
 	  (void*) GMAC_Handler,					 /* 84 Ethernet MAC */
 	  (void*) TCC0_0_Handler,                /* 85 Timer Counter Control 0 IRQ 0 */
 	  (void*) TCC0_1_Handler,                /* 86 Timer Counter Control 0 IRQ 1 */
@@ -486,7 +510,7 @@ void Reset_Handler(void)
       *pDest = 0;
   }
 
-#if defined(__FPU_USED) && defined(__SAMD51__)
+#if defined(__FPU_USED) && (defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__))
 	/* Enable FPU */
 	SCB->CPACR |= (0xFu << 20);
 	__DSB();
@@ -513,7 +537,28 @@ void SysTick_Handler(void)
 
 static void (*usb_isr)(void) = NULL;
 
-#if defined(__SAMD51__)
+#if defined(__SAME53__) || defined(__SAME54__)
+void USB_OTHER_Handler(void)
+{
+	if (usb_isr)
+	usb_isr();
+}
+void USB_SOF_HSOF_Handler(void)
+{
+	if (usb_isr)
+	usb_isr();
+}
+void USB_TRCPT0_Handler(void)
+{
+	if (usb_isr)
+	usb_isr();
+}
+void USB_TRCPT1_Handler(void)
+{
+	if (usb_isr)
+	usb_isr();
+}
+#elif defined(__SAMD51__) || defined(__SAME51__)
 void USB_0_Handler(void)
 {
 	if (usb_isr)

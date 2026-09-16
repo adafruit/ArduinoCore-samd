@@ -17,7 +17,7 @@
 */
 #pragma once
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 #define NUM_DMA_CHANNELS 4
 #else
 #define NUM_DMA_CHANNELS 1

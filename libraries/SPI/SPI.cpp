@@ -278,7 +278,7 @@ void SPIClass::dmaAllocate(void) {
   // aren't large and there's usually only a handful to a dozen, so this
   // isn't an excessive burden in exchange for big non-blocking transfers.
   uint32_t maxWriteBytes = FLASH_SIZE; // Writes can't exceed all of flash
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   uint32_t maxReadBytes = HSRAM_SIZE;  // Reads can't exceed all of RAM
 #else
   uint32_t maxReadBytes = HMCRAMC0_SIZE;
@@ -521,11 +521,11 @@ int SPIClass::getDMAC_ID_RX(void) {
   return (idx >= 0) ? sercomData[idx].dmac_id_rx : -1;
 }
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
 // Set the SPI device's SERCOM clock CORE and SLOW clock sources.
 // SercomClockSource values are an enumeration in SERCOM.h.
-// This works on SAMD51 only.  On SAMD21, a dummy function is declared
+// This works on SAMD51/SAME5x only.  On SAMD21, a dummy function is declared
 // in SPI.h which compiles to nothing, so user code doesn't need to check
 // and conditionally compile lines for different architectures.
 void SPIClass::setClockSource(SercomClockSource clk) {
@@ -534,7 +534,7 @@ void SPIClass::setClockSource(SercomClockSource clk) {
   _p_sercom->setClockSource(idx, clk, false); // false = set slow clock
 }
 
-#endif // end __SAMD51__
+#endif // end SAMD51/SAME5x
 
 #if SPI_INTERFACES_COUNT > 0
   /* In case new variant doesn't define these macros,

@@ -27,7 +27,7 @@ extern "C" {
 static int _readResolution = 10;
 static int _ADCResolution = 10;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 static int _writeResolution = 12;
 static int _dacResolution = 12;
 #else
@@ -36,7 +36,7 @@ static int _writeResolution = 8;
 #endif
 
 
-#if !defined(__SAMD51__)
+#if !(defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__))
 // Wait for synchronization of registers between the clock domains
 static __inline__ void syncADC() __attribute__((always_inline, unused));
 static void syncADC() {
@@ -73,7 +73,7 @@ static bool dacEnabled[2];
 void analogReadResolution(int res)
 {
   _readResolution = res;
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
 	if (res > 10) {
 		ADC0->CTRLB.bit.RESSEL = ADC_CTRLB_RESSEL_12BIT_Val;
@@ -133,7 +133,7 @@ static inline uint32_t mapResolution(uint32_t value, uint32_t from, uint32_t to)
  */
 void analogReference(eAnalogReference mode)
 {
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	while(ADC0->SYNCBUSY.reg & ADC_SYNCBUSY_REFCTRL); //wait for sync
 	while(ADC1->SYNCBUSY.reg & ADC_SYNCBUSY_REFCTRL); //wait for sync
 	
@@ -272,14 +272,18 @@ uint32_t analogRead(uint32_t pin)
   } else 
 #endif
   if (pin <= 5) {
+#ifdef analogInputToDigitalPin
+    pin = analogInputToDigitalPin(pin);
+#else
     pin += A0;
+#endif
   }
 
   pinPeripheral(pin, PIO_ANALOG);
  //ATSAMR, for example, doesn't have a DAC
 #ifdef DAC
 
-	#if defined(__SAMD51__)
+	#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	  if (pin == PIN_DAC0 || pin == PIN_DAC1) { // Disable DAC, if analogWrite(A0,dval) used previously the DAC is enabled
 		uint8_t channel = (pin == PIN_DAC0 ? 0 : 1);
 		
@@ -309,7 +313,7 @@ uint32_t analogRead(uint32_t pin)
 
 #endif
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   Adc *adc;
   if(g_APinDescription[pin].ulPinAttribute & PIN_ATTR_ANALOG) adc = ADC0;
   else if(g_APinDescription[pin].ulPinAttribute & PIN_ATTR_ANALOG_ALT) adc = ADC1;
@@ -412,13 +416,13 @@ void analogWrite(uint32_t pin, uint32_t value)
 	  if ((attr & PIN_ATTR_ANALOG) == PIN_ATTR_ANALOG)
 	  {
 	    // DAC handling code
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 		if (pin == PIN_DAC0 || pin == PIN_DAC1) { // 2 DACs on A0 (PA02) and A1 (PA05)
 #else
 	    if (pin == PIN_DAC0) { // Only 1 DAC on A0 (PA02)
 #endif
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
 	    value = mapResolution(value, _writeResolution, _dacResolution);
 
@@ -480,13 +484,13 @@ void analogWrite(uint32_t pin, uint32_t value)
 			syncDAC();
 			DAC->CTRLA.bit.ENABLE = 0x01;     // Enable DAC
 			syncDAC();
-#endif // __SAMD51__
+#endif // SAMD51/SAME5x
 				return;
 	  }
 	}
 #endif // DAC
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	if(attr & (PIN_ATTR_PWM_E|PIN_ATTR_PWM_F|PIN_ATTR_PWM_G)){
 
 		uint32_t tcNum = GetTCNumber(pinDesc.ulPWMChannel);

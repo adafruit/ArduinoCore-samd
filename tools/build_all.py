@@ -61,6 +61,11 @@ def build_examples(variant):
             # skip non-tinyusb variant for tinyusb examples
             success = SKIPPED
             skip_count += 1
+        elif (variant.startswith('metro_m0:') and
+              sketch.endswith('/video_capture/video_capture.ino')):
+            # TinyUSB video capture exceeds the SAMD21's available RAM.
+            success = SKIPPED
+            skip_count += 1
         elif 'usbstack=tinyusb' in variant and "libraries/USBHost" in sketch:
             # skip -tinyusb variant for USBHost examples
             success = SKIPPED

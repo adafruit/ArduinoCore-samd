@@ -37,7 +37,7 @@
 //#define _useTimer2   // <- TODO do not activate until the code in Servo.cpp has been changed in order
                        //         to manage more than one channel per timer on the SAMD architecture
 
-#if defined(__SAMD51__) 
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   #if defined (_useTimer1)
     #define TC_FOR_TIMER1             TC1
     #define CHANNEL_FOR_TIMER1        0
