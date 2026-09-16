@@ -105,6 +105,7 @@ static const uint8_t A6  = PIN_A6;
 #define PERIPH_SPI    sercom1
 #define PAD_SPI_TX    SPI_PAD_0_SCK_1
 #define PAD_SPI_RX    SERCOM_RX_PAD_3
+#define SPI_IT_HANDLER SERCOM1_Handler
 
 static const uint8_t SS   = PIN_SPI_SS;   // SPI Slave SS not used. Set here only for reference.
 static const uint8_t MOSI = PIN_SPI_MOSI;
@@ -157,6 +158,7 @@ extern Uart Serial1;
 #define PIN_SERIAL1_TX (14ul)
 #define PAD_SERIAL1_TX (UART_TX_PAD_2)
 #define PAD_SERIAL1_RX (SERCOM_RX_PAD_3)
+#define PERIPH_SERIAL1 sercom5
 
 // Serial2 - GSM
 extern Uart Serial2;
@@ -164,6 +166,7 @@ extern Uart Serial2;
 #define PIN_SERIAL2_TX (26ul)
 #define PAD_SERIAL2_TX (UART_TX_PAD_0)
 #define PAD_SERIAL2_RX (SERCOM_RX_PAD_1)
+#define PERIPH_SERIAL2 sercom4
 #define PIN_SERIAL2_RTS (28u)
 #define PIN_SERIAL2_CTS (29u)
 

@@ -218,8 +218,3 @@ SERCOM sercom4( SERCOM4 ) ;
 SERCOM sercom5( SERCOM5 ) ;
 
 // We'll use sercom5 for Serial1 hardware serial since pins 0 and 1 are not external
-Uart Serial1( &sercom5, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
-void SERCOM5_Handler()
-{
-  Serial1.IrqHandler();
-}
