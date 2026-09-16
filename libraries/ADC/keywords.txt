@@ -1,0 +1,52 @@
+#######################################
+# Syntax Coloring Map For ADC
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+ChannelADC	KEYWORD1
+AdcEngine	KEYWORD1
+AdcSampleNum	KEYWORD1
+AdcWinMode	KEYWORD1
+AdcRefSel	KEYWORD1
+AdcGain	KEYWORD1
+AdcResSel	KEYWORD1
+AdcPrescaler	KEYWORD1
+AdcMuxPos	KEYWORD1
+AdcMuxNeg	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+analogReadCorrection	KEYWORD2
+attach	KEYWORD2
+read	KEYWORD2
+value	KEYWORD2
+setWindow	KEYWORD2
+clearWindow	KEYWORD2
+windowEnabled	KEYWORD2
+setWindowCallback	KEYWORD2
+setReadCallback	KEYWORD2
+setEventControl	KEYWORD2
+setCtrlB	KEYWORD2
+setReference	KEYWORD2
+setGain	KEYWORD2
+setCalibration	KEYWORD2
+end	KEYWORD2
+begin	KEYWORD2
+instance	KEYWORD2
+enqueue	KEYWORD2
+registerChannel	KEYWORD2
+unregisterChannel	KEYWORD2
+service	KEYWORD2
+resultByteForMux	KEYWORD2
+enabledMask	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+ADC_MUX_SOURCE_INVALID	LITERAL1

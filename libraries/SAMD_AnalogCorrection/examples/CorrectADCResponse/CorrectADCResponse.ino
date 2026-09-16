@@ -21,7 +21,7 @@
        - the instruction line to copy/paste in the final sketch
 */
 
-#include "SAMD_AnalogCorrection.h"
+#include <ADC.h>
 
 #define ADC_GND_PIN          A1
 #define ADC_3V3_PIN          A2
