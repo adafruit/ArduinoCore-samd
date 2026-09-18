@@ -38,10 +38,10 @@ static I2SDevice_SAMD21G18x i2sd(*I2S);
 #include "I2S.h"
 
 #ifdef USE_TINYUSB
-// For Serial when selecting TinyUSB.
-// PlatformIO does not give framework-bundled libraries the lib_deps include
-// paths, so the header can be unreachable there; skip it instead of failing.
-#if !defined(PLATFORMIO) || !defined(__has_include) || __has_include(<Adafruit_TinyUSB.h>)
+// For Serial when selecting TinyUSB; the Arduino builder discovers and links
+// the library from this include. PlatformIO never resolves it (framework-
+// bundled libraries get no lib_deps include paths), so skip it there.
+#ifndef PLATFORMIO
 #include <Adafruit_TinyUSB.h>
 #endif
 #endif
