@@ -17,6 +17,8 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
+#include <sam.h>
+
 #ifndef USE_TINYUSB
 
 #include <stdio.h>
@@ -27,7 +29,6 @@
 #include "variant.h"
 #include "USB_host.h"
 #include "samd21_host.h"
-#include "sam.h"
 #include "wiring_digital.h"
 #include "wiring_private.h"
 
@@ -40,9 +41,197 @@
 // Handle UOTGHS Host driver state
 static uhd_vbus_state_t uhd_state = UHD_STATE_NO_VBUS;
 
+#if defined(__SAME53__) || defined(__SAME54__)
+__attribute__((__aligned__(4))) volatile usb_descriptor_host_registers_t usb_pipe_table[USB_EPT_NUM];
+#else // __SAME53__ / __SAME54__
 __attribute__((__aligned__(4))) volatile UsbHostDescriptor usb_pipe_table[USB_EPT_NUM];
+#endif // __SAME53__ / __SAME54__
 
 extern void (*gpf_isr)(void);
+
+#if defined(__SAME53__) || defined(__SAME54__)
+
+void UHD_Init(void)
+{
+	const uint32_t calibration = *(const uint32_t *)(SW0_ADDR + 4u);
+	uint32_t pad_transn = (calibration & FUSES_SW0_WORD_1_USB_TRANSN_Msk) >> FUSES_SW0_WORD_1_USB_TRANSN_Pos;
+	uint32_t pad_transp = (calibration & FUSES_SW0_WORD_1_USB_TRANSP_Msk) >> FUSES_SW0_WORD_1_USB_TRANSP_Pos;
+	uint32_t pad_trim = (calibration & FUSES_SW0_WORD_1_USB_TRIM_Msk) >> FUSES_SW0_WORD_1_USB_TRIM_Pos;
+
+	USB_SetHandler(&UHD_Handler);
+	MCLK_REGS->MCLK_APBBMASK |= MCLK_APBBMASK_USB_Msk;
+	pinPeripheral(PIN_USB_DM, PIO_COM);
+	pinPeripheral(PIN_USB_DP, PIO_COM);
+	GCLK_REGS->GCLK_PCHCTRL[USB_GCLK_ID] = GCLK_PCHCTRL_GEN_GCLK1 | GCLK_PCHCTRL_CHEN_Msk;
+
+	USB_REGS->HOST.USB_CTRLA = USB_CTRLA_SWRST_Msk;
+	while (USB_REGS->HOST.USB_SYNCBUSY & USB_SYNCBUSY_SWRST_Msk);
+	USB_REGS->HOST.USB_CTRLA = USB_CTRLA_MODE_Msk | USB_CTRLA_RUNSTDBY_Msk;
+
+	if (pad_transn == 0x1f) pad_transn = 5;
+	if (pad_transp == 0x1f) pad_transp = 29;
+	if (pad_trim == 0x7) pad_trim = 3;
+	USB_REGS->HOST.USB_PADCAL = USB_PADCAL_TRANSN(pad_transn) |
+	                                USB_PADCAL_TRANSP(pad_transp) |
+	                                USB_PADCAL_TRIM(pad_trim);
+	USB_REGS->HOST.USB_DESCADD = (uint32_t)&usb_pipe_table[0];
+	USB_REGS->HOST.USB_CTRLB &= ~USB_HOST_CTRLB_SPDCONF_Msk;
+	memset((void *)usb_pipe_table, 0, sizeof(usb_pipe_table));
+	uhd_state = UHD_STATE_NO_VBUS;
+	USB_REGS->HOST.USB_CTRLA |= USB_CTRLA_ENABLE_Msk;
+	while (USB_REGS->HOST.USB_SYNCBUSY & USB_SYNCBUSY_ENABLE_Msk);
+
+	pinMode(PIN_USB_HOST_ENABLE, OUTPUT);
+	digitalWrite(PIN_USB_HOST_ENABLE, HIGH);
+	USB_REGS->HOST.USB_INTENSET = USB_HOST_INTENSET_DCONN_Msk |
+	                                  USB_HOST_INTENSET_WAKEUP_Msk |
+	                                  USB_HOST_INTENSET_DDISC_Msk;
+	USB_REGS->HOST.USB_CTRLB |= USB_HOST_CTRLB_VBUSOK_Msk;
+
+	NVIC_SetPriority(USB_OTHER_IRQn, 0UL);
+	NVIC_SetPriority(USB_SOF_HSOF_IRQn, 0UL);
+	NVIC_SetPriority(USB_TRCPT0_IRQn, 0UL);
+	NVIC_SetPriority(USB_TRCPT1_IRQn, 0UL);
+	NVIC_EnableIRQ(USB_OTHER_IRQn);
+	NVIC_EnableIRQ(USB_SOF_HSOF_IRQn);
+	NVIC_EnableIRQ(USB_TRCPT0_IRQn);
+	NVIC_EnableIRQ(USB_TRCPT1_IRQn);
+}
+
+void UHD_Handler(void)
+{
+	if ((USB_REGS->HOST.USB_CTRLA & USB_CTRLA_MODE_Msk) == 0) return;
+
+	uint16_t flags = USB_REGS->HOST.USB_INTFLAG;
+	if (flags & USB_HOST_INTFLAG_HSOF_Msk) {
+		USB_REGS->HOST.USB_INTFLAG = USB_HOST_INTFLAG_HSOF_Msk;
+		uhd_state = UHD_STATE_CONNECTED;
+	} else if (flags & USB_HOST_INTFLAG_RST_Msk) {
+		USB_REGS->HOST.USB_INTFLAG = USB_HOST_INTFLAG_RST_Msk;
+		uhd_state = UHD_STATE_DISCONNECTED;
+	} else if (flags & USB_HOST_INTFLAG_UPRSM_Msk) {
+		USB_REGS->HOST.USB_INTFLAG = USB_HOST_INTFLAG_UPRSM_Msk;
+		uhd_state = UHD_STATE_DISCONNECTED;
+	} else if (flags & USB_HOST_INTFLAG_DNRSM_Msk) {
+		USB_REGS->HOST.USB_INTFLAG = USB_HOST_INTFLAG_DNRSM_Msk;
+		uhd_state = UHD_STATE_DISCONNECTED;
+	} else if (flags & USB_HOST_INTFLAG_WAKEUP_Msk) {
+		USB_REGS->HOST.USB_INTFLAG = USB_HOST_INTFLAG_WAKEUP_Msk;
+		uhd_state = UHD_STATE_CONNECTED;
+	} else if (flags & USB_HOST_INTFLAG_RAMACER_Msk) {
+		USB_REGS->HOST.USB_INTFLAG = USB_HOST_INTFLAG_RAMACER_Msk;
+		uhd_state = UHD_STATE_DISCONNECTED;
+	} else if (flags & USB_HOST_INTFLAG_DCONN_Msk) {
+		USB_REGS->HOST.USB_INTFLAG = USB_HOST_INTFLAG_DCONN_Msk | USB_HOST_INTFLAG_DDISC_Msk;
+		USB_REGS->HOST.USB_INTENCLR = USB_HOST_INTENCLR_DCONN_Msk;
+		USB_REGS->HOST.USB_INTENSET = USB_HOST_INTENSET_DDISC_Msk;
+		uhd_state = UHD_STATE_CONNECTED;
+	} else if (flags & USB_HOST_INTFLAG_DDISC_Msk) {
+		USB_REGS->HOST.USB_INTFLAG = USB_HOST_INTFLAG_DDISC_Msk | USB_HOST_INTFLAG_DCONN_Msk;
+		USB_REGS->HOST.USB_INTENCLR = USB_HOST_INTENCLR_DDISC_Msk;
+		USB_REGS->HOST.USB_INTENSET = USB_HOST_INTENSET_DCONN_Msk;
+		uhd_state = UHD_STATE_DISCONNECTED;
+	}
+}
+
+uhd_vbus_state_t UHD_GetVBUSState(void)
+{
+	return uhd_state;
+}
+
+uint32_t UHD_Pipe0_Alloc(uint32_t ul_add, uint32_t ul_ep_size)
+{
+	(void)ul_add;
+	(void)ul_ep_size;
+	uint32_t size = (USB_REGS->HOST.USB_STATUS & USB_HOST_STATUS_SPEED_Msk) ?
+	                    USB_PCKSIZE_SIZE_8_BYTES : USB_PCKSIZE_SIZE_64_BYTES;
+	USB_REGS->HOST.HOST_PIPE[0].USB_PCFG = USB_HOST_PCFG_PTYPE(1);
+	usb_pipe_table[0].HOST_DESC_BANK[0].USB_CTRL_PIPE = USB_HOST_CTRL_PIPE_PEPNUM(0);
+	usb_pipe_table[0].HOST_DESC_BANK[0].USB_PCKSIZE = USB_HOST_PCKSIZE_SIZE(size);
+	return 0;
+}
+
+uint32_t UHD_Pipe_Alloc(uint32_t ul_dev_addr, uint32_t ul_dev_ep, uint32_t ul_type,
+		uint32_t ul_dir, uint32_t ul_maxsize, uint32_t ul_interval, uint32_t ul_nb_bank)
+{
+	usb_host_pipe_registers_t *pipe = &USB_REGS->HOST.HOST_PIPE[ul_dev_ep];
+	pipe->USB_PCFG = USB_HOST_PCFG_BK(ul_nb_bank) | ul_type |
+	                   USB_HOST_PCFG_PTOKEN((ul_dir & USB_EP_DIR_IN) ? 1 : 2);
+	pipe->USB_BINTERVAL = ul_interval;
+	if (ul_dir & USB_EP_DIR_IN) pipe->USB_PSTATUSSET = USB_HOST_PSTATUSSET_BK0RDY_Msk;
+	else pipe->USB_PSTATUSCLR = USB_HOST_PSTATUSCLR_BK0RDY_Msk;
+
+	ul_maxsize = (USB_REGS->HOST.USB_STATUS & USB_HOST_STATUS_SPEED_Msk) ?
+	                 USB_PCKSIZE_SIZE_8_BYTES : USB_PCKSIZE_SIZE_64_BYTES;
+	memset((void *)&usb_pipe_table[ul_dev_ep], 0, sizeof(usb_pipe_table[ul_dev_ep]));
+	usb_pipe_table[ul_dev_ep].HOST_DESC_BANK[0].USB_CTRL_PIPE =
+	    USB_HOST_CTRL_PIPE_PDADDR(ul_dev_addr) | USB_HOST_CTRL_PIPE_PEPNUM(ul_dev_ep);
+	usb_pipe_table[ul_dev_ep].HOST_DESC_BANK[0].USB_PCKSIZE = USB_HOST_PCKSIZE_SIZE(ul_maxsize);
+	return 1;
+}
+
+void UHD_Pipe_CountZero(uint32_t ul_pipe)
+{
+	usb_pipe_table[ul_pipe].HOST_DESC_BANK[0].USB_PCKSIZE &= ~USB_HOST_PCKSIZE_BYTE_COUNT_Msk;
+}
+
+void UHD_Pipe_Free(uint32_t ul_pipe)
+{
+	USB_REGS->HOST.HOST_PIPE[ul_pipe].USB_PSTATUSSET = USB_HOST_PSTATUSSET_PFREEZE_Msk;
+}
+
+uint32_t UHD_Pipe_Read(uint32_t pipe_num, uint32_t buf_size, uint8_t *buf)
+{
+	usb_host_pipe_registers_t *pipe = &USB_REGS->HOST.HOST_PIPE[pipe_num];
+	if ((pipe->USB_PCFG & USB_HOST_PCFG_PTYPE_Msk) == USB_HOST_PTYPE_DIS) return 0;
+	volatile usb_host_desc_bank_registers_t *bank = &usb_pipe_table[pipe_num].HOST_DESC_BANK[0];
+	bank->USB_ADDR = (uint32_t)buf;
+	bank->USB_PCKSIZE = (bank->USB_PCKSIZE & ~(USB_HOST_PCKSIZE_BYTE_COUNT_Msk |
+	                         USB_HOST_PCKSIZE_MULTI_PACKET_SIZE_Msk)) |
+	                         USB_HOST_PCKSIZE_MULTI_PACKET_SIZE(buf_size);
+	pipe->USB_PCFG = (pipe->USB_PCFG & ~USB_HOST_PCFG_PTOKEN_Msk) | USB_HOST_PCFG_PTOKEN(1);
+	pipe->USB_PSTATUSCLR = USB_HOST_PSTATUSCLR_BK0RDY_Msk | USB_HOST_PSTATUSCLR_PFREEZE_Msk;
+	return buf_size;
+}
+
+void UHD_Pipe_Write(uint32_t ul_pipe, uint32_t ul_size, uint8_t *buf)
+{
+	volatile usb_host_desc_bank_registers_t *bank = &usb_pipe_table[ul_pipe].HOST_DESC_BANK[0];
+	bank->USB_ADDR = (uint32_t)buf;
+	bank->USB_PCKSIZE = (bank->USB_PCKSIZE & ~(USB_HOST_PCKSIZE_BYTE_COUNT_Msk |
+	                         USB_HOST_PCKSIZE_MULTI_PACKET_SIZE_Msk)) |
+	                         USB_HOST_PCKSIZE_BYTE_COUNT(ul_size);
+}
+
+void UHD_Pipe_Send(uint32_t ul_pipe, uint32_t ul_token_type)
+{
+	usb_host_pipe_registers_t *pipe = &USB_REGS->HOST.HOST_PIPE[ul_pipe];
+	pipe->USB_PCFG = (pipe->USB_PCFG & ~USB_HOST_PCFG_PTOKEN_Msk) |
+	                   USB_HOST_PCFG_PTOKEN(ul_token_type);
+	if (ul_token_type == USB_HOST_PCFG_PTOKEN_SETUP) {
+		pipe->USB_PINTFLAG = USB_HOST_PINTFLAG_TXSTP_Msk;
+		pipe->USB_PSTATUSSET = USB_HOST_PSTATUSSET_BK0RDY_Msk;
+	} else if (ul_token_type == USB_HOST_PCFG_PTOKEN_IN) {
+		pipe->USB_PSTATUSCLR = USB_HOST_PSTATUSCLR_BK0RDY_Msk;
+	} else {
+		pipe->USB_PINTFLAG = USB_HOST_PINTFLAG_TRCPT1_Msk;
+		pipe->USB_PSTATUSSET = USB_HOST_PSTATUSSET_BK0RDY_Msk;
+	}
+	pipe->USB_PSTATUSCLR = USB_HOST_PSTATUSCLR_PFREEZE_Msk;
+}
+
+uint32_t UHD_Pipe_Is_Transfer_Complete(uint32_t ul_pipe, uint32_t ul_token_type)
+{
+	usb_host_pipe_registers_t *pipe = &USB_REGS->HOST.HOST_PIPE[ul_pipe];
+	uint8_t completion = (ul_token_type == USB_HOST_PCFG_PTOKEN_SETUP) ?
+	                         USB_HOST_PINTFLAG_TXSTP_Msk : USB_HOST_PINTFLAG_TRCPT1_Msk;
+	if ((pipe->USB_PINTFLAG & completion) == 0) return 0;
+	pipe->USB_PINTFLAG = completion;
+	pipe->USB_PSTATUSSET = USB_HOST_PSTATUSSET_PFREEZE_Msk;
+	return 1;
+}
+
+#else // __SAME53__ / __SAME54__
 
 
 // NVM Software Calibration Area Mapping
@@ -68,11 +257,11 @@ void UHD_Init(void)
 	USB_SetHandler(&UHD_Handler);
 
 	/* Enable USB clock */
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	MCLK->APBBMASK.reg |= MCLK_APBBMASK_USB;
 #else
 	PM->APBBMASK.reg |= PM_APBBMASK_USB;
-#endif
+#endif // __SAMD51__ / __SAME51__
 
 	/* Set up the USB DP/DM pins */
 	pinPeripheral( PIN_USB_DM, PIO_COM );
@@ -89,7 +278,7 @@ void UHD_Init(void)
 	* Put Generic Clock Generator 0 as source for Generic Clock Multiplexer 6 (USB reference)
 	*/
 	
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	GCLK->PCHCTRL[USB_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
 #else
 	GCLK->CLKCTRL.reg = GCLK_CLKCTRL_ID(6) |        // Generic Clock Multiplexer 6
@@ -100,7 +289,7 @@ void UHD_Init(void)
 	{
 		/* Wait for synchronization */
 	}
-#endif
+#endif // __SAMD51__ / __SAME51__
 
 	/* Reset */
 	USB->HOST.CTRLA.bit.SWRST = 1;
@@ -116,11 +305,11 @@ void UHD_Init(void)
 
 
 	/* Load Pad Calibration */
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	pad_transn = (*((uint32_t *)(NVMCTRL_SW0)       // Non-Volatile Memory Controller
 #else
 	pad_transn = (*((uint32_t *)(NVMCTRL_OTP4)       // Non-Volatile Memory Controller
-#endif
+#endif // __SAMD51__ / __SAME51__
 
 					+ (NVM_USB_PAD_TRANSN_POS / 32))
 					>> (NVM_USB_PAD_TRANSN_POS % 32))
@@ -133,11 +322,11 @@ void UHD_Init(void)
 
 	USB->HOST.PADCAL.bit.TRANSN = pad_transn;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	pad_transp = (*((uint32_t *)(NVMCTRL_SW0)
 #else
 	pad_transp = (*((uint32_t *)(NVMCTRL_OTP4)
-#endif
+#endif // __SAMD51__ / __SAME51__
 					+ (NVM_USB_PAD_TRANSP_POS / 32))
 					>> (NVM_USB_PAD_TRANSP_POS % 32))
 				& ((1 << NVM_USB_PAD_TRANSP_SIZE) - 1);
@@ -149,11 +338,11 @@ void UHD_Init(void)
 
 	USB->HOST.PADCAL.bit.TRANSP = pad_transp;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	pad_trim = (*((uint32_t *)(NVMCTRL_SW0)
 #else
 	pad_trim = (*((uint32_t *)(NVMCTRL_OTP4)
-#endif
+#endif // __SAMD51__ / __SAME51__
 					+ (NVM_USB_PAD_TRIM_POS / 32))
 				>> (NVM_USB_PAD_TRIM_POS % 32))
 				& ((1 << NVM_USB_PAD_TRIM_SIZE) - 1);
@@ -189,7 +378,7 @@ void UHD_Init(void)
 	USB->HOST.CTRLB.bit.VBUSOK = 1;
 
 	// Configure interrupts
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	NVIC_SetPriority((IRQn_Type)USB_0_IRQn, 0UL);
 	NVIC_SetPriority((IRQn_Type)USB_1_IRQn, 0UL);
 	NVIC_SetPriority((IRQn_Type)USB_2_IRQn, 0UL);
@@ -202,7 +391,7 @@ void UHD_Init(void)
 #else
 	NVIC_SetPriority((IRQn_Type)USB_IRQn, 0UL);
 	NVIC_EnableIRQ((IRQn_Type)USB_IRQn);
-#endif
+#endif // __SAMD51__ / __SAME51__
 }
 
 
@@ -545,6 +734,8 @@ uint32_t UHD_Pipe_Is_Transfer_Complete(uint32_t ul_pipe, uint32_t ul_token_type)
    return 0;
 }
 
+#endif // __SAME53__ / __SAME54__
+
 
 
 
@@ -555,4 +746,4 @@ uint32_t UHD_Pipe_Is_Transfer_Complete(uint32_t ul_pipe, uint32_t ul_token_type)
 
 #endif //  HOST_DEFINED
 
-#endif // USE_TINYUSB
+#endif // !USE_TINYUSB

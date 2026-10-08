@@ -54,6 +54,7 @@ static char isRemoteWakeUpEnabled = 0;
 static char isEndpointHalt = 0;
 
 extern void (*gpf_isr)(void);
+extern "C" void USB_SetHandler(void (*new_usb_isr)(void));
 
 // USB_Handler ISR
 extern "C" void UDD_Handler(void) {
@@ -246,7 +247,7 @@ bool USBDeviceClass::sendDescriptor(USBSetup &setup)
 		}
 		else if (setup.wValueL == ISERIAL) {
 #ifdef PLUGGABLE_USB_ENABLED
-#ifdef __SAMD51__
+	#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 			#define SERIAL_NUMBER_WORD_0	*(volatile uint32_t*)(0x008061FC)
 			#define SERIAL_NUMBER_WORD_1	*(volatile uint32_t*)(0x00806010)
 			#define SERIAL_NUMBER_WORD_2	*(volatile uint32_t*)(0x00806014)
@@ -333,7 +334,7 @@ void USBDeviceClass::init()
 #endif
 
 	/* Enable USB clock */
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	MCLK->APBBMASK.reg |= MCLK_APBBMASK_USB;
 	MCLK->AHBMASK.reg |= MCLK_AHBMASK_USB;
 	
@@ -347,6 +348,23 @@ void USBDeviceClass::init()
 	
 	
 	GCLK->PCHCTRL[USB_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK1_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+#elif defined(__SAME53__) || defined(__SAME54__)
+	MCLK_REGS->MCLK_APBBMASK |= MCLK_APBBMASK_USB_Msk;
+	MCLK_REGS->MCLK_AHBMASK |= MCLK_AHBMASK_USB_Msk;
+
+	PORT_REGS->GROUP[0].PORT_PINCFG[PIN_PA24H_USB_DM] |= PORT_PINCFG_PMUXEN_Msk;
+	PORT_REGS->GROUP[0].PORT_PMUX[PIN_PA24H_USB_DM / 2] =
+	    (PORT_REGS->GROUP[0].PORT_PMUX[PIN_PA24H_USB_DM / 2] &
+	     ~(0xFu << (4u * (PIN_PA24H_USB_DM & 0x01u)))) |
+	    (MUX_PA24H_USB_DM << (4u * (PIN_PA24H_USB_DM & 0x01u)));
+	PORT_REGS->GROUP[0].PORT_PINCFG[PIN_PA25H_USB_DP] |= PORT_PINCFG_PMUXEN_Msk;
+	PORT_REGS->GROUP[0].PORT_PMUX[PIN_PA25H_USB_DP / 2] =
+	    (PORT_REGS->GROUP[0].PORT_PMUX[PIN_PA25H_USB_DP / 2] &
+	     ~(0xFu << (4u * (PIN_PA25H_USB_DP & 0x01u)))) |
+	    (MUX_PA25H_USB_DP << (4u * (PIN_PA25H_USB_DP & 0x01u)));
+
+	GCLK_REGS->GCLK_PCHCTRL[USB_GCLK_ID] = GCLK_PCHCTRL_GEN_GCLK1 |
+	                                           GCLK_PCHCTRL_CHEN_Msk;
 #else
 	PM->APBBMASK.reg |= PM_APBBMASK_USB;
 	
@@ -377,7 +395,7 @@ void USBDeviceClass::init()
 	usbd.setFullSpeed();
 
 	// Configure interrupts
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	/* Attach to the USB host */
 	NVIC_SetPriority(USB_0_IRQn, 0UL);
 	NVIC_SetPriority(USB_1_IRQn, 0UL);
@@ -387,6 +405,15 @@ void USBDeviceClass::init()
 	NVIC_EnableIRQ(USB_1_IRQn);
 	NVIC_EnableIRQ(USB_2_IRQn);
 	NVIC_EnableIRQ(USB_3_IRQn);
+#elif defined(__SAME53__) || defined(__SAME54__)
+	NVIC_SetPriority(USB_OTHER_IRQn, 0UL);
+	NVIC_SetPriority(USB_SOF_HSOF_IRQn, 0UL);
+	NVIC_SetPriority(USB_TRCPT0_IRQn, 0UL);
+	NVIC_SetPriority(USB_TRCPT1_IRQn, 0UL);
+	NVIC_EnableIRQ(USB_OTHER_IRQn);
+	NVIC_EnableIRQ(USB_SOF_HSOF_IRQn);
+	NVIC_EnableIRQ(USB_TRCPT0_IRQn);
+	NVIC_EnableIRQ(USB_TRCPT1_IRQn);
 #else
 	NVIC_SetPriority((IRQn_Type) USB_IRQn, 0UL);
 	NVIC_EnableIRQ((IRQn_Type) USB_IRQn);
@@ -422,9 +449,7 @@ void USBDeviceClass::setAddress(uint32_t addr)
 	// Wait for transfer to complete
 	while (!usbd.epBank1IsTransferComplete(0)) {}
 
-	// Set USB address to addr
-	USB->DEVICE.DADD.bit.DADD = addr; // Address
-	USB->DEVICE.DADD.bit.ADDEN = 1; // Enable
+	usbd.setAddress(addr);
 }
 
 bool USBDeviceClass::detach()
@@ -568,19 +593,15 @@ void USBDeviceClass::flush(uint32_t ep)
 
 void USBDeviceClass::stall(uint32_t ep)
 {
-	// TODO: test
-	// TODO: use .bit. notation
-
-	// Stall endpoint
-	USB->DEVICE.DeviceEndpoint[ep].EPSTATUSSET.reg = USB_DEVICE_EPSTATUSSET_STALLRQ(2);
+	usbd.epBank1SetStallReq(ep);
 }
 
 bool USBDeviceClass::connected()
 {
 	// Count frame numbers
-	uint8_t f = USB->DEVICE.FNUM.bit.FNUM;
+	uint16_t f = usbd.frameNumber();
 	//delay(3);
-	return f != USB->DEVICE.FNUM.bit.FNUM;
+	return f != usbd.frameNumber();
 }
 
 

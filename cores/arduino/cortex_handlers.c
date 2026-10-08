@@ -35,7 +35,7 @@ void Dummy_Handler(void)
   for (;;) { }
 }
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 
 /* Cortex-M4 processor handlers */
 void Reset_Handler               ( void );
@@ -62,6 +62,7 @@ void SUPC_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Han
 void SUPC_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void WDT_Handler                 ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void RTC_Handler                 ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAMD51__) || defined(__SAME51__)
 void EIC_0_Handler               ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void EIC_1_Handler               ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void EIC_2_Handler               ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
@@ -78,6 +79,25 @@ void EIC_12_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Han
 void EIC_13_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void EIC_14_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void EIC_15_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#elif defined(__SAME53__) || defined(__SAME54__)
+void EIC_EXTINT_0_Handler        ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_1_Handler        ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_2_Handler        ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_3_Handler        ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_4_Handler        ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_5_Handler        ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_6_Handler        ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_7_Handler        ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_8_Handler        ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_9_Handler        ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_10_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_11_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_12_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_13_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_14_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void EIC_EXTINT_15_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
+#endif
 void FREQM_Handler               ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void NVMCTRL_0_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void NVMCTRL_1_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
@@ -85,7 +105,11 @@ void DMAC_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Han
 void DMAC_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void DMAC_2_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void DMAC_3_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAME53__) || defined(__SAME54__)
+void DMAC_OTHER_Handler          ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
 void DMAC_4_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#endif
 void EVSYS_0_Handler             ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void EVSYS_1_Handler             ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void EVSYS_2_Handler             ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
@@ -98,41 +122,89 @@ void RAMECC_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Han
 void SERCOM0_0_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM0_1_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM0_2_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAMD51__) || defined(__SAME51__)
 void SERCOM0_3_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#elif defined(__SAME53__) || defined(__SAME54__)
+void SERCOM0_OTHER_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
+#endif
 void SERCOM1_0_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM1_1_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM1_2_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAMD51__) || defined(__SAME51__)
 void SERCOM1_3_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#elif defined(__SAME53__) || defined(__SAME54__)
+void SERCOM1_OTHER_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
+#endif
 void SERCOM2_0_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM2_1_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM2_2_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAMD51__) || defined(__SAME51__)
 void SERCOM2_3_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#elif defined(__SAME53__) || defined(__SAME54__)
+void SERCOM2_OTHER_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
+#endif
 void SERCOM3_0_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM3_1_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM3_2_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAMD51__) || defined(__SAME51__)
 void SERCOM3_3_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#elif defined(__SAME53__) || defined(__SAME54__)
+void SERCOM3_OTHER_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
+#endif
 void SERCOM4_0_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM4_1_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM4_2_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAMD51__) || defined(__SAME51__)
 void SERCOM4_3_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#elif defined(__SAME53__) || defined(__SAME54__)
+void SERCOM4_OTHER_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
+#endif
 void SERCOM5_0_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM5_1_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM5_2_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAMD51__) || defined(__SAME51__)
 void SERCOM5_3_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#elif defined(__SAME53__) || defined(__SAME54__)
+void SERCOM5_OTHER_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
+#endif
 void SERCOM6_0_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM6_1_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM6_2_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAMD51__) || defined(__SAME51__)
 void SERCOM6_3_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#elif defined(__SAME53__) || defined(__SAME54__)
+void SERCOM6_OTHER_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
+#endif
 void SERCOM7_0_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM7_1_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void SERCOM7_2_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAMD51__) || defined(__SAME51__)
 void SERCOM7_3_Handler           ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#elif defined(__SAME53__) || defined(__SAME54__)
+void SERCOM7_OTHER_Handler       ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
+#endif
 void CAN0_Handler                ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void CAN1_Handler                ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAMD51__) || defined(__SAME51__)
 void USB_0_Handler               ( void ) __attribute__ ((weak));
 void USB_1_Handler               ( void ) __attribute__ ((weak));
 void USB_2_Handler               ( void ) __attribute__ ((weak));
 void USB_3_Handler               ( void ) __attribute__ ((weak));
+#elif defined(__SAME53__) || defined(__SAME54__)
+void USB_OTHER_Handler           ( void ) __attribute__ ((weak));
+void USB_SOF_HSOF_Handler        ( void ) __attribute__ ((weak));
+void USB_TRCPT0_Handler          ( void ) __attribute__ ((weak));
+void USB_TRCPT1_Handler          ( void ) __attribute__ ((weak));
+#else
+#endif
 void GMAC_Handler                ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void TCC0_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void TCC0_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
@@ -167,10 +239,17 @@ void TC7_Handler                 ( void ) __attribute__ ((weak, alias("Dummy_Han
 void PDEC_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void PDEC_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void PDEC_2_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#if defined(__SAME53__) || defined(__SAME54__)
+void ADC0_OTHER_Handler          ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void ADC0_RESRDY_Handler         ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void ADC1_OTHER_Handler          ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+void ADC1_RESRDY_Handler         ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#else
 void ADC0_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void ADC0_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void ADC1_0_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void ADC1_1_Handler              ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
+#endif
 void AC_Handler                  ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void DAC_0_Handler               ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
 void DAC_1_Handler               ( void ) __attribute__ ((weak, alias("Dummy_Handler")));
@@ -232,6 +311,7 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 	  (void*) SUPC_1_Handler,                /*  9 Supply Controller IRQ 1 */
 	  (void*) WDT_Handler,                   /* 10 Watchdog Timer */
 	  (void*) RTC_Handler,                   /* 11 Real-Time Counter */
+#if defined(__SAMD51__) || defined(__SAME51__)
 	  (void*) EIC_0_Handler,                 /* 12 External Interrupt Controller IRQ 0 */
 	  (void*) EIC_1_Handler,                 /* 13 External Interrupt Controller IRQ 1 */
 	  (void*) EIC_2_Handler,                 /* 14 External Interrupt Controller IRQ 2 */
@@ -248,6 +328,25 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 	  (void*) EIC_13_Handler,                /* 25 External Interrupt Controller IRQ 13 */
 	  (void*) EIC_14_Handler,                /* 26 External Interrupt Controller IRQ 14 */
 	  (void*) EIC_15_Handler,                /* 27 External Interrupt Controller IRQ 15 */
+#elif defined(__SAME53__) || defined(__SAME54__)
+	  (void*) EIC_EXTINT_0_Handler,          /* 12 External Interrupt Controller IRQ 0 */
+	  (void*) EIC_EXTINT_1_Handler,          /* 13 External Interrupt Controller IRQ 1 */
+	  (void*) EIC_EXTINT_2_Handler,          /* 14 External Interrupt Controller IRQ 2 */
+	  (void*) EIC_EXTINT_3_Handler,          /* 15 External Interrupt Controller IRQ 3 */
+	  (void*) EIC_EXTINT_4_Handler,          /* 16 External Interrupt Controller IRQ 4 */
+	  (void*) EIC_EXTINT_5_Handler,          /* 17 External Interrupt Controller IRQ 5 */
+	  (void*) EIC_EXTINT_6_Handler,          /* 18 External Interrupt Controller IRQ 6 */
+	  (void*) EIC_EXTINT_7_Handler,          /* 19 External Interrupt Controller IRQ 7 */
+	  (void*) EIC_EXTINT_8_Handler,          /* 20 External Interrupt Controller IRQ 8 */
+	  (void*) EIC_EXTINT_9_Handler,          /* 21 External Interrupt Controller IRQ 9 */
+	  (void*) EIC_EXTINT_10_Handler,         /* 22 External Interrupt Controller IRQ 10 */
+	  (void*) EIC_EXTINT_11_Handler,         /* 23 External Interrupt Controller IRQ 11 */
+	  (void*) EIC_EXTINT_12_Handler,         /* 24 External Interrupt Controller IRQ 12 */
+	  (void*) EIC_EXTINT_13_Handler,         /* 25 External Interrupt Controller IRQ 13 */
+	  (void*) EIC_EXTINT_14_Handler,         /* 26 External Interrupt Controller IRQ 14 */
+	  (void*) EIC_EXTINT_15_Handler,         /* 27 External Interrupt Controller IRQ 15 */
+#else
+#endif
 	  (void*) FREQM_Handler,                 /* 28 Frequency Meter */
 	  (void*) NVMCTRL_0_Handler,             /* 29 Non-Volatile Memory Controller IRQ 0 */
 	  (void*) NVMCTRL_1_Handler,             /* 30 Non-Volatile Memory Controller IRQ 1 */
@@ -255,7 +354,11 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 	  (void*) DMAC_1_Handler,                /* 32 Direct Memory Access Controller IRQ 1 */
 	  (void*) DMAC_2_Handler,                /* 33 Direct Memory Access Controller IRQ 2 */
 	  (void*) DMAC_3_Handler,                /* 34 Direct Memory Access Controller IRQ 3 */
+#if defined(__SAME53__) || defined(__SAME54__)
+	  (void*) DMAC_OTHER_Handler,            /* 35 Direct Memory Access Controller other IRQ */
+#else
 	  (void*) DMAC_4_Handler,                /* 35 Direct Memory Access Controller IRQ 4 */
+#endif
 	  (void*) EVSYS_0_Handler,               /* 36 Event System Interface IRQ 0 */
 	  (void*) EVSYS_1_Handler,               /* 37 Event System Interface IRQ 1 */
 	  (void*) EVSYS_2_Handler,               /* 38 Event System Interface IRQ 2 */
@@ -269,41 +372,89 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 	  (void*) SERCOM0_0_Handler,             /* 46 Serial Communication Interface 0 IRQ 0 */
 	  (void*) SERCOM0_1_Handler,             /* 47 Serial Communication Interface 0 IRQ 1 */
 	  (void*) SERCOM0_2_Handler,             /* 48 Serial Communication Interface 0 IRQ 2 */
+#if defined(__SAMD51__) || defined(__SAME51__)
 	  (void*) SERCOM0_3_Handler,             /* 49 Serial Communication Interface 0 IRQ 3 */
+#elif defined(__SAME53__) || defined(__SAME54__)
+	  (void*) SERCOM0_OTHER_Handler,         /* Serial Communication Interface 0 other IRQ */
+#else
+#endif
 	  (void*) SERCOM1_0_Handler,             /* 50 Serial Communication Interface 1 IRQ 0 */
 	  (void*) SERCOM1_1_Handler,             /* 51 Serial Communication Interface 1 IRQ 1 */
 	  (void*) SERCOM1_2_Handler,             /* 52 Serial Communication Interface 1 IRQ 2 */
+#if defined(__SAMD51__) || defined(__SAME51__)
 	  (void*) SERCOM1_3_Handler,             /* 53 Serial Communication Interface 1 IRQ 3 */
+#elif defined(__SAME53__) || defined(__SAME54__)
+	  (void*) SERCOM1_OTHER_Handler,         /* Serial Communication Interface 1 other IRQ */
+#else
+#endif
 	  (void*) SERCOM2_0_Handler,             /* 54 Serial Communication Interface 2 IRQ 0 */
 	  (void*) SERCOM2_1_Handler,             /* 55 Serial Communication Interface 2 IRQ 1 */
 	  (void*) SERCOM2_2_Handler,             /* 56 Serial Communication Interface 2 IRQ 2 */
+#if defined(__SAMD51__) || defined(__SAME51__)
 	  (void*) SERCOM2_3_Handler,             /* 57 Serial Communication Interface 2 IRQ 3 */
+#elif defined(__SAME53__) || defined(__SAME54__)
+	  (void*) SERCOM2_OTHER_Handler,         /* Serial Communication Interface 2 other IRQ */
+#else
+#endif
 	  (void*) SERCOM3_0_Handler,             /* 58 Serial Communication Interface 3 IRQ 0 */
 	  (void*) SERCOM3_1_Handler,             /* 59 Serial Communication Interface 3 IRQ 1 */
 	  (void*) SERCOM3_2_Handler,             /* 60 Serial Communication Interface 3 IRQ 2 */
+#if defined(__SAMD51__) || defined(__SAME51__)
 	  (void*) SERCOM3_3_Handler,             /* 61 Serial Communication Interface 3 IRQ 3 */
+#elif defined(__SAME53__) || defined(__SAME54__)
+	  (void*) SERCOM3_OTHER_Handler,         /* Serial Communication Interface 3 other IRQ */
+#else
+#endif
 	  (void*) SERCOM4_0_Handler,             /* 62 Serial Communication Interface 4 IRQ 0 */
 	  (void*) SERCOM4_1_Handler,             /* 63 Serial Communication Interface 4 IRQ 1 */
 	  (void*) SERCOM4_2_Handler,             /* 64 Serial Communication Interface 4 IRQ 2 */
+#if defined(__SAMD51__) || defined(__SAME51__)
 	  (void*) SERCOM4_3_Handler,             /* 65 Serial Communication Interface 4 IRQ 3 */
+#elif defined(__SAME53__) || defined(__SAME54__)
+	  (void*) SERCOM4_OTHER_Handler,         /* Serial Communication Interface 4 other IRQ */
+#else
+#endif
 	  (void*) SERCOM5_0_Handler,             /* 66 Serial Communication Interface 5 IRQ 0 */
 	  (void*) SERCOM5_1_Handler,             /* 67 Serial Communication Interface 5 IRQ 1 */
 	  (void*) SERCOM5_2_Handler,             /* 68 Serial Communication Interface 5 IRQ 2 */
+#if defined(__SAMD51__) || defined(__SAME51__)
 	  (void*) SERCOM5_3_Handler,             /* 69 Serial Communication Interface 5 IRQ 3 */
+#elif defined(__SAME53__) || defined(__SAME54__)
+	  (void*) SERCOM5_OTHER_Handler,         /* Serial Communication Interface 5 other IRQ */
+#else
+#endif
 	  (void*) SERCOM6_0_Handler,             /* 70 Serial Communication Interface 6 IRQ 0 */
 	  (void*) SERCOM6_1_Handler,             /* 71 Serial Communication Interface 6 IRQ 1 */
 	  (void*) SERCOM6_2_Handler,             /* 72 Serial Communication Interface 6 IRQ 2 */
+#if defined(__SAMD51__) || defined(__SAME51__)
 	  (void*) SERCOM6_3_Handler,             /* 73 Serial Communication Interface 6 IRQ 3 */
+#elif defined(__SAME53__) || defined(__SAME54__)
+	  (void*) SERCOM6_OTHER_Handler,         /* Serial Communication Interface 6 other IRQ */
+#else
+#endif
 	  (void*) SERCOM7_0_Handler,             /* 74 Serial Communication Interface 7 IRQ 0 */
 	  (void*) SERCOM7_1_Handler,             /* 75 Serial Communication Interface 7 IRQ 1 */
 	  (void*) SERCOM7_2_Handler,             /* 76 Serial Communication Interface 7 IRQ 2 */
+#if defined(__SAMD51__) || defined(__SAME51__)
 	  (void*) SERCOM7_3_Handler,             /* 77 Serial Communication Interface 7 IRQ 3 */
+#elif defined(__SAME53__) || defined(__SAME54__)
+	  (void*) SERCOM7_OTHER_Handler,         /* Serial Communication Interface 7 other IRQ */
+#else
+#endif
 	  (void*) CAN0_Handler,                  /* 78 Control Area Network 0 (SAM E5x) */
 	  (void*) CAN1_Handler,                  /* 79 Control Area Network 0 (SAM E5x) */
+#if defined(__SAMD51__) || defined(__SAME51__)
 	  (void*) USB_0_Handler,                 /* 80 Universal Serial Bus IRQ 0 */
 	  (void*) USB_1_Handler,                 /* 81 Universal Serial Bus IRQ 1 */
 	  (void*) USB_2_Handler,                 /* 82 Universal Serial Bus IRQ 2 */
 	  (void*) USB_3_Handler,                 /* 83 Universal Serial Bus IRQ 3 */
+#elif defined(__SAME53__) || defined(__SAME54__)
+	  (void*) USB_OTHER_Handler,             /* 80 Universal Serial Bus other IRQ */
+	  (void*) USB_SOF_HSOF_Handler,          /* 81 Universal Serial Bus SOF/HSOF IRQ */
+	  (void*) USB_TRCPT0_Handler,            /* 82 Universal Serial Bus transfer complete 0 IRQ */
+	  (void*) USB_TRCPT1_Handler,            /* 83 Universal Serial Bus transfer complete 1 IRQ */
+#else
+#endif
 	  (void*) GMAC_Handler,					 /* 84 Ethernet MAC */
 	  (void*) TCC0_0_Handler,                /* 85 Timer Counter Control 0 IRQ 0 */
 	  (void*) TCC0_1_Handler,                /* 86 Timer Counter Control 0 IRQ 1 */
@@ -338,10 +489,17 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 	  (void*) PDEC_0_Handler,                /* 115 Quadrature Decodeur IRQ 0 */
 	  (void*) PDEC_1_Handler,                /* 116 Quadrature Decodeur IRQ 1 */
 	  (void*) PDEC_2_Handler,                /* 117 Quadrature Decodeur IRQ 2 */
+#if defined(__SAME53__) || defined(__SAME54__)
+	  (void*) ADC0_OTHER_Handler,            /* 118 Analog Digital Converter 0 other IRQ */
+	  (void*) ADC0_RESRDY_Handler,           /* 119 Analog Digital Converter 0 result-ready IRQ */
+	  (void*) ADC1_OTHER_Handler,            /* 120 Analog Digital Converter 1 other IRQ */
+	  (void*) ADC1_RESRDY_Handler,           /* 121 Analog Digital Converter 1 result-ready IRQ */
+#else
 	  (void*) ADC0_0_Handler,                /* 118 Analog Digital Converter 0 IRQ 0 */
 	  (void*) ADC0_1_Handler,                /* 119 Analog Digital Converter 0 IRQ 1 */
 	  (void*) ADC1_0_Handler,                /* 120 Analog Digital Converter 1 IRQ 0 */
 	  (void*) ADC1_1_Handler,                /* 121 Analog Digital Converter 1 IRQ 1 */
+#endif
 	  (void*) AC_Handler,                    /* 122 Analog Comparators */
 	  (void*) DAC_0_Handler,                 /* 123 Digital-to-Analog Converter IRQ 0 */
 	  (void*) DAC_1_Handler,                 /* 124 Digital-to-Analog Converter IRQ 1 */
@@ -465,6 +623,7 @@ __attribute__ ((section(".isr_vector"))) const DeviceVectors exception_table =
 #endif
 
 extern int main(void);
+extern void SystemInit(void);
 
 /* This is called on processor reset to initialize the device and call main() */
 void Reset_Handler(void)
@@ -486,7 +645,8 @@ void Reset_Handler(void)
       *pDest = 0;
   }
 
-#if defined(__FPU_USED) && defined(__SAMD51__)
+#if defined(__FPU_USED) && \
+    (defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__))
 	/* Enable FPU */
 	SCB->CPACR |= (0xFu << 20);
 	__DSB();
@@ -513,32 +673,26 @@ void SysTick_Handler(void)
 
 static void (*usb_isr)(void) = NULL;
 
-#if defined(__SAMD51__)
-void USB_0_Handler(void)
+static void dispatchUSBInterrupt(void)
 {
 	if (usb_isr)
-	usb_isr();
+		usb_isr();
 }
-void USB_1_Handler(void)
-{
-	if (usb_isr)
-	usb_isr();
-}
-void USB_2_Handler(void)
-{
-	if (usb_isr)
-	usb_isr();
-}
-void USB_3_Handler(void)
-{
-	if (usb_isr)
-	usb_isr();
-}
+
+#if defined(__SAMD51__) || defined(__SAME51__)
+void USB_0_Handler(void) { dispatchUSBInterrupt(); }
+void USB_1_Handler(void) { dispatchUSBInterrupt(); }
+void USB_2_Handler(void) { dispatchUSBInterrupt(); }
+void USB_3_Handler(void) { dispatchUSBInterrupt(); }
+#elif defined(__SAME53__) || defined(__SAME54__)
+void USB_OTHER_Handler(void) { dispatchUSBInterrupt(); }
+void USB_SOF_HSOF_Handler(void) { dispatchUSBInterrupt(); }
+void USB_TRCPT0_Handler(void) { dispatchUSBInterrupt(); }
+void USB_TRCPT1_Handler(void) { dispatchUSBInterrupt(); }
 #else
 void USB_Handler(void)
 {
-  if (usb_isr)
-    usb_isr();
+	dispatchUSBInterrupt();
 }
 #endif
 

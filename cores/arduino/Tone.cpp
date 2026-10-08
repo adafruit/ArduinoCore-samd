@@ -30,14 +30,20 @@ volatile int64_t toggleCount;
 volatile bool toneIsActive = false;
 volatile bool firstTimeRunning = false;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
   #define TONE_TC         TC0
   #define TONE_TC_IRQn    TC0_IRQn
   #define TONE_TC_GCLK_ID	TC0_GCLK_ID
   #define Tone_Handler    TC0_Handler
 
   #define WAIT_TC16_REGS_SYNC(x) while(x->COUNT16.SYNCBUSY.bit.ENABLE);
+#elif defined(__SAME53__) || defined(__SAME54__)
+  #define TONE_TC         TC0_REGS
+  #define TONE_TC_IRQn    TC0_IRQn
+  #define TONE_TC_GCLK_ID TC0_GCLK_ID
+  #define Tone_Handler    TC0_Handler
 
+  #define WAIT_TC16_REGS_SYNC(x) while ((x)->COUNT16.TC_SYNCBUSY);
 #else
   #define TONE_TC         TC5
   #define TONE_TC_IRQn    TC5_IRQn
@@ -49,7 +55,18 @@ volatile bool firstTimeRunning = false;
 #define TONE_TC_TOP     0xFFFF
 #define TONE_TC_CHANNEL 0
 
-static inline void resetTC (Tc* TCx)
+#if defined(__SAME53__) || defined(__SAME54__)
+static inline void resetTC(tc_registers_t *TCx)
+{
+  TCx->COUNT16.TC_CTRLA &= ~TC_CTRLA_ENABLE_Msk;
+  WAIT_TC16_REGS_SYNC(TCx)
+
+  TCx->COUNT16.TC_CTRLA = TC_CTRLA_SWRST_Msk;
+  WAIT_TC16_REGS_SYNC(TCx)
+  while (TCx->COUNT16.TC_CTRLA & TC_CTRLA_SWRST_Msk);
+}
+#else
+static inline void resetTC(Tc *TCx)
 {
   // Disable TCx
   TCx->COUNT16.CTRLA.reg &= ~TC_CTRLA_ENABLE;
@@ -60,6 +77,7 @@ static inline void resetTC (Tc* TCx)
   WAIT_TC16_REGS_SYNC(TCx)
   while (TCx->COUNT16.CTRLA.bit.SWRST);
 }
+#endif
 
 void toneAccurateClock (uint32_t accurateSystemCoreClockFrequency)
 {
@@ -86,8 +104,11 @@ void tone (uint32_t outputPin, uint32_t frequency, uint32_t duration)
     
     NVIC_SetPriority(TONE_TC_IRQn, 5);
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
     GCLK->PCHCTRL[TONE_TC_GCLK_ID].reg = GCLK_PCHCTRL_GEN_GCLK0_Val | (1 << GCLK_PCHCTRL_CHEN_Pos);
+#elif defined(__SAME53__) || defined(__SAME54__)
+    GCLK_REGS->GCLK_PCHCTRL[TONE_TC_GCLK_ID] = GCLK_PCHCTRL_GEN_GCLK0 |
+                                                     GCLK_PCHCTRL_CHEN_Msk;
 #else
     // Enable GCLK for TC4 and TC5 (timer counter input clock)
     GCLK->CLKCTRL.reg = (uint16_t) (GCLK_CLKCTRL_CLKEN | GCLK_CLKCTRL_GEN_GCLK0 | GCLK_CLKCTRL_ID(GCM_TC4_TC5));
@@ -150,24 +171,43 @@ void tone (uint32_t outputPin, uint32_t frequency, uint32_t duration)
   uint16_t tmpReg = 0;
   tmpReg |= TC_CTRLA_MODE_COUNT16;  // Set Timer counter Mode to 16 bits
   
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__)
 	TONE_TC->COUNT16.WAVE.reg = TC_WAVE_WAVEGEN_MFRQ;  // Set TONE_TC mode as match frequency
+#elif defined(__SAME53__) || defined(__SAME54__)
+  TONE_TC->COUNT16.TC_WAVE = TC_WAVE_WAVEGEN_MFRQ;
 #else
   tmpReg |= TC_CTRLA_WAVEGEN_MFRQ;  // Set TONE_TC mode as match frequency
 #endif
   tmpReg |= prescalerConfigBits;
+#if defined(__SAME53__) || defined(__SAME54__)
+  TONE_TC->COUNT16.TC_CTRLA |= tmpReg;
+#else
   TONE_TC->COUNT16.CTRLA.reg |= tmpReg;
+#endif
   WAIT_TC16_REGS_SYNC(TONE_TC)
 
+#if defined(__SAME53__) || defined(__SAME54__)
+  TONE_TC->COUNT16.TC_CC[TONE_TC_CHANNEL] = (uint16_t)ccValue;
+#else
   TONE_TC->COUNT16.CC[TONE_TC_CHANNEL].reg = (uint16_t) ccValue;
+#endif
   WAIT_TC16_REGS_SYNC(TONE_TC)
 
+#if defined(__SAME53__) || defined(__SAME54__)
+  portToggleRegister = &PORT_REGS->GROUP[g_APinDescription[outputPin].ulPort].PORT_OUTTGL;
+  portClearRegister = &PORT_REGS->GROUP[g_APinDescription[outputPin].ulPort].PORT_OUTCLR;
+#else
   portToggleRegister = &(PORT->Group[g_APinDescription[outputPin].ulPort].OUTTGL.reg);
   portClearRegister = &(PORT->Group[g_APinDescription[outputPin].ulPort].OUTCLR.reg);
+#endif
   portBitMask = (1ul << g_APinDescription[outputPin].ulPin);
 
   // Enable the TONE_TC interrupt request
+#if defined(__SAME53__) || defined(__SAME54__)
+  TONE_TC->COUNT16.TC_INTENSET = TC_INTENSET_MC0_Msk;
+#else
   TONE_TC->COUNT16.INTENSET.bit.MC0 = 1;
+#endif
   
   if (outputPin != lastOutputPin)
   {
@@ -178,7 +218,11 @@ void tone (uint32_t outputPin, uint32_t frequency, uint32_t duration)
   }
 
   // Enable TONE_TC
+#if defined(__SAME53__) || defined(__SAME54__)
+  TONE_TC->COUNT16.TC_CTRLA |= TC_CTRLA_ENABLE_Msk;
+#else
   TONE_TC->COUNT16.CTRLA.reg |= TC_CTRLA_ENABLE;
+#endif
   WAIT_TC16_REGS_SYNC(TONE_TC)
   
   NVIC_EnableIRQ(TONE_TC_IRQn);
@@ -219,7 +263,11 @@ void Tone_Handler (void)
       --toggleCount;
 
     // Clear the interrupt
+#if defined(__SAME53__) || defined(__SAME54__)
+    TONE_TC->COUNT16.TC_INTFLAG = TC_INTFLAG_MC0_Msk;
+#else
     TONE_TC->COUNT16.INTFLAG.bit.MC0 = 1;
+#endif
   }
   else
   {
