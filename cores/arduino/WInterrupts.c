@@ -34,7 +34,7 @@ static void __initialize()
   memset(ISRcallback, 0, sizeof(ISRcallback));
   nints = 0;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   ///EIC MCLK is enabled by default
   for (uint32_t i = 0; i <= 15; i++)     // EIC_0_IRQn = 12 ... EIC_15_IRQn = 27
   {
@@ -63,7 +63,7 @@ static void __initialize()
 */
 
   // Enable EIC
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   EIC->CTRLA.bit.ENABLE = 1;
   while (EIC->SYNCBUSY.bit.ENABLE == 1) { }
 #else
@@ -95,7 +95,7 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 	}
 	uint32_t inMask = (1UL << in);
 	// Enable wakeup capability on pin in case being used during sleep
-	#if defined(__SAMD51__)
+	#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	//I believe this is done automatically
 	#else
 	EIC->WAKEUP.reg |= (1 << in);
@@ -164,7 +164,7 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 			  pos = in << 2;
 			}
 
-			#if defined (__SAMD51__)
+			#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 			EIC->CTRLA.bit.ENABLE = 0;
 			while (EIC->SYNCBUSY.bit.ENABLE == 1) { }
 			#endif
@@ -197,7 +197,7 @@ void attachInterrupt(uint32_t pin, voidFuncPtr callback, uint32_t mode)
 		EIC->INTENSET.reg = EIC_INTENSET_EXTINT(1 << in);
 	}
 
-	#if defined (__SAMD51__)
+	#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	EIC->CTRLA.bit.ENABLE = 1;
 	while (EIC->SYNCBUSY.bit.ENABLE == 1) { }
 	#endif
@@ -221,7 +221,7 @@ void detachInterrupt(uint32_t pin)
     EIC->INTENCLR.reg = EIC_INTENCLR_EXTINT(1 << in);
   
   // Disable wakeup capability on pin during sleep
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 //I believe this is done automatically
 #else
     // Disable wakeup capability on pin during sleep
@@ -249,7 +249,7 @@ void detachInterrupt(uint32_t pin)
 /*
  * External Interrupt Controller NVIC Interrupt Handler
  */
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 void InterruptHandler(uint32_t unused_i)
 {
   (void)unused_i;
