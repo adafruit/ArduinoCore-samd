@@ -94,7 +94,7 @@ const PinDescription g_APinDescription[]=
   { PORTB,  4, PIO_DIGITAL, PIN_ATTR_DIGITAL, No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_4 },
   { PORTB,  5, PIO_DIGITAL, PIN_ATTR_DIGITAL, No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_5 },
 
-  // 39 - SWO 
+  // 39 - SWO
   { PORTB, 30, PIO_DIGITAL, PIN_ATTR_DIGITAL, No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_6 }, // used as output only
 
   // 40 - Internal NeoPixel
@@ -132,41 +132,5 @@ SERCOM sercom4( SERCOM4 ) ;
 SERCOM sercom5( SERCOM5 ) ;
 
 // sercom for pins 0 & 1 UART
-Uart Serial1( &sercom3, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
-
-void SERCOM3_0_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM3_1_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM3_2_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM3_3_Handler()
-{
-  Serial1.IrqHandler();
-}
 
 // sercom for internal ESP32 UART connection
-Uart Serial2( &sercom0, PIN_SERIAL2_RX, PIN_SERIAL2_TX, PAD_SERIAL2_RX, PAD_SERIAL2_TX ) ;
-
-void SERCOM0_0_Handler()
-{
-  Serial2.IrqHandler();
-}
-void SERCOM0_1_Handler()
-{
-  Serial2.IrqHandler();
-}
-void SERCOM0_2_Handler()
-{
-  Serial2.IrqHandler();
-}
-void SERCOM0_3_Handler()
-{
-  Serial2.IrqHandler();
-}
