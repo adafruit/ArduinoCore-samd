@@ -28,7 +28,7 @@ void *_sbrk(int incr)
   static char *brkval = &end ;
   char *prev_brkval = brkval;
 
-  if (brkval + incr + __malloc_margin > (char *)__get_MSP()) {
+  if (incr > 0 && brkval + incr + __malloc_margin > (char *)__get_MSP()) {
     /* Heap and stack collision */
     errno = ENOMEM;
     return (void*) -1;
