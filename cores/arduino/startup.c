@@ -187,8 +187,8 @@ void SystemInit( void )
   OSCCTRL->DFLLCTRLB.reg = OSCCTRL_DFLLCTRLB_MODE |
                           OSCCTRL_DFLLCTRLB_WAITLOCK;
 
-  // Bounded in iterations of the CPU on OSCULP32K: without a running crystal the DFLL never fine-locks,
-  // so it then falls back to open loop at the DFLLVAL it started from
+  // Bounded in OSCULP32K CPU iterations: the earlier waits need a running crystal, so this only catches a reference
+  // that stops after setup or a DFLL that cannot fine-lock, falling back to open loop at the DFLLVAL it started from
   uint32_t timeout = 2000;
   while ( (OSCCTRL->STATUS.reg & (OSCCTRL_STATUS_DFLLRDY | OSCCTRL_STATUS_DFLLLCKC | OSCCTRL_STATUS_DFLLLCKF))
           != (OSCCTRL_STATUS_DFLLRDY | OSCCTRL_STATUS_DFLLLCKC | OSCCTRL_STATUS_DFLLLCKF) && --timeout )
