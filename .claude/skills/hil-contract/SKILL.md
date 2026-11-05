@@ -122,4 +122,6 @@ sketches, so restoring `core_cdc` is the whole cleanup.
   `metro_m0_express` runs from a dev PC's `local.json` only), crystalless startup, SERCOM UART/I2C/SPI, analog,
   PWM, I2S, USBHost and every other peripheral (no fixture wired), the bootloaders, cold power-on, and every other
   variant; those build only.
-- **Commissioning:** pending the first farm run under these sketches.
+- **Commissioning:** ci.lan's `metro_m4_express` (uid `9995AD485337433231202020FF100A34`, `239a:8020`) ran the
+  battery on 2026-11-05: `cdc_arduino`, `cdc_tinyusb` and `timing` passed and `core_cdc` was restored. `timing` read
+  `millis()` about 0.3% fast against the host, inside its bound; it makes no clock-accuracy claim.
