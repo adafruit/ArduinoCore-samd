@@ -1,0 +1,15 @@
+{
+  "boards": [
+    {
+      "name": "metro_m4_express",
+      "uid": "9995AD485337433231202020FF100A34",
+      "probe": "000063728691",
+      "debug": {
+        "openocd": "-f interface/jlink.cfg -c \"transport select swd\" -c \"adapter speed 4000\" -f target/atsame5x.cfg"
+      },
+      "arduino": {
+        "tests": ["cdc_arduino", "cdc_tinyusb", "timing"]
+      }
+    }
+  ]
+}

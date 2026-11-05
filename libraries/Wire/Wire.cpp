@@ -25,8 +25,12 @@ extern "C" {
 #include <wiring_private.h>
 
 #ifdef USE_TINYUSB
-// For Serial when selecting TinyUSB
+// For Serial when selecting TinyUSB; the Arduino builder discovers and links
+// the library from this include. PlatformIO never resolves it (framework-
+// bundled libraries get no lib_deps include paths), so skip it there.
+#ifndef PLATFORMIO
 #include <Adafruit_TinyUSB.h>
+#endif
 #endif
 
 #include "Wire.h"
