@@ -1,0 +1,19 @@
+{
+  "boards": [
+    {
+      "name": "metro_m0_express",
+      "uid": "<the DUT's USB serial under Arduino firmware: hil_test.py commission prints it>",
+      "flasher": {
+        "name": "jlink",
+        "uid": "<the J-Link's serial number>",
+        "args": "-device ATSAMD21G18"
+      },
+      "debug": {
+        "openocd": "-f interface/jlink.cfg -c \"transport select swd\" -c \"adapter speed 4000\" -f target/at91samdXX.cfg"
+      },
+      "arduino": {
+        "tests": ["cdc_arduino", "cdc_tinyusb", "timing"]
+      }
+    }
+  ]
+}
