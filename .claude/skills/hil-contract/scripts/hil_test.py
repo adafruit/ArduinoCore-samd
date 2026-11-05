@@ -40,7 +40,7 @@ import agentrc_pin  # noqa: E402
 import check_build as BUILD  # noqa: E402
 
 TESTS = {'cdc_arduino': 'core_cdc', 'cdc_tinyusb': 'core_cdc_tinyusb', 'timing': 'core_timing'}
-ROLE_TESTS = {'device': ('cdc_arduino', 'cdc_tinyusb', 'timing')}
+ROLE_TESTS = {'device': tuple(TESTS)}
 RESTORE_TEST = {'device': 'cdc_arduino'}
 REPORT_SCHEMA = 'adafruit-samd-core-hil'
 # hil_remote.py (agentrc arduino_remote.py)

@@ -43,8 +43,8 @@ def fake_agentrc(repo, hil_load=''):
     git(repo, 'init', '-q')
     for e in agentrc_pin.ENGINES:
         (repo / e).parent.mkdir(parents=True, exist_ok=True)
-        (repo / e).write_text(f'FILES = ({HIL_LOAD!r},)\nPROFILE_API = {agentrc_pin.PROFILE_API}\n\n\n'
-                              f'def {agentrc_pin.CORE_MODE}():\n    pass\n')
+        (repo / e).write_text(f'FILES = ({HIL_LOAD!r},)\nPROFILE_API = {agentrc_pin.PROFILE_API}\n'
+                              f'PROFILE_FEATURES = ({agentrc_pin.FEATURE!r},)\n')
     (repo / HIL_LOAD).parent.mkdir(parents=True, exist_ok=True)
     (repo / HIL_LOAD).write_text(hil_load)
     (repo / 'README.md').write_text('not in the closure\n')

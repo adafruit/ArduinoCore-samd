@@ -2,7 +2,6 @@
 """The build contract's profile: the board table against CI's matrix and boards.txt, sketch eligibility against
 tools/build_all.py, source classification and selection through agentrc's arduino_build.py in core mode, and the
 VID:PID adapter. arduino-cli is not run; a real build is evidence only from a run of the script itself."""
-import ast
 import json
 import re
 import subprocess
@@ -23,17 +22,10 @@ def ci_matrix():
     return re.findall(r"^\s+- '([^']+)'", text.split('board:')[1].split('runs-on')[0], re.M)
 
 
-def build_all_literal(name):
-    for node in ast.parse((ROOT / 'tools/build_all.py').read_text()).body:
-        if isinstance(node, ast.Assign) and any(getattr(t, 'id', None) == name for t in node.targets):
-            return ast.literal_eval(node.value)
-    raise KeyError(name)
-
-
 class Tables(unittest.TestCase):
     def test_ci_matrix_is_the_table(self):
         self.assertEqual(sorted(ci_matrix()), sorted(cb.CI_VARIANTS))
-        self.assertEqual(build_all_literal('FQBN_PREFIX'), cb.FQBN_PREFIX)
+        self.assertEqual(cb.agentrc_pin.literal(ROOT, 'tools/build_all.py', 'FQBN_PREFIX'), cb.FQBN_PREFIX)
         for v in cb.CI_VARIANTS:
             entries = [b for b in cb.BOARDS.values() if b['filters'] == v and 'span' not in b]
             self.assertEqual([b['fqbn'] for b in entries], [cb.FQBN_PREFIX + v], v)
@@ -154,8 +146,7 @@ class Selection(unittest.TestCase):
     def test_boards_txt_builds_ci_and_the_rig_board(self):
         effect, boards, _ = E.classify('boards.txt')
         self.assertEqual(effect, 'boards')
-        self.assertEqual(sorted(boards), sorted([b for b, e in cb.BOARDS.items() if 'span' not in e
-                                                 and e['filters'] in cb.CI_VARIANTS] + ['metro_m4_express']))
+        self.assertEqual(sorted(boards), sorted(cb.CI_BOARDS + ('metro_m4_express',)))
 
     def test_core_change_runs_the_farm_board_and_names_samd21_uncovered(self):
         sel = E.select(['cores/arduino/wiring.c'], roster=['metro_m4_express'])

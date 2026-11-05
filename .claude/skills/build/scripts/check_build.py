@@ -40,6 +40,7 @@ BOARDS = {
         'fqbn': FQBN_PREFIX + v, 'family': 'samd51' if v.split(':')[0] in SAMD51_IDS else 'samd21', 'filters': v}
     for v in CI_VARIANTS
 }
+CI_BOARDS = tuple(BOARDS)
 # the rig board, named as in agentrc's board registry: Metro M4 under the Arduino USB stack (the core's default);
 # `span` is above the UF2 bootloader (variants/metro_m4/linker_scripts/gcc/flash_with_bootloader.ld) and below the
 # SAMD51J19's 512 KiB
@@ -112,7 +113,7 @@ def classify_source(path):
     """The core's own source rules (arduino_build.classify falls through to the common ones on None; a changed file
     of an example sketch is classified before this)."""
     for prefix, why in UNCOVERED.items():
-        if path == prefix or path.startswith(prefix):
+        if path.startswith(prefix):
             return 'uncovered', None, why
     if path == 'cores/arduino/startup.c':
         return 'boards', tuple(b for f in REPRESENTATIVES.values() for b in f) + CRYSTALLESS, \
@@ -127,9 +128,7 @@ def classify_source(path):
         return ('boards', tuple(boards), f'variant {variant}') if boards else \
             ('uncovered', None, f'variant {variant} is built by no boards.txt board')
     if path in ('boards.txt', 'platform.txt'):
-        return 'boards', tuple(b for b, e in BOARDS.items() if 'span' not in e and e['filters'] in CI_VARIANTS) + \
-            ('metro_m4_express',), \
-            'board and build recipes: CI\'s matrix and the rig board'
+        return 'boards', CI_BOARDS + ('metro_m4_express',), 'board and build recipes: CI\'s matrix and the rig board'
     if path in ('tools/build_all.py', 'tools/makeboards.py', '.github/workflows/githubci.yml'):
         return 'tests', 'build', 'CI\'s matrix, filters or the boards.txt generator: the contract tests check parity'
     if path == 'libraries/Adafruit_TinyUSB_Arduino':
