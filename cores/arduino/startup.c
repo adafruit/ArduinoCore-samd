@@ -150,6 +150,12 @@ void SystemInit( void )
 
   GCLK->PCHCTRL[OSCCTRL_GCLK_ID_DFLL48].reg = GCLK_PCHCTRL_CHEN |
     GCLK_PCHCTRL_GEN(GCLK_PCHCTRL_GEN_GCLK3_Val);
+  while ( (GCLK->PCHCTRL[OSCCTRL_GCLK_ID_DFLL48].reg & GCLK_PCHCTRL_CHEN) == 0 )
+    {
+      /* Wait for synchronization */
+    }
+
+  uint32_t const dfllval_open_loop = OSCCTRL->DFLLVAL.reg;
 
   OSCCTRL->DFLLCTRLA.reg = 0;
 
@@ -175,13 +181,31 @@ void SystemInit( void )
       /* Wait for synchronization */
     }
 
+  OSCCTRL->DFLLVAL.reg = OSCCTRL->DFLLVAL.reg;
+  while( OSCCTRL->DFLLSYNC.bit.DFLLVAL );
+
   OSCCTRL->DFLLCTRLB.reg = OSCCTRL_DFLLCTRLB_MODE |
                           OSCCTRL_DFLLCTRLB_WAITLOCK;
 
+  // Bounded in iterations of the CPU on OSCULP32K: without a running crystal the DFLL never fine-locks,
+  // so it then falls back to open loop at the DFLLVAL it started from
+  uint32_t timeout = 2000;
   while ( (OSCCTRL->STATUS.reg & (OSCCTRL_STATUS_DFLLRDY | OSCCTRL_STATUS_DFLLLCKC | OSCCTRL_STATUS_DFLLLCKF))
-          != (OSCCTRL_STATUS_DFLLRDY | OSCCTRL_STATUS_DFLLLCKC | OSCCTRL_STATUS_DFLLLCKF) )
+          != (OSCCTRL_STATUS_DFLLRDY | OSCCTRL_STATUS_DFLLLCKC | OSCCTRL_STATUS_DFLLLCKF) && --timeout )
     {
       /* Wait for synchronization, coarse lock, and fine lock */
+    }
+
+  if ( timeout == 0 )
+    {
+      OSCCTRL->DFLLCTRLB.reg = 0;
+      while ( OSCCTRL->DFLLSYNC.reg & OSCCTRL_DFLLSYNC_DFLLCTRLB )
+        {
+          /* Wait for synchronization */
+        }
+
+      OSCCTRL->DFLLVAL.reg = dfllval_open_loop;
+      while( OSCCTRL->DFLLSYNC.bit.DFLLVAL );
     }
 #endif
   
