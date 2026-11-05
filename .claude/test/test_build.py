@@ -163,6 +163,10 @@ class Selection(unittest.TestCase):
         self.assertEqual(sel['hil']['boards'], ['metro_m4_express'])
         self.assertEqual([u['family'] for u in sel['hil']['uncovered']], ['samd21'])
 
+    def test_the_cdc_source_and_its_tinyusb_copy_change_together(self):
+        sel = E.select(['test/hil/core_cdc/core_cdc.ino', 'test/hil/core_cdc_tinyusb/core_cdc_tinyusb.ino'])
+        self.assertEqual(sel['builds']['metro_m4_express'], ['test/hil/core_cdc', 'test/hil/core_cdc_tinyusb'])
+
     def test_hil_sketch_builds_only_on_rig_boards(self):
         sel = E.select(['test/hil/core_timing/core_timing.ino'], roster=['metro_m4_express'])
         self.assertEqual(sorted(sel['builds']), ['metro_m0_express', 'metro_m4_express'])

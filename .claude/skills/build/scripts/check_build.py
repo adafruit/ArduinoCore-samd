@@ -54,7 +54,7 @@ CRYSTALLESS = ('circuitplayground_m0', 'pyportal_m4')   # CI boards whose boards
 TINYUSB_BOARDS = ('metro_m0_tinyusb', 'metro_m4_tinyusb')
 ARDUINO_USB_BOARDS = ('metro_m0', 'metro_m4_express')
 # the sketches a HIL record carries, the first also the restoration image: it writes no flash. core_cdc_tinyusb is
-# core_cdc's source built with the TinyUSB stack (fqbn())
+# a copy of core_cdc (a contract test keeps them equal) built with the TinyUSB stack (fqbn())
 HIL_SKETCHES = {'device': ('test/hil/core_cdc', 'test/hil/core_cdc_tinyusb', 'test/hil/core_timing')}
 CONTRACT_TESTS = {'build': '.claude/test/test_build.py', 'hil': '.claude/test/test_hil.py',
                   'hil_remote': '.claude/test/test_hil_remote.py', 'agentrc_pin': '.claude/test/test_agentrc_pin.py'}

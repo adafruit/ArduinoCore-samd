@@ -102,6 +102,17 @@ def fields(words):
     return dict(w.split('=', 1) for w in words if '=' in w)
 
 
+class Rejected(Exception):
+    pass
+
+
+def passed(words, op):
+    """The fields of a `HIL_RESULT <nonce> <op> PASS ...` reply; Rejected naming the reply for any other."""
+    if words[0] != 'HIL_RESULT' or words[2:4] != [op, 'PASS']:
+        raise Rejected(f'{op}: {" ".join(words)}')
+    return fields(words)
+
+
 def chip_of(board):
     return BUILD.BOARDS[board['name']]['family'] if board.get('name') in BUILD.BOARDS else None
 
@@ -120,6 +131,8 @@ def session(dev, deadline, run_dir, nonce, check):
     log = []
     try:
         return check(Console(port, deadline, log), tty)
+    except Rejected as e:
+        return False, f'{tty}: {e}'
     finally:
         port.close()
         (Path(run_dir) / f'core-{nonce}.log').write_text('\n'.join(log) + '\n')
@@ -127,7 +140,10 @@ def session(dev, deadline, run_dir, nonce, check):
 
 def info_problem(console, nonce, stack, board):
     """'' when INFO reports the expected USB stack and the board's chip family, else why not; the INFO fields."""
-    got = fields(console.ask(f'INFO {nonce}', nonce))
+    words = console.ask(f'INFO {nonce}', nonce)
+    if words[0] != 'HIL_INFO':
+        return f'INFO answered {" ".join(words)}', {}
+    got = fields(words)
     want = {'stack': stack, 'chip': chip_of(board)}
     wrong = {k: got.get(k) for k, v in want.items() if v and got.get(k) != v}
     return (f'INFO {wrong} != {want}' if wrong else ''), got
@@ -143,7 +159,7 @@ def echo(console, nonce):
         got = console.read_exact(n)
         if got != data:
             return False, f'ECHO {n}: {len(got)} bytes back, {"equal" if got == data[:len(got)] else "differing"}'
-        f = fields(console.reply(sub))
+        f = passed(console.reply(sub), 'echo')
         if (f.get('len'), f.get('crc')) != (str(n), f'{zlib.crc32(data):08x}'):
             return False, f'ECHO {n}: result {f} (want len={n} crc={zlib.crc32(data):08x})'
         done.append(n)
@@ -163,11 +179,11 @@ def cdc_test(stack):
     return test
 
 
-def timed(console, line, nonce):
-    """(fields, host send time, host receive time) of one exchange."""
+def timed(console, line, nonce, op):
+    """(fields of its PASS reply, host send time, host receive time) of one exchange."""
     t0 = time.monotonic()
     words = console.ask(line, nonce)
-    return fields(words), t0, time.monotonic()
+    return passed(words, op), t0, time.monotonic()
 
 
 def timing_problem(dev_ms, host_lo, host_hi):
@@ -183,9 +199,9 @@ def test_timing(dev, nonce, deadline, tracker, run_dir, board):
         why, info = info_problem(console, nonce + 'i', 'arduino', board)
         if why:
             return False, f'{tty}: {why}'
-        a, a0, a1 = timed(console, f'TIME {nonce}a', nonce + 'a')
+        a, a0, a1 = timed(console, f'TIME {nonce}a', nonce + 'a', 'time')
         time.sleep(TIMING_SPAN)
-        b, b0, b1 = timed(console, f'TIME {nonce}b', nonce + 'b')
+        b, b0, b1 = timed(console, f'TIME {nonce}b', nonce + 'b', 'time')
         try:
             ms = (int(b['ms']) - int(a['ms'])) & 0xffffffff
             us = (int(b['us']) - int(a['us'])) & 0xffffffff
@@ -197,7 +213,7 @@ def test_timing(dev, nonce, deadline, tracker, run_dir, board):
             return False, f'{tty}: millis() {why}'
         if abs(us / 1000 - ms) > 2:
             return False, f'{tty}: micros() advanced {us} us while millis() advanced {ms} ms'
-        d, _, _ = timed(console, f'DELAY {nonce}d {DELAY_MS}', nonce + 'd')
+        d, _, _ = timed(console, f'DELAY {nonce}d {DELAY_MS}', nonce + 'd', 'delay')
         try:
             delay_us = int(d['us'])
         except (KeyError, ValueError):

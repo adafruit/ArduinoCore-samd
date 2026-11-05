@@ -23,8 +23,9 @@ class FakeDut:
     """core_cdc's and core_timing's protocol (test/hil/core_cdc/core_cdc.ino, test/hil/core_timing/core_timing.ino)
     over a byte stream, with a clock running `rate` times the host's."""
 
-    def __init__(self, stack='arduino', chip='samd51', rate=1.0, corrupt=False, delay_us=1000400):
+    def __init__(self, stack='arduino', chip='samd51', rate=1.0, corrupt=False, delay_us=1000400, status='PASS'):
         self.stack, self.chip, self.rate, self.corrupt, self.delay_us = stack, chip, rate, corrupt, delay_us
+        self.status = status   # what every HIL_RESULT reports
         self.out, self.pending = b'', b''
         self.echo = None   # (nonce, bytes left, bytes so far)
         self.start = time.monotonic()
@@ -55,7 +56,8 @@ class FakeDut:
                 left -= len(take)
                 self.echo = (nonce, left, seen) if left else None
                 if not left:
-                    self.out += f'\r\nHIL_RESULT {nonce} echo PASS len={len(seen)} crc={zlib.crc32(seen):08x}\r\n'.encode()
+                    self.out += (f'\r\nHIL_RESULT {nonce} echo {self.status} len={len(seen)} '
+                                 f'crc={zlib.crc32(seen):08x}\r\n').encode()
                 continue
             if b'\n' not in self.pending:
                 return
@@ -75,9 +77,9 @@ class FakeDut:
             return
         elif cmd == 'TIME':
             us = self.now_us()
-            reply = f'HIL_RESULT {nonce} time PASS ms={us // 1000} us={us}'
+            reply = f'HIL_RESULT {nonce} time {self.status} ms={us // 1000} us={us}'
         elif cmd == 'DELAY':
-            reply = f'HIL_RESULT {nonce} delay PASS ms={w[2]} us={self.delay_us}'
+            reply = f'HIL_RESULT {nonce} delay {self.status} ms={w[2]} us={self.delay_us}'
         else:
             reply = f'HIL_RESULT {nonce} ? REJECT why=unknown'
         self.out += (reply + '\r\n').encode()
@@ -136,6 +138,27 @@ class Protocol(unittest.TestCase):
         dut.command = lambda line: setattr(dut, 'out', dut.out + b'HIL_INFO other stack=arduino\r\n')
         with self.assertRaises(TimeoutError):
             self.run_test(ht.TEST_FUNCS['cdc_arduino'], dut, timeout=0.5)
+
+    def test_a_reply_other_than_pass_fails(self):
+        for fn in (ht.TEST_FUNCS['cdc_arduino'], ht.test_timing):
+            with self.subTest(fn=fn):
+                ok, detail = self.run_test(fn, FakeDut(status='REJECT'))
+                self.assertFalse(ok)
+                self.assertIn('REJECT', detail)
+
+    def test_info_answered_by_a_result_fails(self):
+        dut = FakeDut()
+        info = dut.command
+
+        def command(line):
+            if line.startswith('INFO'):
+                dut.out += f'HIL_RESULT {line.split()[1]} ? REJECT why=unknown\r\n'.encode()
+            else:
+                info(line)
+        dut.command = command
+        ok, detail = self.run_test(ht.TEST_FUNCS['cdc_arduino'], dut)
+        self.assertFalse(ok)
+        self.assertIn('INFO answered', detail)
 
     def test_timing_bracket(self):
         self.assertEqual(ht.timing_problem(1000, 995, 1005), '')

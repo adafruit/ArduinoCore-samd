@@ -2,7 +2,8 @@
 //
 // HIL sketch (.claude/skills/hil-contract/SKILL.md) and the restoration image:
 // the board's resting firmware between runs, with no flash write path.
-// test/hil/core_cdc_tinyusb builds this same file with usbstack=tinyusb. One
+// test/hil/core_cdc_tinyusb holds a copy of this file, built with
+// usbstack=tinyusb (a contract test keeps the two equal). One
 // command per line on Serial (the DUT's USB CDC), one reply line each carrying
 // the command's nonce; anything else is answered REJECT why=<reason>.
 //

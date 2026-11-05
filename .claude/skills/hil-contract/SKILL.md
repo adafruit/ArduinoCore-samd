@@ -49,8 +49,9 @@ command's nonce (a missing, stale or other reply fails the test at its deadline)
 - `cdc_arduino` (`test/hil/core_cdc/`, the Arduino USB stack; also the restoration check): `INFO` must report
   `stack=arduino` and the board's chip family; `ECHO` of 1, 63, 64, 65 and 1000 random bytes must return every byte
   as sent, then a `PASS` line with their length and crc32.
-- `cdc_tinyusb` (`test/hil/core_cdc_tinyusb/`, the same source built with `usbstack=tinyusb`): the same checks with
-  `stack=tinyusb`, through the core's TinyUSB integration and the bundled TinyUSB library.
+- `cdc_tinyusb` (`test/hil/core_cdc_tinyusb/`, a copy of `core_cdc` kept equal by a contract test, built with
+  `usbstack=tinyusb`): the same checks with `stack=tinyusb`, through the core's TinyUSB integration and the bundled
+  TinyUSB library.
 - `timing` (`test/hil/core_timing/`, Arduino stack): `millis()` read twice 3 s apart must lie within the host's
   monotonic bracket of the two exchanges widened by 1%, `micros()` must agree with `millis()` within 2 ms, and
   `delay(1000)` measured by `micros()` must take 1000 to 1002 ms, widened by 1%. A coarse functional bound, no clock
