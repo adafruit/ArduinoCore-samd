@@ -3,6 +3,17 @@ name: Build
 on: [pull_request, push]
 
 jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: 'true'
+
+    - name: Run pre-commit
+      uses: pre-commit/action@v3.0.1
+
   build:
     strategy:
       fail-fast: false
