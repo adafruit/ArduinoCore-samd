@@ -68,7 +68,7 @@ int pinPeripheral( uint32_t ulPin, EPioType ulPeripheral )
     case PIO_TIMER:
     case PIO_TIMER_ALT:
     case PIO_EXTINT:
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
     case PIO_TCC_PDEC:
     case PIO_COM:
     case PIO_SDHC:
@@ -127,4 +127,3 @@ int pinPeripheral( uint32_t ulPin, EPioType ulPeripheral )
 
   return 0l ;
 }
-
