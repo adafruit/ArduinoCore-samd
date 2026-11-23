@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""The HIL profile: the host side of the HIL sketches' serial protocol against a simulated DUT, the rosters, and the
-profile bound to agentrc's arduino_hil.py. The simulation proves the host's parsing and verdicts only; what the
+"""The HIL profile: agentrc's shared core battery under this profile against a simulated DUT, the rosters, and
+the profile bound to agentrc's arduino_hil.py. The simulation proves the host's parsing and verdicts only; what the
 firmware does is a farm run's evidence."""
 import json
 import sys
 import tempfile
-import time
 import unittest
 import zlib
 from pathlib import Path
@@ -19,16 +18,31 @@ E = ht.engine()
 BOARD = {'name': 'metro_m4_express'}
 
 
+class FakeClock:
+    """arduino_hil's `time`: the host clock moves only on sleep() and on the FakeDut's port I/O, so every exchange takes
+    the same host time whatever the machine's load."""
+
+    def __init__(self):
+        self.us = 0
+
+    def monotonic(self):
+        return self.us / 1e6
+
+    def sleep(self, seconds):
+        self.us += round(seconds * 1e6)
+
+
 class FakeDut:
     """core_cdc's and core_timing's protocol (test/hil/core_cdc/core_cdc.ino, test/hil/core_timing/core_timing.ino)
-    over a byte stream, with a clock running `rate` times the host's."""
+    over a byte stream, each write and read taking IO_US of the host's clock, with a clock running `rate` times the
+    host's."""
+    IO_US = 1000
 
-    def __init__(self, stack='arduino', chip='samd51', rate=1.0, corrupt=False, delay_us=1000400, status='PASS'):
-        self.stack, self.chip, self.rate, self.corrupt, self.delay_us = stack, chip, rate, corrupt, delay_us
+    def __init__(self, clock, stack='arduino', chip='samd51', rate=1.0, delay_us=None, status='PASS'):
+        self.clock, self.stack, self.chip, self.rate, self.delay_us = clock, stack, chip, rate, delay_us
         self.status = status   # what every HIL_RESULT reports
         self.out, self.pending = b'', b''
         self.echo = None   # (nonce, bytes left, bytes so far)
-        self.start = time.monotonic()
         self.closed = False
 
     def reset_input_buffer(self):
@@ -42,17 +56,19 @@ class FakeDut:
         return min(len(self.out), 17)   # replies arrive in fragments
 
     def read(self, n):
+        self.clock.us += self.IO_US
         chunk, self.out = self.out[:n], self.out[n:]
         return chunk
 
     def write(self, data):
+        self.clock.us += self.IO_US
         self.pending += data
         while self.pending:
             if self.echo:
                 nonce, left, seen = self.echo
                 take, self.pending = self.pending[:left], self.pending[left:]
                 seen += take
-                self.out += bytes([take[0] ^ 1]) + take[1:] if self.corrupt and take else take
+                self.out += take
                 left -= len(take)
                 self.echo = (nonce, left, seen) if left else None
                 if not left:
@@ -64,9 +80,6 @@ class FakeDut:
             line, self.pending = self.pending.split(b'\n', 1)
             self.command(line.decode())
 
-    def now_us(self):
-        return int((time.monotonic() - self.start) * 1e6 * self.rate)
-
     def command(self, line):
         w = line.split()
         cmd, nonce = w[0], w[1]
@@ -76,93 +89,89 @@ class FakeDut:
             self.echo = (nonce, int(w[2]), b'')
             return
         elif cmd == 'TIME':
-            us = self.now_us()
+            us = int(self.clock.us * self.rate)
             reply = f'HIL_RESULT {nonce} time {self.status} ms={us // 1000} us={us}'
-        elif cmd == 'DELAY':
-            reply = f'HIL_RESULT {nonce} delay {self.status} ms={w[2]} us={self.delay_us}'
-        else:
-            reply = f'HIL_RESULT {nonce} ? REJECT why=unknown'
+        else:   # DELAY
+            us = int(w[2]) * 1000 + 400 if self.delay_us is None else self.delay_us
+            reply = f'HIL_RESULT {nonce} delay {self.status} ms={w[2]} us={us}'
         self.out += (reply + '\r\n').encode()
 
 
-class Protocol(unittest.TestCase):
+class Battery(unittest.TestCase):
+    """CORE_TESTS run agentrc's shared core battery with this profile's stacks, chips and constants."""
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        span = mock.patch.object(ht, 'TIMING_SPAN', 0.2)
-        span.start()
-        self.addCleanup(span.stop)
+        self.clock = FakeClock()
+        for patch in (mock.patch.object(E, 'time', self.clock),
+                      mock.patch.object(E, 'node', return_value='/dev/ttyACM0')):
+            patch.start()
+            self.addCleanup(patch.stop)
 
-    def run_test(self, fn, dut, timeout=5):
-        with mock.patch.object(ht, 'open_console', return_value=('/dev/ttyACM0', dut)):
-            result = fn({'dir': '/x'}, 'abcd1234', time.monotonic() + timeout, None, self.tmp.name, BOARD)
+    def dut(self, **kw):
+        return FakeDut(self.clock, **kw)
+
+    def run_test(self, test, dut, timeout=5):
+        with mock.patch('serial.Serial', return_value=dut):
+            result = E.test_func(test)({'dir': '/x'}, 'abcd1234', self.clock.monotonic() + timeout, None,
+                                       self.tmp.name, BOARD)
         self.assertTrue(dut.closed)
         self.assertTrue((Path(self.tmp.name) / 'core-abcd1234.log').is_file())
         return result
 
-    def test_cdc_passes_on_its_stack(self):
+    def test_cdc_passes_on_its_stack_only(self):
         for stack in ('arduino', 'tinyusb'):
             with self.subTest(stack=stack):
-                ok, detail = self.run_test(ht.TEST_FUNCS[f'cdc_{stack}'], FakeDut(stack=stack))
+                ok, detail = self.run_test(f'cdc_{stack}', self.dut(stack=stack))
                 self.assertTrue(ok, detail)
                 self.assertIn(f'echoed {list(ht.ECHO_LENGTHS)} bytes', detail)
-
-    def test_cdc_fails_on_the_other_stack_or_chip(self):
-        ok, detail = self.run_test(ht.TEST_FUNCS['cdc_tinyusb'], FakeDut(stack='arduino'))
+        ok, detail = self.run_test('cdc_tinyusb', self.dut(stack='arduino'))
         self.assertFalse(ok)
         self.assertIn("'stack': 'arduino'", detail)
-        ok, detail = self.run_test(ht.TEST_FUNCS['cdc_arduino'], FakeDut(chip='samd21'))
+
+    def test_the_chip_is_the_boards_family(self):
+        self.assertEqual(E.core_chip(BOARD), 'samd51')
+        ok, _ = self.run_test('cdc_arduino', self.dut(chip='samd21'))
         self.assertFalse(ok)
 
-    def test_cdc_fails_on_corrupted_echo(self):
-        ok, detail = self.run_test(ht.TEST_FUNCS['cdc_arduino'], FakeDut(corrupt=True))
-        self.assertFalse(ok)
-        self.assertIn('differing', detail)
-
-    def test_timing_passes_at_the_hosts_rate(self):
-        ok, detail = self.run_test(ht.test_timing, FakeDut())
+    def test_timing_passes_at_the_hosts_rate_naming_crystalless(self):
+        ok, detail = self.run_test('timing', self.dut())
         self.assertTrue(ok, detail)
-
-    def test_timing_fails_on_a_clock_off_by_more_than_the_bound(self):
-        ok, detail = self.run_test(ht.test_timing, FakeDut(rate=1.05))
+        self.assertIn('f_cpu=120000000 crystalless=0: millis', detail)
+        ok, detail = self.run_test('timing', self.dut(rate=1.05))
         self.assertFalse(ok)
         self.assertIn('millis()', detail)
 
     def test_timing_fails_on_a_short_delay(self):
-        ok, detail = self.run_test(ht.test_timing, FakeDut(delay_us=900000))
+        ok, detail = self.run_test('timing', self.dut(delay_us=900000))
         self.assertFalse(ok)
-        self.assertIn('delay(1000)', detail)
+        self.assertIn('delay(1000) 900.0 ms outside the host bracket', detail)
+
+    def test_a_non_pass_time_reply_fails_naming_it(self):
+        ok, detail = self.run_test('timing', self.dut(status='REJECT'))
+        self.assertFalse(ok)
+        self.assertIn('time: HIL_RESULT abcd1234a time REJECT', detail)
 
     def test_a_reply_with_another_nonce_times_out(self):
-        dut = FakeDut()
-        dut.command = lambda line: setattr(dut, 'out', dut.out + b'HIL_INFO other stack=arduino\r\n')
-        with self.assertRaises(TimeoutError):
-            self.run_test(ht.TEST_FUNCS['cdc_arduino'], dut, timeout=0.5)
-
-    def test_a_reply_other_than_pass_fails(self):
-        for fn in (ht.TEST_FUNCS['cdc_arduino'], ht.test_timing):
-            with self.subTest(fn=fn):
-                ok, detail = self.run_test(fn, FakeDut(status='REJECT'))
-                self.assertFalse(ok)
-                self.assertIn('REJECT', detail)
+        dut = self.dut()
+        dut.command = lambda line: setattr(dut, 'out', dut.out + b'HIL_INFO other stack=arduino chip=samd51\r\n')
+        with self.assertRaisesRegex(TimeoutError, 'no reply for nonce abcd1234i'):
+            self.run_test('cdc_arduino', dut, timeout=0.5)
 
     def test_info_answered_by_a_result_fails(self):
-        dut = FakeDut()
-        info = dut.command
-
-        def command(line):
-            if line.startswith('INFO'):
-                dut.out += f'HIL_RESULT {line.split()[1]} ? REJECT why=unknown\r\n'.encode()
-            else:
-                info(line)
-        dut.command = command
-        ok, detail = self.run_test(ht.TEST_FUNCS['cdc_arduino'], dut)
+        dut = self.dut()
+        reply = 'HIL_RESULT {} info PASS stack=arduino chip=samd51\r\n'
+        dut.command = lambda line: setattr(dut, 'out', dut.out + reply.format(line.split()[1]).encode())
+        ok, detail = self.run_test('cdc_arduino', dut)
         self.assertFalse(ok)
-        self.assertIn('INFO answered', detail)
+        self.assertIn('INFO answered HIL_RESULT abcd1234i info PASS', detail)
 
     def test_timing_bracket(self):
-        self.assertEqual(ht.timing_problem(1000, 995, 1005), '')
-        self.assertIn('outside', ht.timing_problem(1100, 995, 1005))
+        self.assertEqual(E.core_timing_problem(1000, 995, 1005), '')
+        for dev_ms in (980, 1020):   # beyond the bracket widened by TIMING_TOLERANCE and a millis() tick
+            with self.subTest(dev_ms=dev_ms):
+                self.assertIn(f'{dev_ms:.1f} ms outside the host bracket', E.core_timing_problem(dev_ms, 995, 1005))
 
 
 class Rosters(unittest.TestCase):
@@ -180,7 +189,7 @@ class Rosters(unittest.TestCase):
 
 class Profile(unittest.TestCase):
     def test_tests_and_sketches_agree(self):
-        sketches = {Path(s).name for s in ht.BUILD.HIL_SKETCHES['device']}
+        sketches = {Path(s).name for s in E.B.hil_sketches('metro_m4_express')}
         self.assertEqual(set(ht.TESTS.values()), sketches)   # the engine's bind() checks the restore and the roles
 
     def test_engine_is_bound_to_this_profile(self):
