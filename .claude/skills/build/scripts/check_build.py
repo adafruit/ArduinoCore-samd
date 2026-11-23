@@ -54,9 +54,9 @@ REPRESENTATIVES = {'samd21': ['metro_m0', 'metro_m0_tinyusb'], 'samd51': ['metro
 CRYSTALLESS = ('circuitplayground_m0', 'pyportal_m4')   # CI boards whose boards.txt flags define CRYSTALLESS
 TINYUSB_BOARDS = ('metro_m0_tinyusb', 'metro_m4_tinyusb')
 ARDUINO_USB_BOARDS = ('metro_m0', 'metro_m4_express')
-# the sketches a HIL record carries, the first also the restoration image: it writes no flash. core_cdc_tinyusb is
-# a copy of core_cdc (a contract test keeps them equal) built with the TinyUSB stack (fqbn())
-HIL_SKETCHES = {'device': ('test/hil/core_cdc', 'test/hil/core_cdc_tinyusb', 'test/hil/core_timing')}
+# the sketches a HIL record carries, the first also the restoration image: it writes no flash
+HIL_SKETCHES = {'device': ('test/hil/core_cdc', {'core_cdc_tinyusb': ('test/hil/core_cdc', 'usbstack=tinyusb')},
+                           'test/hil/core_timing')}
 CONTRACT_TESTS = {'build': '.claude/test/test_build.py', 'hil': '.claude/test/test_hil.py',
                   'hil_remote': '.claude/test/test_hil_remote.py', 'agentrc_pin': '.claude/test/test_agentrc_pin.py'}
 SMOKE_BOARDS = ('metro_m4_express',)
@@ -148,12 +148,6 @@ def exclude(board, example):
     tinyusb = 'usbstack=tinyusb' in BOARDS[board].get('filters', board)
     return (not tinyusb and example.startswith('libraries/Adafruit_TinyUSB_Arduino/')) or \
         (tinyusb and example.startswith('libraries/USBHost/'))
-
-
-def fqbn(board, example):
-    """The board's FQBN; core_cdc_tinyusb takes the TinyUSB stack instead."""
-    base = BOARDS[board]['fqbn']
-    return base.replace('usbstack=arduino', 'usbstack=tinyusb') if example == 'test/hil/core_cdc_tinyusb' else base
 
 
 def vid_pid(build_dir, board=None, roster_entry=None):

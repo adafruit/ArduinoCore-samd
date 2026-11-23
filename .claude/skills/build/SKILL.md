@@ -69,7 +69,7 @@ pass with no build or test run is "nothing to build": say so in `notes`. Exit 3 
   contract tests pin the ones no CI variant builds (`unbuildable_examples()`).
 - **A HIL record** (`--board B --shared --record FILE --hil-config ROSTER`, by convention
   `build/hil/<board>.build.json`) is the HIL contract's build receipt. It carries `core_cdc` (Arduino stack, the
-  restoration image), `core_cdc_tinyusb` (the same source under the TinyUSB stack, its own FQBN) and `core_timing`;
+  restoration image), `core_cdc_tinyusb` (a named build of `core_cdc` with `usbstack=tinyusb`) and `core_timing`;
   each sketch's VID:PID is the `-DUSB_VID`/`-DUSB_PID` `platform.txt` passes to every compile.
 - **Private dirs for parallel agents.** Each build uses `build/agent-<pid>/<board>/<sketch path>`, removed when it
   passes; `--shared` builds into `build/hil/<board>/<sketch>` under `build/hil/.lock` and keeps it for flashing.

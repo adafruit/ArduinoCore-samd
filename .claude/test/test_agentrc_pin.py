@@ -44,7 +44,7 @@ def fake_agentrc(repo, hil_load=''):
     for e in agentrc_pin.ENGINES:
         (repo / e).parent.mkdir(parents=True, exist_ok=True)
         (repo / e).write_text(f'FILES = ({HIL_LOAD!r},)\nPROFILE_API = {agentrc_pin.PROFILE_API}\n'
-                              f'PROFILE_FEATURES = ({agentrc_pin.FEATURE!r},)\n')
+                              f'PROFILE_FEATURES = {agentrc_pin.FEATURES!r}\n')
     (repo / HIL_LOAD).parent.mkdir(parents=True, exist_ok=True)
     (repo / HIL_LOAD).write_text(hil_load)
     (repo / 'README.md').write_text('not in the closure\n')
@@ -182,11 +182,15 @@ class Installed(Env):
                 self.assertRaisesRegex(agentrc_pin.PinError, 'implements profile API'):
             agentrc_pin.load(agentrc_pin.ENGINES[0])
 
-    def test_engines_without_core_mode_are_refused_before_loading(self):
-        (self.repo / agentrc_pin.ENGINES[0]).write_text(f'FILES = ({HIL_LOAD!r},)\nPROFILE_API = 1\n')
-        with mock.patch.object(agentrc_pin, 'loader', side_effect=AssertionError('loaded')), \
-                self.assertRaisesRegex(agentrc_pin.PinError, 'has no core mode'):
-            agentrc_pin.load(agentrc_pin.ENGINES[0])
+    def test_engines_lacking_a_feature_are_refused_before_loading(self):
+        for feature in agentrc_pin.FEATURES:
+            others = tuple(f for f in agentrc_pin.FEATURES if f != feature)
+            (self.repo / agentrc_pin.ENGINES[0]).write_text(f'FILES = ({HIL_LOAD!r},)\nPROFILE_API = 1\n'
+                                                            f'PROFILE_FEATURES = {others!r}\n')
+            with self.subTest(feature=feature), \
+                    mock.patch.object(agentrc_pin, 'loader', side_effect=AssertionError('loaded')), \
+                    self.assertRaisesRegex(agentrc_pin.PinError, rf"lacks profile features \['{feature}'\]"):
+                agentrc_pin.load(agentrc_pin.ENGINES[0])
 
     def test_check_and_test_never_fetch(self):
         with mock.patch.object(agentrc_pin, 'fetch', side_effect=AssertionError('fetched')):

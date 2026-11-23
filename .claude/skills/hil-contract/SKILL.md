@@ -10,11 +10,13 @@ skill (`arduino_hil.py`, `arduino_remote.py`), shared with Adafruit TinyUSB Ardu
 contracts have the same commands, budgets, session rules and recovery; this page names what is this core's. Manual
 runs only: no CI job runs this battery. Scripts, all in `scripts/`, each with its usage in its docstring:
 
-- `hil_test.py`: the harness on the host with the boards (this core's profile and tests).
+- `hil_test.py`: the harness on the host with the boards (this core's profile; its tests are the `arduino` skill's
+  shared core battery).
 - `hil_remote.py`: drives the harness on ci.lan from the dev PC that built the firmware.
 - `agentrc_pin.py`: which agentrc both load their shared scripts from: the installed one
   (`${AGENTRC_DIR:-$HOME/.claude}`) on a dev PC, never fetched; in CI the commit `test/hil/agentrc.json` pins; on the
-  rig, the copy `hil_remote.py` staged. It refuses an agentrc without core mode.
+  rig, the copy `hil_remote.py` staged. It refuses an agentrc without core mode, named builds or the shared core
+  battery.
 
 ```bash
 H=.claude/skills/hil-contract/scripts
@@ -49,13 +51,13 @@ command's nonce (a missing, stale or other reply fails the test at its deadline)
 - `cdc_arduino` (`test/hil/core_cdc/`, the Arduino USB stack; also the restoration check): `INFO` must report
   `stack=arduino` and the board's chip family; `ECHO` of 1, 63, 64, 65 and 1000 random bytes must return every byte
   as sent, then a `PASS` line with their length and crc32.
-- `cdc_tinyusb` (`test/hil/core_cdc_tinyusb/`, a copy of `core_cdc` kept equal by a contract test, built with
+- `cdc_tinyusb` (`core_cdc_tinyusb`, the build contract's named build of `test/hil/core_cdc/` with
   `usbstack=tinyusb`): the same checks with `stack=tinyusb`, through the core's TinyUSB integration and the bundled
   TinyUSB library.
 - `timing` (`test/hil/core_timing/`, Arduino stack): `millis()` read twice 3 s apart must lie within the host's
-  monotonic bracket of the two exchanges widened by 1%, `micros()` must agree with `millis()` within 2 ms, and
-  `delay(1000)` measured by `micros()` must take 1000 to 1002 ms, widened by 1%. A coarse functional bound, no clock
-  accuracy claim; `INFO` reports `f_cpu` and `crystalless` for the record.
+  monotonic bracket of the two exchanges widened by 1% and 1 ms (one `millis()` tick), `micros()` must agree with
+  `millis()` within 2 ms, and `delay(1000)` measured by `micros()` must take 1000 to 1002 ms, widened the same way. A
+  coarse functional bound, no clock accuracy claim; `INFO` reports `f_cpu` and `crystalless` for the record.
 
 `-b` narrows the boards. The PR-scoped selector is the build contract's:
 

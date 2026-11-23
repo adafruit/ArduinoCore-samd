@@ -68,13 +68,12 @@ class Tables(unittest.TestCase):
             self.assertIn(cb.BOARDS[b]['filters'], cb.CI_VARIANTS)
 
     def test_hil_sketches_exist_and_tinyusb_is_core_cdc_rebuilt(self):
-        for sketch in cb.HIL_SKETCHES['device']:
+        for sketch in set(map(E.source_of, E.hil_sketches('metro_m4_express'))):
             self.assertTrue((ROOT / sketch / f'{Path(sketch).name}.ino').is_file(), sketch)
-        self.assertEqual((ROOT / 'test/hil/core_cdc_tinyusb/core_cdc_tinyusb.ino').read_bytes(),
-                         (ROOT / 'test/hil/core_cdc/core_cdc.ino').read_bytes())
-        self.assertEqual(cb.fqbn('metro_m4_express', 'test/hil/core_cdc_tinyusb'),
+        self.assertEqual(E.source_of('core_cdc_tinyusb'), 'test/hil/core_cdc')
+        self.assertEqual(E.fqbn('metro_m4_express', 'core_cdc_tinyusb'),
                          'adafruit:samd:adafruit_metro_m4:speed=120,usbstack=tinyusb')
-        self.assertEqual(cb.fqbn('metro_m4_express', 'test/hil/core_cdc'), cb.BOARDS['metro_m4_express']['fqbn'])
+        self.assertEqual(E.fqbn('metro_m4_express', 'test/hil/core_cdc'), cb.BOARDS['metro_m4_express']['fqbn'])
 
     def test_unbuildable_examples_are_pinned(self):
         # the sketches tools/build_all.py skips on every CI variant (their .test.only/.test.skip markers): no build
@@ -153,10 +152,6 @@ class Selection(unittest.TestCase):
         self.assertEqual(sorted(sel['builds']), sorted(b for f in cb.REPRESENTATIVES.values() for b in f))
         self.assertEqual(sel['hil']['boards'], ['metro_m4_express'])
         self.assertEqual([u['family'] for u in sel['hil']['uncovered']], ['samd21'])
-
-    def test_the_cdc_source_and_its_tinyusb_copy_change_together(self):
-        sel = E.select(['test/hil/core_cdc/core_cdc.ino', 'test/hil/core_cdc_tinyusb/core_cdc_tinyusb.ino'])
-        self.assertEqual(sel['builds']['metro_m4_express'], ['test/hil/core_cdc', 'test/hil/core_cdc_tinyusb'])
 
     def test_hil_sketch_builds_only_on_rig_boards(self):
         sel = E.select(['test/hil/core_timing/core_timing.ino'], roster=['metro_m4_express'])
