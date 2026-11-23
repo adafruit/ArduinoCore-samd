@@ -15,8 +15,9 @@ runs only: no CI job runs this battery. Scripts, all in `scripts/`, each with it
 - `hil_remote.py`: drives the harness on ci.lan from the dev PC that built the firmware.
 - `agentrc_pin.py`: which agentrc both load their shared scripts from: the installed one
   (`${AGENTRC_DIR:-$HOME/.claude}`) on a dev PC, never fetched; in CI the commit `test/hil/agentrc.json` pins; on the
-  rig, the copy `hil_remote.py` staged. It refuses an agentrc without core mode, named builds or the shared core
-  battery.
+  rig, the copy `hil_remote.py` staged. A verbatim copy of the `arduino` skill's `agentrc_pin.py`, configured by
+  `test/hil/agentrc.json`, whose `features` make it refuse an agentrc without core mode, named builds or the shared
+  core battery.
 
 ```bash
 H=.claude/skills/hil-contract/scripts
