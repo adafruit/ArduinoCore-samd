@@ -119,7 +119,7 @@ const PinDescription g_APinDescription[] =
         // ESP GPIO0, BUSY, RESET (52-54)
         {PORTA, 31, PIO_DIGITAL, PIN_ATTR_NONE, No_ADC_Channel, NOT_ON_PWM, NOT_ON_TIMER, EXTERNAL_INT_NONE}, // D52 ESP32_GPIO0
         {PORTA, 0, PIO_DIGITAL, PIN_ATTR_PWM_E, No_ADC_Channel, TC2_CH0, TC2_CH0, EXTERNAL_INT_0},            // D53 ESP32_BUSY
-        {PORTB, 12, PIO_DIGITAL, PIN_ATTR_PWM_F, No_ADC_Channel, TCC3_CH0, TC4_CH0, EXTERNAL_INT_12},         // D54 ESP32_RESET 
+        {PORTB, 12, PIO_DIGITAL, PIN_ATTR_PWM_F, No_ADC_Channel, TCC3_CH0, TC4_CH0, EXTERNAL_INT_12},         // D54 ESP32_RESET
 
 };
 
@@ -133,22 +133,3 @@ SERCOM sercom2( SERCOM2 ) ;
 SERCOM sercom3( SERCOM3 ) ;
 SERCOM sercom4( SERCOM4 ) ;
 SERCOM sercom5( SERCOM5 ) ;
-
-Uart Serial1( &sercom5, PIN_SERIAL1_RX, PIN_SERIAL1_TX, PAD_SERIAL1_RX, PAD_SERIAL1_TX ) ;
-
-void SERCOM5_0_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM5_1_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM5_2_Handler()
-{
-  Serial1.IrqHandler();
-}
-void SERCOM5_3_Handler()
-{
-  Serial1.IrqHandler();
-}
