@@ -36,8 +36,9 @@ ci.lan has no arduino-cli and no checkout of this core: firmware is built on the
 each requested board not-run naming the missing file.
 
 A roster entry is the `arduino` skill's (`name`, the board's name in agentrc's board registry and its lock; `uid`, the
-DUT's USB serial; `usb_port`; `probe`, its debug probe's serial, whose registry entry supplies the flasher, or a dev
-PC's unregistered board's own `flasher`; `debug`) plus `arduino.tests`: `["cdc_arduino", "cdc_tinyusb", "timing"]`.
+DUT's USB serial; `usb_port`; `probe`, its debug probe's serial, whose registry entry supplies the flasher and any
+`debug` route, or a dev PC's unregistered board's own `flasher` and `debug`) plus `arduino.tests`:
+`["cdc_arduino", "cdc_tinyusb", "timing"]`.
 A board's name must be a rig board of the build profile (`metro_m4_express`, `metro_m0_express`).
 
 ci.lan's `metro_m4_express` is also on tinyusb's roster, tinyuf2's, Adafruit TinyUSB Arduino's and Adafruit
