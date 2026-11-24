@@ -25,7 +25,7 @@ def ci_matrix():
 class Tables(unittest.TestCase):
     def test_ci_matrix_is_the_table(self):
         self.assertEqual(sorted(ci_matrix()), sorted(cb.CI_VARIANTS))
-        self.assertEqual(cb.agentrc_pin.literal(ROOT, 'tools/build_all.py', 'FQBN_PREFIX'), cb.FQBN_PREFIX)
+        self.assertEqual(cb.agentrc_pin.literals(ROOT, 'tools/build_all.py', 'FQBN_PREFIX')['FQBN_PREFIX'], cb.FQBN_PREFIX)
         for v in cb.CI_VARIANTS:
             entries = [b for b in cb.BOARDS.values() if b['filters'] == v and 'span' not in b]
             self.assertEqual([b['fqbn'] for b in entries], [cb.FQBN_PREFIX + v], v)
