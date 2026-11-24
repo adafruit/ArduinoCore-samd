@@ -2,6 +2,7 @@
 """The build contract's profile: the board table against CI's matrix and boards.txt, sketch eligibility against
 tools/build_all.py, source classification and selection through agentrc's arduino_build.py in core mode, and the
 VID:PID adapter. arduino-cli is not run; a real build is evidence only from a run of the script itself."""
+import ast
 import json
 import re
 import subprocess
@@ -17,6 +18,13 @@ import check_build as cb  # noqa: E402
 E = cb.engine()
 
 
+def build_all_literal(name):
+    """A module-level literal of tools/build_all.py, read without running it."""
+    tree = ast.parse((ROOT / 'tools/build_all.py').read_text())
+    return next(ast.literal_eval(n.value) for n in tree.body
+                if isinstance(n, ast.Assign) and any(getattr(t, 'id', None) == name for t in n.targets))
+
+
 def ci_matrix():
     text = (ROOT / '.github/workflows/githubci.yml').read_text()
     return re.findall(r"^\s+- '([^']+)'", text.split('board:')[1].split('runs-on')[0], re.M)
@@ -25,7 +33,7 @@ def ci_matrix():
 class Tables(unittest.TestCase):
     def test_ci_matrix_is_the_table(self):
         self.assertEqual(sorted(ci_matrix()), sorted(cb.CI_VARIANTS))
-        self.assertEqual(cb.agentrc_pin.literals(ROOT, 'tools/build_all.py', 'FQBN_PREFIX')['FQBN_PREFIX'], cb.FQBN_PREFIX)
+        self.assertEqual(build_all_literal('FQBN_PREFIX'), cb.FQBN_PREFIX)
         for v in cb.CI_VARIANTS:
             entries = [b for b in cb.BOARDS.values() if b['filters'] == v and 'span' not in b]
             self.assertEqual([b['fqbn'] for b in entries], [cb.FQBN_PREFIX + v], v)
