@@ -39,13 +39,13 @@ typedef enum _EAnalogChannel
   ADC_Channel5=5,
   ADC_Channel6=6,
   ADC_Channel7=7,
-#if defined __SAMD21J18A__ || defined(__SAMD51__)
+#if defined __SAMD21J18A__ || defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   ADC_Channel8=8,
   ADC_Channel9=9,
 #endif // __SAMD21J18A__
   ADC_Channel10=10,
   ADC_Channel11=11,
-#if defined __SAMD21J18A__ || defined(__SAMD51__)
+#if defined __SAMD21J18A__ || defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   ADC_Channel12=12,
   ADC_Channel13=13,
   ADC_Channel14=14,
@@ -61,7 +61,14 @@ typedef enum _EAnalogChannel
   ADC_Channel_PTAT=0x1C,
 } EAnalogChannel ;
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
+
+#ifndef TC_INST_NUM
+  #define TC_INST_NUM 8
+#endif
+#ifndef TCC_INST_NUM
+  #define TCC_INST_NUM 5
+#endif
 
 #if defined(__SAMD51G19A__) || defined(__SAME51G19A__)
 
@@ -307,7 +314,7 @@ typedef enum _EPioType
   PIO_SERCOM_ALT,       /* The pin is controlled by the associated signal of peripheral D. */
   PIO_TIMER,            /* The pin is controlled by the associated signal of peripheral E. */
   PIO_TIMER_ALT,        /* The pin is controlled by the associated signal of peripheral F. */
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
   PIO_TCC_PDEC,			/* The pin is controlled by the associated signal of peripheral G. */
   PIO_COM,             /* The pin is controlled by the associated signal of peripheral H. */
   PIO_SDHC,             /* The pin is controlled by the associated signal of peripheral I. */
@@ -341,7 +348,7 @@ typedef enum _EPioType
 #define PIN_ATTR_EXTINT        (1UL<<6)
 #define PIN_ATTR_ANALOG_ALT	   (1UL<<7)
 
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 // these correspond to the mux table
 #define PIN_ATTR_PWM_E         (1UL<<3)
 #define PIN_ATTR_PWM_F         (1UL<<8)

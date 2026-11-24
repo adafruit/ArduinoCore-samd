@@ -61,7 +61,7 @@ unsigned long micros( void )
   // a runtime multiplication and shift, saving a few cycles
 }
 
-#ifdef __SAMD51__
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 /*
  * On SAMD51, use the (32bit) cycle count maintained by the DWT unit,
  * and count exact number of cycles elapsed, rather than guessing how

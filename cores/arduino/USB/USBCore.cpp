@@ -246,7 +246,7 @@ bool USBDeviceClass::sendDescriptor(USBSetup &setup)
 		}
 		else if (setup.wValueL == ISERIAL) {
 #ifdef PLUGGABLE_USB_ENABLED
-#ifdef __SAMD51__
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 			#define SERIAL_NUMBER_WORD_0	*(volatile uint32_t*)(0x008061FC)
 			#define SERIAL_NUMBER_WORD_1	*(volatile uint32_t*)(0x00806010)
 			#define SERIAL_NUMBER_WORD_2	*(volatile uint32_t*)(0x00806014)
@@ -333,7 +333,7 @@ void USBDeviceClass::init()
 #endif
 
 	/* Enable USB clock */
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	MCLK->APBBMASK.reg |= MCLK_APBBMASK_USB;
 	MCLK->AHBMASK.reg |= MCLK_AHBMASK_USB;
 	
@@ -377,7 +377,7 @@ void USBDeviceClass::init()
 	usbd.setFullSpeed();
 
 	// Configure interrupts
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 	/* Attach to the USB host */
 	NVIC_SetPriority(USB_0_IRQn, 0UL);
 	NVIC_SetPriority(USB_1_IRQn, 0UL);

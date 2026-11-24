@@ -1,0 +1,17 @@
+{
+  "name": "framework-arduino-samd-adafruit",
+  "version": "1.7.16+simio-same5x",
+  "description": "Arduino Wiring-based framework for Microchip SAM D and SAME microcontrollers.",
+  "keywords": [
+    "framework",
+    "arduino",
+    "microchip",
+    "samd",
+    "same"
+  ],
+  "license": "LGPL-2.1-or-later",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adafruit/ArduinoCore-samd"
+  }
+}

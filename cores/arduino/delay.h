@@ -61,7 +61,7 @@ extern void delay( unsigned long dwMs ) ;
  *
  * \param dwUs the number of microseconds to pause (uint32_t)
  */
-#if defined(__SAMD51__)
+#if defined(__SAMD51__) || defined(__SAME51__) || defined(__SAME53__) || defined(__SAME54__)
 extern void delayMicroseconds( unsigned int );
 #else
 static __inline__ void delayMicroseconds( unsigned int ) __attribute__((always_inline, unused)) ;
