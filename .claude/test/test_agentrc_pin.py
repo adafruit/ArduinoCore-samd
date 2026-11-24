@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """agentrc_pin.py in this core: its test/hil/agentrc.json configuration and the agentrc this checkout really selects.
-The bootstrap's common behaviour is tested in agentrc (tests/test_arduino_pin.py); the staged round trip, contract
-files and load() targets are `agentrc_pin.py test`'s conformance check (pin_conformance.py)."""
+The bootstrap's common behaviour is tested in agentrc (tests/test_arduino_pin.py); `agentrc_pin.py test` compares this
+copy with the canonical one and checks the staged round trip, contract files and load() targets (pin_conformance.py)."""
 import sys
 import unittest
 from pathlib import Path
@@ -12,8 +12,6 @@ import agentrc_pin  # noqa: E402
 import hil_test  # noqa: E402
 
 hil_test.engine()   # the selected agentrc: a missing one fails here, naming the remedy
-
-CONSUMER = '.claude/skills/hil-contract/scripts/agentrc_pin.py'
 
 
 class Configuration(unittest.TestCase):
@@ -31,10 +29,6 @@ class Configuration(unittest.TestCase):
 
 class Selected(unittest.TestCase):
     """The agentrc this checkout really selects: the installed one on a dev PC, the pin in CI."""
-
-    def test_the_copy_is_the_selected_canonical(self):
-        canonical = Path(agentrc_pin.identity()['root']) / 'skills/arduino/scripts/agentrc_pin.py'
-        self.assertEqual((ROOT / CONSUMER).read_bytes(), canonical.read_bytes(), canonical)
 
     def test_hil_test_binds_the_selected_identity(self):
         ident = agentrc_pin.identity()
